@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { ageClassForYear } from "@/domain/age";
 import { savePersonAction } from "@/app/actions/household";
-import { KID_SUBGROUPS, MODEL_LABEL, MODEL_TYPES } from "@/domain/lamal";
+import { KID_SUBGROUPS } from "@/domain/lamal";
 import { Alert } from "@/ui/alert";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
 import { SubmitButton } from "@/ui/submit";
@@ -15,11 +15,9 @@ export interface PersonDefaults {
   birthDate: string;
   kidSubgroup: string;
   employedAccidentCover: boolean;
-  healthCostsRp: number;
-  allowedModels: string[];
-  excludedInsurerIds: number[];
-  doctorName: string | null;
 }
+
+const KID_RANK: Record<string, string> = { K1: "Tarif normal", K3: "Rabais 3e enfant", K4: "Rabais 4e enfant", K5: "Rabais dès le 5e enfant" };
 
 function isMinorAround(birthDate: string, year: number): boolean {
   try {
@@ -31,15 +29,13 @@ function isMinorAround(birthDate: string, year: number): boolean {
 }
 
 /**
- * `compact` : seulement l'identité (accueil) ; les préférences du comparateur se règlent au
- * questionnaire des besoins du rituel. `stay` : rester sur la page après un ajout.
+ * Identité d'une personne. Les préférences du comparateur (frais, modèles, médecin) se règlent
+ * au questionnaire des besoins du rituel, pas ici. `stay` : rester sur la page après un ajout.
  */
-export function PersonForm({ person, insurers, year, onDone, compact, stay, next, submitLabel }: {
+export function PersonForm({ person, year, onDone, stay, next, submitLabel }: {
   person: PersonDefaults | null;
-  insurers: { id: number; name: string }[];
   year: number;
   onDone?: () => void;
-  compact?: boolean;
   stay?: boolean;
   /** Page où aller après l'enregistrement (accueil guidé). */
   next?: string;
@@ -65,54 +61,24 @@ export function PersonForm({ person, insurers, year, onDone, compact, stay, next
           <Input id="lastName" name="lastName" required defaultValue={person?.lastName} autoComplete="family-name" />
         </Field>
       </div>
-      <Field label="Date de naissance" htmlFor="birthDate" error={fe.birthDate} hint="Détermine la catégorie (enfant, jeune adulte, adulte) pour chaque année.">
+      <Field label="Date de naissance" htmlFor="birthDate" error={fe.birthDate}>
         <Input id="birthDate" name="birthDate" type="date" required value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
       </Field>
-      {!compact && (
-      <Field label="Frais de santé attendus par an (CHF)" htmlFor="healthCosts" hint="Factures médicales estimées. Sert à classer les offres selon le coût total (prime + franchise + quote-part).">
-        <Input id="healthCosts" name="healthCosts" inputMode="decimal" defaultValue={((person?.healthCostsRp ?? 50000) / 100).toFixed(0)} />
-      </Field>
-      )}
       {minor ? (
-        <Field label="Échelon enfant" htmlFor="kidSubgroup" hint="K1 = tarif normal. Certaines caisses accordent un rabais dès le 2e ou 3e enfant (K3, K4, K5) : voir la police.">
+        <Field label="Rang de l'enfant" htmlFor="kidSubgroup" hint="Certaines caisses font un rabais dès le 2e ou 3e enfant : voir la police.">
           <Select id="kidSubgroup" name="kidSubgroup" defaultValue={person?.kidSubgroup ?? "K1"}>
             {KID_SUBGROUPS.map((k) => (
-              <option key={k}>{k}</option>
+              <option key={k} value={k}>
+                {KID_RANK[k]}
+              </option>
             ))}
           </Select>
         </Field>
       ) : (
         <input type="hidden" name="kidSubgroup" value={person?.kidSubgroup ?? "K1"} />
       )}
-      {!minor && (
-        <Checkbox name="employedAccidentCover" defaultChecked={person?.employedAccidentCover} label="Employé·e au moins 8 h/semaine (accidents couverts par l'employeur : la LAMal peut exclure l'accident)" />
-      )}
-
-      {!compact && (
-      <>
-      <fieldset className="space-y-1">
-        <legend className="mb-1 text-sm font-medium">Modèles acceptés pour le comparateur</legend>
-        <p className="mb-2 text-sm text-muted">Aucun coché = tous les modèles.</p>
-        <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
-          {MODEL_TYPES.map((m) => (
-            <Checkbox key={m} name="allowedModels" value={m} defaultChecked={person?.allowedModels.includes(m)} label={MODEL_LABEL[m]} />
-          ))}
-        </div>
-      </fieldset>
-
-      <Field label="Médecin traitant" htmlFor="doctorName" hint="Pour vérifier qu'il figure sur la liste des modèles médecin de famille / HMO.">
-        <Input id="doctorName" name="doctorName" defaultValue={person?.doctorName ?? ""} placeholder="Dr Martin, Lausanne" />
-      </Field>
-
-      <details className="rounded-xl border border-border p-3">
-        <summary className="min-h-11 cursor-pointer content-center font-medium">Caisses à exclure du comparateur</summary>
-        <div className="mt-2 max-h-72 overflow-y-auto">
-          {insurers.map((i) => (
-            <Checkbox key={i.id} name="excludedInsurerIds" value={i.id} defaultChecked={person?.excludedInsurerIds.includes(i.id)} label={i.name} />
-          ))}
-        </div>
-      </details>
-      </>
+      {!minor && person?.id && (
+        <Checkbox name="employedAccidentCover" defaultChecked={person?.employedAccidentCover} label="Employé·e au moins 8 h par semaine (accident couvert par l'employeur)" />
       )}
 
       <FormError message={state?.error} />

@@ -22,7 +22,7 @@ export default function HistoryPage() {
       <Page>
         <PageHeader title="Historique" />
         <EmptyState icon={<LineIcon aria-hidden />} title="Pas encore d'historique" action={<Button asChild><Link href="/foyer">Indiquer les contrats</Link></Button>}>
-          L&apos;historique se construit à partir des contrats de chaque année. Saisissez aussi les années passées si vous avez les polices.
+          Se construit à partir de vos contrats. Ajoutez les années passées si vous les avez.
         </EmptyState>
       </Page>
     );

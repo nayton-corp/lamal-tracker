@@ -1,11 +1,10 @@
 "use client";
 
-import { Camera, CheckCircle2, FileUp, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, FileUp, Loader2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { analyzePolicyAction, applyPolicyImportAction } from "@/app/actions/household";
-import { analyzePolicyTextAction } from "@/app/actions/journey";
 import type { ImportedPerson, PolicyImport } from "@/application/policy-import";
 import { MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { Alert } from "@/ui/alert";
@@ -13,7 +12,6 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
-import { readImageText, type OcrProgress } from "./ocr";
 
 type Row = ImportedPerson & { include: boolean; premium: string; lcaKeep: boolean[] };
 
@@ -23,7 +21,18 @@ const toRp = (s: string) => {
   return s.trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
 };
 
-export function ImportFlow({ insurers, years, hasPersons, onSaved }: { insurers: { id: number; name: string }[]; years: number[]; hasPersons: boolean; onSaved?: () => void }) {
+/**
+ * Import d'une police PDF : le texte est lu sur le Raspberry Pi, les contrats proposés sont
+ * vérifiés puis enregistrés. `initial` : analyse déjà faite (accueil depuis la police).
+ */
+export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
+  insurers: { id: number; name: string }[];
+  years: number[];
+  hasPersons: boolean;
+  initial?: PolicyImport | null;
+  /** Appelé après l'enregistrement (accueil guidé) ; sinon un lien ramène au foyer. */
+  onSaved?: () => void;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +41,16 @@ export function ImportFlow({ insurers, years, hasPersons, onSaved }: { insurers:
   const [insurerId, setInsurerId] = useState<string>("");
   const [year, setYear] = useState<number>(years[1] ?? years[0]!);
   const [rows, setRows] = useState<Row[]>([]);
-  const [ocr, setOcr] = useState<OcrProgress | null>(null);
+  const [started, setStarted] = useState(false);
+  if (initial && !started) {
+    setStarted(true);
+    show({ result: initial });
+  }
 
   if (!hasPersons) {
     return (
-      <Alert tone="info" title="Ajoutez d'abord les membres du foyer">
-        Leur date de naissance permet de les retrouver dans la police. <Link href="/foyer/personne/nouvelle" className="text-primary underline">Ajouter une personne</Link>
+      <Alert tone="info" title="Ajoutez d'abord la personne">
+        Sa date de naissance permet de la retrouver dans la police. <Link href="/foyer/personne/nouvelle" className="text-primary underline">Ajouter une personne</Link>
       </Alert>
     );
   }
@@ -54,23 +67,11 @@ export function ImportFlow({ insurers, years, hasPersons, onSaved }: { insurers:
     setRows(res.result.persons.map((p) => ({ ...p, include: true, premium: toChf(p.billedMonthlyRp), lcaKeep: p.lca.map(() => true) })));
   }
 
-  /** PDF : texte extrait sur le Raspberry Pi. Photo : texte lu sur l'appareil, puis analysé. */
   function analyze(file: File | undefined) {
     if (!file) return;
     setError(null);
     setDone(null);
     start(async () => {
-      if (file.type.startsWith("image/")) {
-        try {
-          const text = await readImageText(file, setOcr);
-          setOcr(null);
-          show(await analyzePolicyTextAction(text));
-        } catch {
-          setOcr(null);
-          setError("La photo n'a pas pu être lue. Reprenez-la à plat, bien éclairée, ou importez le PDF.");
-        }
-        return;
-      }
       const form = new FormData();
       form.set("file", file);
       show(await analyzePolicyAction(form));
@@ -110,43 +111,30 @@ export function ImportFlow({ insurers, years, hasPersons, onSaved }: { insurers:
 
   return (
     <div className="space-y-4">
-      <Card className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-2">
+      {!result && (
+        <Card className="space-y-3">
           <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/40 bg-primary-soft/30 p-4 text-center text-sm hover:bg-primary-soft/60">
-            <Camera aria-hidden className="size-7 text-primary" />
-            <span className="font-semibold">Photo de la police ou de la carte d&apos;assuré</span>
-            <span className="text-xs text-muted">Bien à plat, toute la page visible</span>
-            <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label="Photo de la police" disabled={pending} onChange={(e) => { analyze(e.target.files?.[0]); e.target.value = ""; }} />
-          </label>
-          <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-4 text-center text-sm hover:bg-surface-2">
             <FileUp aria-hidden className="size-7 text-primary" />
-            <span className="font-semibold">PDF de la police</span>
-            <span className="text-xs text-muted">Reçu par e-mail ou sur le portail client</span>
-            <input type="file" accept="application/pdf,.pdf,image/*" className="sr-only" aria-label="PDF de la police" disabled={pending} onChange={(e) => { analyze(e.target.files?.[0]); e.target.value = ""; }} />
+            <span className="font-semibold">Choisir le PDF de la police</span>
+            <span className="text-xs text-muted">Reçu par e-mail ou téléchargé sur le portail de la caisse</span>
+            <input type="file" accept="application/pdf,.pdf" className="sr-only" aria-label="PDF de la police" disabled={pending} onChange={(e) => { analyze(e.target.files?.[0]); e.target.value = ""; }} />
           </label>
-        </div>
-        {pending && !result && (
-          <div className="space-y-2" role="status">
-            <p className="flex items-center gap-2 text-sm">
-              <Loader2 aria-hidden className="size-4 animate-spin text-primary" /> {ocr ? `${ocr.label}… ${ocr.percent} %` : "Lecture de la police…"}
+          {pending && (
+            <p className="flex items-center gap-2 text-sm" role="status">
+              <Loader2 aria-hidden className="size-4 animate-spin text-primary" /> Lecture de la police…
             </p>
-            {ocr && (
-              <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${ocr.percent}%` }} />
-              </div>
-            )}
-          </div>
-        )}
-        <p className="flex items-start gap-2 text-xs text-muted">
-          <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" /> Tout est lu chez vous : la photo est déchiffrée sur votre téléphone, le PDF sur votre Raspberry Pi. Aucun service externe. Vous vérifiez chaque valeur avant d&apos;enregistrer.
-        </p>
-        <FormError message={error} />
-        {done && (
-          <Alert tone="success" title={done}>
-            <Link href="/foyer" className="text-primary underline">Retour au foyer</Link>
-          </Alert>
-        )}
-      </Card>
+          )}
+          <p className="flex items-start gap-2 text-xs text-muted">
+            <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" /> Lu sur votre Raspberry Pi, rien n&apos;est envoyé ailleurs.
+          </p>
+          <FormError message={error} />
+          {done && (
+            <Alert tone="success" title={done}>
+              {!onSaved && <Link href="/foyer" className="text-primary underline">Retour au foyer</Link>}
+            </Alert>
+          )}
+        </Card>
+      )}
 
       {result && (
         <>
@@ -235,10 +223,14 @@ export function ImportFlow({ insurers, years, hasPersons, onSaved }: { insurers:
             </Card>
           ))}
 
+          <FormError message={error} />
           <Button block size="lg" onClick={save} disabled={pending || invalid}>
-            {pending ? "Enregistrement…" : `Enregistrer les contrats ${year}`}
+            {pending ? "Enregistrement…" : `Enregistrer ${included.length > 1 ? "les contrats" : "le contrat"} ${year}`}
           </Button>
           {invalid && <p className="text-center text-sm text-muted">Complétez la caisse, la franchise et la prime de chaque personne cochée.</p>}
+          <button type="button" className="min-h-11 w-full text-sm text-primary underline-offset-2 hover:underline" onClick={() => { setResult(null); setError(null); }}>
+            Choisir un autre fichier
+          </button>
         </>
       )}
     </div>

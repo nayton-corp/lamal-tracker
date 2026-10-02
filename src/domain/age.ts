@@ -1,3 +1,4 @@
+import type { IsoDate } from "./dates";
 import type { AgeClass } from "./lamal";
 
 /**
@@ -31,4 +32,17 @@ export function ageTransition(birthDate: string, targetYear: number): AgeTransit
       ? `Passe en catégorie jeune adulte en ${targetYear} : les franchises enfant (0–600) ne s'appliquent plus, une franchise adulte (300–2500) doit être choisie.`
       : `Passe en catégorie adulte en ${targetYear} : la prime augmente généralement nettement.`;
   return { from, to, message };
+}
+
+/**
+ * Mineur à une date donnée : vrai tant que le 18e anniversaire n'est pas atteint
+ * (comparaison sur la date complète, pas seulement l'année).
+ */
+export function isMinorOn(birthDate: IsoDate, date: IsoDate): boolean {
+  const [by, bm, bd] = birthDate.split("-").map(Number);
+  if (![by, bm, bd].every((n) => Number.isInteger(n)) || by! < 1900) {
+    throw new Error(`Date de naissance invalide : ${birthDate}`);
+  }
+  const eighteenth = `${by! + 18}-${String(bm).padStart(2, "0")}-${String(bd).padStart(2, "0")}`;
+  return date < eighteenth;
 }

@@ -76,6 +76,8 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
   const adjusting = view.persons.filter((p) => p.line.decision === "ADJUST");
   const keeping = view.persons.filter((p) => p.line.decision === "KEEP");
   const undecided = view.persons.filter((p) => p.line.decision === "UNDECIDED");
+  // Aucune décision prise : les démarches n'ont pas encore de sens.
+  if (undecided.length === view.persons.length) redirect(`/rituel/${year}`);
   const offers = listOfferRequests(db(), r.id);
   const terminations = view.letters.filter((l) => l.kind === "TERMINATION");
   const changes = view.letters.filter((l) => l.kind === "CHANGE");
@@ -92,7 +94,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
 
   return (
     <Page>
-      <PageHeader title="Démarches" subtitle={`Ce qu'il reste à faire pour ${year}, dans l'ordre. Résiliations reçues au plus tard le ${formatDateLong(view.deadlines.receiptDeadline)}.`} back={`/rituel/${year}`} />
+      <PageHeader title="Démarches" subtitle="Dans l'ordre." back={`/rituel/${year}`} />
 
       <Card className="space-y-2">
         <p className="font-medium">Qui change quoi</p>
@@ -120,7 +122,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
         </ul>
         {lcaPending.length > 0 && (
           <Alert tone="lca" title="Complémentaires à contrôler d'abord">
-            {lcaPending.map((p) => p.person.firstName).join(", ")} : <Link className="underline" href={`/rituel/${year}/lca`}>passez le contrôle des complémentaires</Link> avant de résilier.
+            {lcaPending.map((p) => p.person.firstName).join(", ")} : <Link className="underline" href={`/rituel/${year}/lca`}>vérifiez les complémentaires</Link> avant de résilier.
           </Alert>
         )}
         {!nothing && (
@@ -146,7 +148,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
           <div>
             <p className="font-medium">Signature électronique</p>
             <p className="text-sm text-muted">
-              Signez une fois à l&apos;écran : la signature est apposée sur chaque courrier PDF, prêt à envoyer par e-mail ou à imprimer sans stylo.
+              Signez une fois : la signature figure sur chaque courrier PDF.
             </p>
           </div>
           <ul className="divide-y divide-border">
@@ -178,7 +180,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
             ))}
           </ul>
           <p className="text-xs text-muted">
-            Une signature dessinée n&apos;a pas la même valeur qu&apos;une signature manuscrite (art. 14 CO). La plupart des caisses l&apos;acceptent ; pour la résiliation, le plus sûr reste le recommandé signé à la main.
+            Pour la résiliation, le recommandé signé à la main reste le plus sûr (art. 14 CO).
           </p>
         </Card>
       )}
@@ -194,7 +196,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
           n={++n}
           title="Souscrire auprès de la nouvelle caisse"
           done={requestsDone}
-          hint="La demande d'affiliation est pré-remplie (personnes, dates de naissance, produit, franchise, début au 1er janvier). La caisse doit vous accepter pour l'assurance de base, sans questionnaire de santé ; les complémentaires demandées passent, elles, par un questionnaire."
+          hint="Demande pré-remplie. La caisse doit vous accepter pour la base ; les complémentaires passent par un questionnaire."
         >
           {offers.length === 0 && <p className="text-sm text-muted">Préparez les courriers ci-dessus.</p>}
           {offers.map((o) => (
@@ -240,7 +242,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
           done={lettersDone}
           hint={
             <>
-              Imprimez, signez (chaque adulte ; un parent pour les mineurs) et envoyez en <strong>recommandé</strong> avant le {formatDateLong(view.deadlines.sendBy, true)}. Vos complémentaires ne sont pas touchées : la lettre le précise.
+              Imprimez, signez (chaque adulte ; un parent pour les mineurs) et envoyez en <strong>recommandé</strong> avant le {formatDateLong(view.deadlines.sendBy, true)}.
             </>
           }
         >

@@ -1,11 +1,11 @@
 import { BadgeCheck, Check, CircleAlert, ShieldCheck, Stethoscope, TrendingDown } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/review";
 import { compareForLine, offerKey, type CompareView, type DetailedOffer } from "@/application/compare";
 import { insurerLabel } from "@/infrastructure/db/queries";
-import { insurer, lamalPolicy, person, reviewLine } from "@/infrastructure/db/schema";
+import { insurer, lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
 import { STRATEGY_INFO } from "@/domain/strategy";
 import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { db } from "@/server/context";
@@ -35,6 +35,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
   const lineId = Number(l);
   const line = db().select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
   if (!line) notFound();
+  if (db().select({ status: review.status }).from(review).where(eq(review.id, line.reviewId)).get()?.status === "CLOSED") redirect(`/rituel/${year}`);
   const policy = db().select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
   const currentInsurer = db().select().from(insurer).where(eq(insurer.id, policy.insurerId)).get()!;
 

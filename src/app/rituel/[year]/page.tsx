@@ -1,8 +1,11 @@
 import { ArrowRight, CalendarClock, Check, CircleAlert, FileText, RotateCcw, Scale, ShieldAlert, Sparkles, Trash2, Users } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { closeReviewAction, deleteReviewAction, openReviewAction, reopenReviewAction, undoAction } from "@/app/actions/review";
-import { getHousehold, listPersons } from "@/application/household";
+import { getHousehold, listPersons, listPolicies } from "@/application/household";
 import { ensureReview, getReviewByYear, getReviewView, type PersonReview, type ReviewView } from "@/application/review";
+import { reviewDeadlines, ritualWindowOpen } from "@/domain/deadlines";
+import { formatDateLong } from "@/domain/dates";
 import { STRATEGY_INFO } from "@/domain/strategy";
 import { Awareness } from "../_parts/awareness";
 import { nextStep } from "../_parts/next-step";
@@ -39,6 +42,7 @@ const RENEWAL_BADGE = {
 
 export default async function RitualPage({ params }: { params: Promise<{ year: string }> }) {
   const year = Number((await params).year);
+  if (!Number.isInteger(year) || year < 2011 || year > Number(today().slice(0, 4)) + 1) notFound();
   const h = getHousehold(db());
   const persons = h ? listPersons(db(), h.id) : [];
 
@@ -46,8 +50,8 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
     return (
       <Page>
         <PageHeader title={`Rituel ${year}`} />
-        <EmptyState icon={<Users aria-hidden />} title="Foyer à configurer" action={<Button asChild><Link href="/foyer">Configurer le foyer</Link></Button>}>
-          Ajoutez les membres du foyer et leur contrat LAMal {year - 1} pour analyser la hausse.
+        <EmptyState icon={<Users aria-hidden />} title="Rien à analyser pour l'instant" action={<Button asChild><Link href="/bienvenue">Commencer</Link></Button>}>
+          Indiquez d&apos;abord qui est assuré et le contrat {year - 1}.
         </EmptyState>
       </Page>
     );
@@ -55,14 +59,24 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
 
   const dataset = activeDataset(db(), year);
   // Les primes sont publiées : l'analyse s'ouvre d'elle-même (rien n'est décidé à la place de l'utilisateur).
-  if (dataset && !getReviewByYear(db(), year)) ensureReview(db(), year);
+  const windowOpen = ritualWindowOpen(today(), year, Boolean(dataset));
+  if (windowOpen && !getReviewByYear(db(), year)) ensureReview(db(), year);
   const reviewRow = getReviewByYear(db(), year);
+  const hasContracts = persons.some((p) => listPolicies(db(), p.id).some((x) => x.policy.coverageYear === year - 1));
 
   if (!reviewRow) {
     return (
       <Page>
-        <PageHeader title={`Rituel ${year}`} subtitle="Analyse de la hausse et choix de la meilleure caisse." />
-        {dataset ? (
+        <PageHeader title={`Rituel ${year}`} subtitle="Hausse et meilleure caisse pour l'année suivante." />
+        {dataset && !windowOpen ? (
+          <EmptyState icon={<CalendarClock aria-hidden />} title="Délai passé">
+            Les résiliations pour {year} devaient arriver avant le {formatDateLong(reviewDeadlines(year).receiptDeadline)}. Le prochain rituel s&apos;ouvrira à la publication des primes {year + 1}.
+          </EmptyState>
+        ) : dataset && !hasContracts ? (
+          <EmptyState icon={<CircleAlert aria-hidden />} title={`Contrat${persons.length > 1 ? "s" : ""} ${year - 1} à indiquer`} action={<Button asChild><Link href="/bienvenue?etape=contrats">Indiquer {persons.length > 1 ? "les contrats" : "mon contrat"}</Link></Button>}>
+            La hausse se mesure par rapport à {year - 1}.
+          </EmptyState>
+        ) : dataset ? (
           <Card className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">
@@ -80,8 +94,8 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
             </ActionForm>
           </Card>
         ) : (
-          <EmptyState icon={<CalendarClock aria-hidden />} title={`Primes ${year} pas encore importées`} action={<Button asChild><Link href="/donnees">Importer les primes</Link></Button>}>
-            L&apos;OFSP publie les primes de l&apos;année suivante fin septembre. L&apos;app les télécharge automatiquement ; vous pouvez aussi lancer l&apos;import à la main.
+          <EmptyState icon={<CalendarClock aria-hidden />} title={`Primes ${year} pas encore publiées`} action={<Button asChild variant="secondary"><Link href="/donnees">Vérifier maintenant</Link></Button>}>
+            Publiées fin septembre par l&apos;OFSP, téléchargées automatiquement.
           </EmptyState>
         )}
       </Page>
@@ -95,7 +109,7 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
     <Page wide>
       <PageHeader title={`Rituel ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${h.canton}, région ${h.region}`} />
 
-      <Awareness view={view} detailed={!view.review.strategy && !closed} cta={false} />
+      <Awareness view={view} detailed={false} cta={false} />
       {!closed && <Steps view={view} />}
       {!closed && view.review.strategy && (
         <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
@@ -127,7 +141,7 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
         <ul className="grid gap-3 lg:grid-cols-2">
           {view.persons.map((pr, i) => (
             <li key={pr.line.id} id={`ligne-${pr.line.id}`} className="animate-rise" style={{ animationDelay: `${i * 40}ms` }}>
-              <PersonCard pr={pr} year={year} closed={closed} />
+              <PersonCard pr={pr} year={year} closed={closed} ready={Boolean(view.review.needsConfirmedAt)} />
             </li>
           ))}
         </ul>
@@ -135,12 +149,10 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
 
       {!closed && <NextAction view={view} />}
 
-      {!closed && view.steps.find((s) => s.key === "decide")?.done && (
+      {!closed && ["confirm", "close"].includes(nextStep(view).kind) && (
         <Section title="Clôture">
           <Card className="space-y-3">
-            <p className="text-sm text-muted">
-              Quand vous avez reçu vos nouvelles polices (décembre ou janvier), clôturez le rituel : vos contrats {year} sont enregistrés tels que vous les avez choisis. Vous pourrez toujours revenir en arrière.
-            </p>
+            <p className="text-sm text-muted">Après réception des nouvelles polices : vos contrats {year} seront enregistrés tels que choisis.</p>
             <ActionForm action={closeReviewAction} hidden={{ year, reviewId: view.review.id }}>
               <SubmitButton variant="secondary" block pendingLabel="Clôture…">
                 Clôturer le rituel {year}
@@ -162,14 +174,14 @@ function Undo({ year, reviewId, closed }: { year: number; reviewId: number; clos
       <Card className="space-y-3">
         {closed && (
           <ActionForm action={reopenReviewAction} hidden={{ year, reviewId }}>
-            <p className="mb-3 text-sm text-muted">Vous vous êtes trompé ou votre caisse a refusé le changement ? Rouvrez le rituel : vos choix sont conservés et vous pouvez les modifier.</p>
+            <p className="mb-3 text-sm text-muted">Erreur ou refus de la caisse ? Rouvrez : vos choix sont conservés.</p>
             <ConfirmButton
               variant="secondary"
               block
               message={`Rouvrir le rituel ${year} ?`}
               confirmLabel="Rouvrir"
               confirmVariant="primary"
-              details={<p>Les contrats {year} enregistrés à la clôture seront retirés, puis recréés quand vous clôturerez à nouveau. Vos choix et vos lettres sont conservés.</p>}
+              details={<p>Les contrats {year} créés à la clôture sont retirés ; vos choix et lettres sont conservés.</p>}
             >
               <RotateCcw aria-hidden className="size-4" /> Rouvrir le rituel
             </ConfirmButton>
@@ -183,10 +195,7 @@ function Undo({ year, reviewId, closed }: { year: number; reviewId: number; clos
             message={`Supprimer le rituel ${year} ?`}
             confirmLabel="Supprimer le rituel"
             details={
-              <>
-                <p>Tout ce qui a été fait pour {year} est effacé : les choix de chaque personne et les lettres préparées{closed ? `, ainsi que les contrats ${year} créés à la clôture` : ""}.</p>
-                <p>Vos contrats {year - 1} ne changent pas. Vous pourrez relancer l&apos;analyse à tout moment.</p>
-              </>
+              <p>Choix et lettres {year} effacés{closed ? `, contrats ${year} créés à la clôture compris` : ""}. Les contrats {year - 1} restent.</p>
             }
           >
             <Trash2 aria-hidden className="size-4" /> Supprimer ce rituel
@@ -221,7 +230,7 @@ function Steps({ view }: { view: ReviewView }) {
   );
 }
 
-function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; closed: boolean }) {
+function PersonCard({ pr, year, closed, ready }: { pr: PersonReview; year: number; closed: boolean; ready: boolean }) {
   const badge = RENEWAL_BADGE[pr.line.renewalStatus];
   const decided = pr.line.decision !== "UNDECIDED";
   return (
@@ -300,7 +309,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
 
       {!closed && (
         <div className="flex gap-2">
-          <Button asChild block variant={decided ? "secondary" : "primary"}>
+          <Button asChild block variant={decided || !ready ? "secondary" : "primary"}>
             <Link href={`/rituel/${year}/personne/${pr.line.id}`}>
               <Scale aria-hidden className="size-4" /> {decided ? "Revoir" : "Comparer"}
             </Link>
@@ -326,7 +335,7 @@ function NextAction({ view }: { view: ReviewView }) {
       </Alert>
     );
   }
-  const Icon = step.kind === "compare" ? Scale : step.kind === "lca" ? ShieldAlert : step.kind === "procedures" ? FileText : ArrowRight;
+  const Icon = step.kind === "compare" ? Scale : step.kind === "lca" ? ShieldAlert : step.kind === "procedures" || step.kind === "confirm" ? FileText : ArrowRight;
   return (
     <div className="sticky bottom-20 z-30 lg:bottom-6">
       <Button asChild block size="lg" variant={step.kind === "lca" ? "lca" : "primary"} className="shadow-lg">

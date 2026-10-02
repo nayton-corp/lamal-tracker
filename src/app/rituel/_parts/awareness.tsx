@@ -62,9 +62,7 @@ export function Awareness({ view, detailed, cta = true }: { view: ReviewView; de
             </span>
           </p>
           <p className="text-sm text-white/85">
-            {diff > 0
-              ? `Soit ${formatChf(diff * 12, { whole: true })} de plus sur l'année ${year}, par reconduction tacite : votre caisse renouvelle le contrat aux nouvelles conditions si vous ne faites rien.`
-              : `Votre caisse renouvelle le contrat aux nouvelles conditions si vous ne faites rien.`}
+            {diff > 0 ? `Soit ${formatChf(diff * 12, { whole: true })} de plus sur l'année. ` : ""}Sans courrier, votre caisse renouvelle aux nouvelles conditions.
           </p>
         </div>
       )}

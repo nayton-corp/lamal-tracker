@@ -1,37 +1,61 @@
 "use client";
 
-import { Camera, CheckCircle2, ClipboardList, UserRound } from "lucide-react";
+import { CheckCircle2, ClipboardList, FileText, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { HouseholdForm } from "@/app/foyer/household-form";
+import { HouseholdForm, type SoloIdentity } from "@/app/foyer/household-form";
 import { ImportFlow } from "@/app/foyer/importer/import-flow";
 import { PersonForm } from "@/app/foyer/person-form";
 import { PolicyWizard } from "@/app/foyer/policy-wizard";
 import { Badge } from "@/ui/badge";
 import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
+import { PolicyStart } from "./policy-start";
 
 type Insurers = { id: number; name: string }[];
 
-export function AddressStep({ household, solo }: { household: Parameters<typeof HouseholdForm>[0]["household"]; solo: boolean }) {
+/**
+ * Identité et adresse : la police PDF remplit tout (personnes, adresse, puis contrats), sinon
+ * un formulaire. `person` absent = mode foyer (adresse seule) ; sinon identité + adresse.
+ */
+export function IdentityStep({ household, person, insurers, years, next }: {
+  household: Parameters<typeof HouseholdForm>[0]["household"];
+  person?: SoloIdentity | null;
+  insurers: Insurers;
+  years: number[];
+  next: string;
+}) {
   const router = useRouter();
-  return <HouseholdForm household={household} solo={solo} submitLabel="Continuer" onDone={() => router.push("/bienvenue?etape=membres")} />;
+  const solo = person !== undefined;
+  const [mode, setMode] = useState<"pdf" | "manual" | null>(household ? "manual" : null);
+  const form = <HouseholdForm household={household} person={person} next={next} submitLabel="Continuer" onDone={() => router.push(next)} />;
+
+  // Même arbre quel que soit l'état : l'enregistrement rafraîchit la page sans démonter le formulaire.
+  return (
+    <div className="space-y-4">
+      {!household && (
+        <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Comment commencer">
+          <ChoiceCard active={mode === "pdf"} onClick={() => setMode("pdf")} icon={<FileText aria-hidden className="size-6" />} title="Depuis ma police (PDF)" badge="Recommandé" text={solo ? "Nom, adresse et contrat sont lus dans la police. Vous vérifiez." : "Personnes, adresse et contrats sont lus dans la police. Vous vérifiez."} />
+          <ChoiceCard active={mode === "manual"} onClick={() => setMode("manual")} icon={<ClipboardList aria-hidden className="size-6" />} title="Saisir à la main" text={solo ? "Votre nom, votre date de naissance et votre adresse." : "L'adresse du foyer, puis chaque personne."} />
+        </div>
+      )}
+      {mode === "pdf" && <PolicyStart insurers={insurers} years={years} solo={solo} />}
+      {(mode === "manual" || (Boolean(household) && mode !== "pdf")) && <Card>{form}</Card>}
+    </div>
+  );
 }
 
 /** Ajout d'une personne après l'autre ; le formulaire se vide après chaque ajout. */
-export function MemberAdder({ insurers, year, solo, first }: { insurers: Insurers; year: number; solo: boolean; first: boolean }) {
+export function MemberAdder({ year, first }: { year: number; first: boolean }) {
   const router = useRouter();
   const [n, setN] = useState(0);
   return (
     <PersonForm
       key={n}
       person={null}
-      insurers={insurers}
       year={year}
-      compact
       stay
-      next={solo ? "/bienvenue?etape=contrats" : undefined}
-      submitLabel={solo ? "Continuer" : first ? "Ajouter cette personne" : "Ajouter une autre personne"}
+      submitLabel={first ? "Ajouter cette personne" : "Ajouter une autre personne"}
       onDone={() => {
         setN((x) => x + 1);
         router.refresh();
@@ -47,13 +71,10 @@ export interface ContractPerson {
   contract: string | null;
 }
 
-/**
- * Contrats actuels : la police (photo ou PDF) remplit tout d'un coup, ou une saisie guidée par
- * personne. Une seule police couvre souvent tout le foyer.
- */
-export function ContractsStep({ persons, insurers, year, years }: { persons: ContractPerson[]; insurers: Insurers; year: number; years: number[] }) {
+/** Contrats actuels : la police PDF remplit tout d'un coup, ou une saisie guidée par personne. */
+export function ContractsStep({ persons, insurers, year, years, solo }: { persons: ContractPerson[]; insurers: Insurers; year: number; years: number[]; solo: boolean }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"scan" | "manual" | null>(null);
+  const [mode, setMode] = useState<"pdf" | "manual" | null>(null);
   const [manualFor, setManualFor] = useState<number | null>(persons.find((p) => !p.contract)?.id ?? null);
   const missing = persons.filter((p) => !p.contract);
 
@@ -80,27 +101,12 @@ export function ContractsStep({ persons, insurers, year, years }: { persons: Con
 
       {missing.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Comment indiquer les contrats">
-          <ChoiceCard
-            active={mode === "scan"}
-            onClick={() => setMode("scan")}
-            icon={<Camera aria-hidden className="size-6" />}
-            title="Scanner ma police"
-            badge="Recommandé"
-            text="Photo de la police ou de la carte d'assuré, ou le PDF : tout est rempli pour vous, vous vérifiez."
-          />
-          <ChoiceCard
-            active={mode === "manual"}
-            onClick={() => setMode("manual")}
-            icon={<ClipboardList aria-hidden className="size-6" />}
-            title="Saisie guidée"
-            text="Quatre questions par personne : caisse, modèle, franchise, prime. La prime officielle est retrouvée seule."
-          />
+          <ChoiceCard active={mode === "pdf"} onClick={() => setMode("pdf")} icon={<FileText aria-hidden className="size-6" />} title="Importer la police (PDF)" badge="Recommandé" text={solo ? "Caisse, modèle, franchise, prime : tout est rempli, vous vérifiez." : "Une police couvre souvent tout le foyer : tout est rempli, vous vérifiez."} />
+          <ChoiceCard active={mode === "manual"} onClick={() => setMode("manual")} icon={<ClipboardList aria-hidden className="size-6" />} title="Saisie guidée" text="Caisse, modèle, franchise : la prime officielle est retrouvée." />
         </div>
       )}
 
-      {missing.length > 0 && mode === "scan" && (
-        <ImportFlow hasPersons insurers={insurers} years={years} onSaved={() => router.refresh()} />
-      )}
+      {missing.length > 0 && mode === "pdf" && <ImportFlow hasPersons insurers={insurers} years={years} onSaved={() => router.refresh()} />}
 
       {missing.length > 0 && mode === "manual" && (
         <Card className="space-y-4">

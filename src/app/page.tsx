@@ -127,7 +127,7 @@ export default function Home() {
 
       </div>
       <div className="space-y-6">
-      {missing.length === 0 && (
+      {missing.length === 0 && !(reviewView && reviewView.review.status !== "CLOSED") && (
         <Section title="À compléter">
           <p className="flex items-center gap-2 rounded-xl bg-surface p-3 text-sm text-muted shadow-card">
             <CheckCircle2 aria-hidden className="size-4 text-saving" /> Rien à faire pour le moment.
@@ -139,8 +139,8 @@ export default function Home() {
           <ul className="space-y-2">
             {missing.map((r) => (
               <li key={r.p.id}>
-                <Link href={`/foyer/personne/${r.p.id}`} className="flex min-h-12 items-center gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
-                  <CircleAlert aria-hidden className="size-4 text-increase" /> Indiquer le contrat {year} de {r.p.firstName}
+                <Link href="/bienvenue?etape=contrats" className="flex min-h-12 items-center gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
+                  <CircleAlert aria-hidden className="size-4 text-increase" /> Indiquer {solo ? "votre" : "le"} contrat {year}{solo ? "" : ` de ${r.p.firstName}`}
                 </Link>
               </li>
             ))}
@@ -149,7 +149,7 @@ export default function Home() {
       )}
       <p className="flex items-start gap-2 rounded-xl bg-surface p-3 text-xs text-muted shadow-card">
         <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-saving" />
-        <span>Données officielles de l&apos;OFSP (primes, comptes des caisses) et de l&apos;OFEV (CO2). Toutes les caisses, aucune commission, rien ne quitte votre Raspberry Pi.</span>
+        <span>Données officielles OFSP et OFEV. Toutes les caisses, aucune commission, rien ne quitte votre Raspberry Pi.</span>
       </p>
       </div>
       </div>

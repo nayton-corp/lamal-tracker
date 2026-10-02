@@ -10,4 +10,3 @@ tests/fixtures/generated/
 .env
 .env.local
 .e2e/
-public/ocr/

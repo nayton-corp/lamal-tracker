@@ -1,6 +1,7 @@
 "use client";
 
 import { UserRound } from "lucide-react";
+import Link from "next/link";
 import { formatDateShort } from "@/domain/dates";
 import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import { formatChf } from "@/domain/money";
@@ -8,8 +9,15 @@ import { Card } from "@/ui/card";
 import { EditSheet } from "@/ui/edit-sheet";
 import { PersonForm, type PersonDefaults } from "./person-form";
 
-export function ProfileCard({ person, insurers, year, ageLabel }: { person: PersonDefaults & { id: number }; insurers: { id: number; name: string }[]; year: number; ageLabel: string }) {
-  const models = person.allowedModels.length ? person.allowedModels.map((m) => MODEL_LABEL[m as ModelType]).join(", ") : "tous";
+export interface ProfileNeeds {
+  healthCostsRp: number;
+  allowedModels: string[];
+  doctorName: string | null;
+}
+
+/** Identité (modifiable ici) et besoins (réglés au questionnaire du rituel, en lecture seule). */
+export function ProfileCard({ person, needs, needsHref, year, ageLabel }: { person: PersonDefaults & { id: number }; needs: ProfileNeeds; needsHref: string | null; year: number; ageLabel: string }) {
+  const models = needs.allowedModels.length ? needs.allowedModels.map((m) => MODEL_LABEL[m as ModelType]).join(", ") : "tous";
   return (
     <Card className="flex items-start gap-3">
       <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
@@ -22,23 +30,28 @@ export function ProfileCard({ person, insurers, year, ageLabel }: { person: Pers
             Né·e le {formatDateShort(person.birthDate)} <span className="font-normal text-muted">· {ageLabel}</span>
           </dd>
         </div>
-        <div className="flex gap-1">
-          <dt className="text-muted">Frais de santé attendus :</dt>
-          <dd>{formatChf(person.healthCostsRp, { whole: true })}/an</dd>
+        <div className="flex flex-wrap gap-x-1">
+          <dt className="text-muted">Frais de santé :</dt>
+          <dd>{formatChf(needs.healthCostsRp, { whole: true })}/an</dd>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-x-1">
           <dt className="text-muted">Modèles comparés :</dt>
           <dd>{models}</dd>
         </div>
-        {person.doctorName && (
-          <div className="flex gap-1">
+        {needs.doctorName && (
+          <div className="flex flex-wrap gap-x-1">
             <dt className="text-muted">Médecin :</dt>
-            <dd>{person.doctorName}</dd>
+            <dd>{needs.doctorName}</dd>
           </div>
         )}
+        {needsHref && (
+          <dd>
+            <Link href={needsHref} className="text-primary underline">Ajuster les besoins</Link>
+          </dd>
+        )}
       </dl>
-      <EditSheet title={`${person.firstName} ${person.lastName}`} label="Modifier le profil">
-        {(close) => <PersonForm person={person} insurers={insurers} year={year} onDone={close} />}
+      <EditSheet title={`${person.firstName} ${person.lastName}`} label="Modifier">
+        {(close) => <PersonForm person={person} year={year} onDone={close} />}
       </EditSheet>
     </Card>
   );

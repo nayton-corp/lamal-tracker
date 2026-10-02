@@ -1,4 +1,5 @@
 import "server-only";
+import fs from "node:fs";
 import path from "node:path";
 import { activeDataset } from "@/infrastructure/db/queries";
 import { importPremiumFile, type ImportOutcome } from "@/infrastructure/ofsp/importer";
@@ -38,10 +39,18 @@ function cantonFilter(): string[] | undefined {
   return raw ? raw.split(",").map((c) => c.trim().toUpperCase()) : undefined;
 }
 
+/**
+ * Importe un fichier téléchargé ou téléversé, puis le supprime : son empreinte SHA-256 reste en
+ * base (idempotence) et la carte SD du Pi n'accumule pas des dizaines de Mo par publication.
+ */
 async function importOne(s: ImportJob, file: string, origin: string): Promise<ImportOutcome> {
   s.phase = "import";
   s.rowsRead = 0;
-  return importPremiumFile(db(), file, origin, { cantons: cantonFilter(), onProgress: (n) => (s.rowsRead = n) });
+  try {
+    return await importPremiumFile(db(), file, origin, { cantons: cantonFilter(), onProgress: (n) => (s.rowsRead = n) });
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
 }
 
 /** Exécute un import en arrière-plan ; un seul à la fois. Retourne false si un import tourne déjà. */

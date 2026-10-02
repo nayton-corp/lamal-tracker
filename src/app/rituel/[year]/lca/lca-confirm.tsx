@@ -2,15 +2,16 @@
 
 import { CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { acknowledgeLcaAction } from "@/app/actions/review";
+import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/form";
-import { HoldButton } from "@/ui/hold-button";
 
 export function LcaConfirm({ lineId, person, currentInsurer, acknowledgedAt }: { lineId: number; person: string; currentInsurer: string; acknowledgedAt: string | null }) {
   const router = useRouter();
   const [understood, setUnderstood] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
   if (acknowledgedAt) {
     return (
       <p className="flex items-center gap-2 rounded-xl bg-saving-soft p-3 text-sm font-medium text-saving">
@@ -20,21 +21,21 @@ export function LcaConfirm({ lineId, person, currentInsurer, acknowledgedAt }: {
   }
   return (
     <div className="space-y-3">
-      <Checkbox
-        checked={understood}
-        onChange={(e) => setUnderstood(e.target.checked)}
-        label={`Je comprends que seule l'assurance de base LAMal de ${person} chez ${currentInsurer} est résiliée, et que ses complémentaires LCA restent actives.`}
-      />
-      <HoldButton
-        disabled={!understood}
-        onConfirm={async () => {
-          const res = await acknowledgeLcaAction(lineId);
-          if (res?.error) setError(res.error);
-          router.refresh();
-        }}
+      <Checkbox checked={understood} onChange={(e) => setUnderstood(e.target.checked)} label={`Seule l'assurance de base de ${person} chez ${currentInsurer} est résiliée ; ses complémentaires restent actives.`} />
+      <Button
+        block
+        variant="lca"
+        disabled={!understood || pending}
+        onClick={() =>
+          start(async () => {
+            const res = await acknowledgeLcaAction(lineId);
+            if (res?.error) setError(res.error);
+            router.refresh();
+          })
+        }
       >
-        Maintenir pour confirmer
-      </HoldButton>
+        {pending ? "Confirmation…" : "J'ai compris, confirmer"}
+      </Button>
       {error && <p className="text-sm text-increase" role="alert">{error}</p>}
     </div>
   );

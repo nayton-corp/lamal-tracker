@@ -70,9 +70,15 @@ référentiels officiels (`server/reference.ts`).
 
 ## Parcours
 
-- `/bienvenue` : accueil de la première connexion (pour qui, adresse, personnes, contrats).
+- `/login/creer` puis `/login` : mot de passe obligatoire choisi au premier démarrage (hash scrypt dans
+  `settings`), sessions aléatoires en base (`session`, 30 jours glissants), vérification dans `proxy.ts` et
+  `requireSession()` en tête de chaque server action (`server/auth.ts`, `application/auth.ts`).
+- `/bienvenue` : accueil de la première connexion. Seul·e : pour qui → vous (identité + adresse, ou la
+  police PDF qui remplit tout) → contrat. Foyer : pour qui → adresse (ou police PDF) → personnes → contrats.
+  Une deuxième personne fait passer en mode foyer.
 - `/rituel/[année]` : reconduction tacite → `strategie` → `besoins` → `comparer` (onglets par personne)
   → `lca` → `lettres` (démarches, signature) → clôture. L'analyse s'ouvre seule pendant la fenêtre
   du rituel (`ritualWindowOpen`, `ensureReview`).
-- OCR : Tesseract dans le navigateur ; ses fichiers sont copiés dans `public/ocr` au build
-  (`scripts/copy-ocr-assets.mjs`), aucune photo ne quitte l'appareil.
+- Police PDF : texte extrait sur le serveur (`unpdf`), analyse pure dans `domain/policy-import.ts`
+  (caisse, année, personnes par date de naissance, numéros d'assuré / police / AVS, adresse du titulaire),
+  rapprochement avec les tarifs officiels dans `application/policy-import.ts`.

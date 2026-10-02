@@ -1,19 +1,29 @@
-# Déploiement sur le Raspberry Pi : `docker compose up -d`
+# Déploiement sur le Raspberry Pi : `mkdir -p data && sudo chown 1000:1000 data && docker compose up -d`
 services:
   lamal:
     image: ghcr.io/nayton-corp/lamal-tracker:latest
+    # Pour figer une version (retour arrière possible) : image: ghcr.io/nayton-corp/lamal-tracker:sha-xxxxxxx
     # Pour construire sur le Pi à la place : décommentez la ligne suivante et lancez `docker compose up -d --build`.
     # build: .
     container_name: lamal-tracker
     restart: unless-stopped
     ports:
       - "3000:3000"
+      # Si l'app n'est jointe qu'à travers Tailscale (`tailscale serve`), n'écoutez que localement :
+      # - "127.0.0.1:3000:3000"
     volumes:
+      # Le dossier doit appartenir à l'utilisateur 1000 (node) du conteneur : `sudo chown 1000:1000 data`.
       - ./data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Variables sensibles (ex. VAPID_SUBJECT) dans un fichier `.env` en `chmod 600` plutôt qu'ici :
+    # env_file: .env
     environment:
       TZ: Europe/Zurich
-      # Mot de passe d'accès (recommandé) :
-      # APP_PASSWORD: "choisissez-un-mot-de-passe"
+      # Le mot de passe d'accès se choisit dans l'application au premier démarrage (plus de variable APP_PASSWORD).
       # Restreindre l'import à certains cantons pour économiser de la place :
       # IMPORT_CANTONS: "VD"
       # Adresse de contact transmise aux services de notification push :

@@ -1,17 +1,20 @@
 "use client";
 
-import { CalendarCheck, Home, LineChart, Settings, Users } from "lucide-react";
+import { CalendarCheck, Home, LineChart, Settings, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "./cn";
 
-const ITEMS = [
+const items = (solo: boolean) => [
   { href: "/", label: "Accueil", hint: "Vue d'ensemble", Icon: Home },
   { href: "/rituel", label: "Rituel", hint: "Comparer et changer", Icon: CalendarCheck },
-  { href: "/foyer", label: "Foyer", hint: "Personnes et contrats", Icon: Users },
+  solo ? { href: "/foyer", label: "Moi", hint: "Mon contrat", Icon: UserRound } : { href: "/foyer", label: "Foyer", hint: "Personnes et contrats", Icon: Users },
   { href: "/historique", label: "Historique", hint: "Primes année après année", Icon: LineChart },
-  { href: "/donnees", label: "Réglages", hint: "Primes officielles, caisses", Icon: Settings },
+  { href: "/donnees", label: "Réglages", hint: "Sécurité, primes, caisses", Icon: Settings },
 ];
+
+/** Pages plein écran : connexion et accueil guidé, sans barre de navigation. */
+const BARE = /^\/(login|bienvenue)(\/|$)/;
 
 function useActive() {
   const pathname = usePathname();
@@ -19,21 +22,26 @@ function useActive() {
 }
 
 /** Navigation principale : barre du bas sur téléphone, colonne latérale sur ordinateur. */
-export function AppNav() {
+export function AppNav({ solo }: { solo: boolean }) {
+  const pathname = usePathname();
+  if (BARE.test(pathname)) return null;
+  const list = items(solo);
   return (
     <>
-      <BottomNav />
-      <SideNav />
+      <BottomNav items={list} />
+      <SideNav items={list} solo={solo} />
     </>
   );
 }
 
-function BottomNav() {
+type Items = ReturnType<typeof items>;
+
+function BottomNav({ items }: { items: Items }) {
   const isActive = useActive();
   return (
     <nav aria-label="Navigation principale" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/90 backdrop-blur-lg safe-bottom lg:hidden">
       <ul className="mx-auto grid max-w-xl grid-cols-5">
-        {ITEMS.map(({ href, label, Icon }) => {
+        {items.map(({ href, label, Icon }) => {
           const active = isActive(href);
           return (
             <li key={href}>
@@ -58,7 +66,7 @@ function BottomNav() {
   );
 }
 
-function SideNav() {
+function SideNav({ items, solo }: { items: Items; solo: boolean }) {
   const isActive = useActive();
   return (
     <nav aria-label="Navigation principale" className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-surface px-4 py-6 lg:flex">
@@ -67,11 +75,11 @@ function SideNav() {
         <img src="/icons/icon.svg" alt="" width={36} height={36} className="rounded-lg" />
         <span className="leading-tight">
           <span className="block font-bold">Primes LAMal</span>
-          <span className="block text-xs text-muted">Assurance de base du foyer</span>
+          <span className="block text-xs text-muted">{solo ? "Votre assurance de base" : "Assurance de base du foyer"}</span>
         </span>
       </Link>
       <ul className="space-y-1">
-        {ITEMS.map(({ href, label, hint, Icon }) => {
+        {items.map(({ href, label, hint, Icon }) => {
           const active = isActive(href);
           return (
             <li key={href}>

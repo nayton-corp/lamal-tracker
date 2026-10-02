@@ -25,7 +25,7 @@ export default function InsurersPage() {
     <Page>
       <PageHeader
         title="Caisses-maladie"
-        subtitle={`Adresses et contacts repris de l'annuaire officiel de l'OFSP${date ? ` (état au ${formatDateLong(date)})` : ""}, mis à jour automatiquement. Modifiez une adresse seulement si votre police en indique une autre.`}
+        subtitle={`Annuaire officiel OFSP${date ? ` (${formatDateLong(date)})` : ""}. Modifiez seulement si votre police indique une autre adresse.`}
         back="/donnees"
       />
       {yours.length > 0 && (

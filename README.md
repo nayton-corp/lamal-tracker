@@ -1,16 +1,16 @@
 # Primes LAMal — suivi et comparateur annuel
 
-PWA personnelle, mobile d'abord, auto-hébergée sur un Raspberry Pi. À la première connexion, un **accueil guidé** demande pour qui gérer l'assurance (une personne ou un foyer), l'adresse, les personnes, puis leurs contrats actuels : **photo ou PDF de la police** (lecture sur l'appareil, recommandé) ou **saisie guidée** en quatre questions. Chaque automne :
+PWA personnelle, mobile d'abord, auto-hébergée sur un Raspberry Pi, protégée par un **mot de passe** choisi au premier démarrage. À la première connexion, un **accueil guidé** demande pour qui gérer l'assurance (une personne seule ou un foyer), puis propose de **partir du PDF de la police** : personnes, adresse et contrats en sont lus (sur le Pi, rien ne sort), il ne reste qu'à vérifier. Sinon, une **saisie guidée** en quelques questions. Chaque automne :
 
 1. **les primes officielles de l'OFSP sont importées automatiquement** dès leur publication (fin septembre) ;
 2. pendant la fenêtre de changement (publication des primes → 30 novembre), l'accueil montre la **reconduction tacite** : ce que le foyer paiera l'an prochain sans rien faire, personne par personne, l'écart avec cette année et le compte à rebours ;
 3. on choisit une **stratégie** (Économie max, Maintien, Équilibre), puis on confirme ses **besoins** (fréquence des consultations, franchise, modèles de soins, médecin) : le comparateur s'ouvre réglé en conséquence, avec le top 3 de chaque personne et des onglets pour passer d'un membre à l'autre ;
 3. le **comparateur** (offres détaillées, comparaison côte à côte de 2 à 4 offres, coût sans frais / attendu / année chargée) classe les caisses de votre région selon le **coût total attendu** (prime nette de CO2 + franchise + quote-part), avec un simulateur de franchise, le portrait de chaque caisse (réserves, frais administratifs, taille, évolution de ses primes face au marché) et l'explication de chaque modèle ;
-4. un **garde-fou LCA** (confirmation par appui long) empêche de résilier une complémentaire par erreur ;
+4. un **garde-fou LCA** (confirmation explicite) empêche de résilier une complémentaire par erreur ;
 5. la page **Démarches** guide pas à pas, avec une **signature à l'écran** apposée sur les courriers PDF : demande d'affiliation à la nouvelle caisse (PDF et e-mail prérempli, complémentaires souhaitées comprises), résiliation chez l'ancienne, puis confirmations ;
 6. les **lettres de résiliation PDF** (format enveloppe à fenêtre suisse) sont générées en un geste, avec suivi des envois recommandés et rappels avant le 30 novembre ;
 7. l'**historique pluriannuel** garde les primes réellement payées, les économies des rituels et la position du foyer dans le marché ;
-8. la **police** peut être importée en photo (police ou carte d'assuré, texte lu dans le navigateur avec Tesseract) ou en PDF (*Foyer › Importer une police*) : caisse, personnes, tarif officiel, franchise, prime et complémentaires sont repris, sans service externe.
+8. la **police PDF** peut être importée à tout moment (*Foyer › Importer une police*) : caisse, personnes, tarif officiel, franchise, prime, numéro d'assuré (ou AVS) et complémentaires sont repris, sans service externe.
 
 > Outil d'aide à la décision, pas un conseil en assurance. Vérifiez toujours les conditions des modèles (liste de médecins, Telmed…) auprès de la caisse.
 
@@ -41,16 +41,22 @@ echo "<le-jeton>" | docker login ghcr.io -u NaYthanB --password-stdin
 ```sh
 mkdir -p ~/lamal-tracker && cd ~/lamal-tracker
 # copier docker-compose.yml de ce dépôt dans ce dossier, puis :
+mkdir -p data && sudo chown 1000:1000 data   # le conteneur tourne en utilisateur 1000 (node)
 docker compose up -d
 ```
 
-L'app répond sur `http://<ip-du-pi>:3000`. Les données vivent dans `~/lamal-tracker/data` (un seul fichier SQLite).
+Le dossier `data/` doit exister **avant** le premier `docker compose up` et appartenir à l'utilisateur 1000 : sinon Docker le crée pour `root`, l'app ne peut pas y écrire sa base et le conteneur s'arrête avec un message qui rappelle la commande `chown`.
 
-Variables utiles (dans `docker-compose.yml`) :
+L'app répond sur `http://<ip-du-pi>:3000`. Les données vivent dans `~/lamal-tracker/data` (un seul fichier SQLite). **Au premier démarrage, l'app demande de choisir un mot de passe** ; il protège toutes les pages et la sauvegarde.
+
+Si l'app n'est jointe qu'à travers Tailscale (voir ci-dessous), n'exposez le port qu'en local en remplaçant `"3000:3000"` par `"127.0.0.1:3000:3000"` dans `docker-compose.yml` : les autres appareils du réseau local ne voient plus le port.
+
+Pour **figer une version** (et pouvoir revenir en arrière), remplacez `:latest` par le tag `sha-xxxxxxx` du commit voulu (visible dans *Packages* sur GitHub) : `image: ghcr.io/nayton-corp/lamal-tracker:sha-xxxxxxx`. L'image `:latest` n'est publiée qu'une fois la CI (lint, tests, build, e2e) passée.
+
+Variables utiles (dans `docker-compose.yml`, ou dans un fichier `.env` en `chmod 600` via `env_file`) :
 
 | Variable | Rôle |
 |---|---|
-| `APP_PASSWORD` | Mot de passe d'accès (recommandé dès que le Pi est joignable hors de chez vous). |
 | `IMPORT_CANTONS` | Ex. `VD` : n'importe que votre canton (≈ 3 Mo par an au lieu de ≈ 60 Mo). |
 | `VAPID_SUBJECT` | `mailto:` de contact pour les notifications push. |
 | `OFSP_AUTO_CHECK=false` | Désactive le contrôle automatique des nouvelles primes. |
@@ -77,8 +83,18 @@ cd ~/lamal-tracker && docker compose pull && docker compose up -d
 ```
 
 - **Sauvegarde** : *Réglages › Sauvegarde* télécharge une copie cohérente de la base. Ou, sur le Pi : `cp data/lamal.db* /un/autre/disque/` (app arrêtée), ou `sqlite3 data/lamal.db ".backup '/chemin/sauvegarde.db'"`.
-- **Restauration** : arrêter le conteneur, remettre le fichier `lamal.db` dans `data/`, relancer.
+- **Sauvegarde automatique avant migration** : quand une mise à jour modifie le schéma, l'app copie d'abord la base dans `data/backups/lamal-<date>.db` (les cinq dernières copies sont gardées). Si la migration échoue, le journal du conteneur (`docker logs lamal-tracker`) indique la copie à restaurer et l'app refuse de démarrer.
+- **Restauration** : arrêter le conteneur, remettre le fichier `lamal.db` dans `data/` (et supprimer `lamal.db-wal` / `lamal.db-shm`), relancer. Pour revenir à une version antérieure du code, épingler son tag `sha-…` (voir plus haut).
 - Les migrations du schéma s'appliquent seules au démarrage.
+- **Sécurité** (*Réglages › Sécurité*) : changer le mot de passe, voir et fermer les sessions ouvertes sur les autres appareils (cinq échecs de connexion verrouillent l'accès quelques minutes).
+- **Recommencer à zéro** (*Réglages › Sécurité › Recommencer à zéro*, mot de passe demandé) : efface personnes, contrats, rituels, lettres et signatures ; les primes officielles et le mot de passe restent.
+- **Mot de passe oublié** : cette commande efface le mot de passe et les sessions ; l'app en redemande un au prochain chargement.
+
+  ```sh
+  docker exec lamal-tracker node -e "const {DatabaseSync}=require('node:sqlite');new DatabaseSync('/data/lamal.db').exec(\"DELETE FROM settings WHERE key IN ('auth.password','auth.failures'); DELETE FROM session\")"
+  ```
+
+- Les journaux du conteneur sont limités (3 × 10 Mo) pour ne pas remplir la carte SD.
 
 ### Construire l'image sur le Pi (alternative)
 

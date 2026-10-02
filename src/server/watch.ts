@@ -5,6 +5,7 @@ import { formatDateLong } from "@/domain/dates";
 import { getSetting, setSetting } from "@/infrastructure/db/settings";
 import { notifyAll } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
+import { yearAttemptKey, yearRetryDue } from "@/infrastructure/ofsp/retry";
 import { activeDataset } from "@/infrastructure/db/queries";
 import { db, ritualYear, today } from "./context";
 import { referenceTick } from "./reference";
@@ -23,13 +24,17 @@ export async function checkForNewPremiums(force = false): Promise<string> {
   } catch (error) {
     if (!force) throw error;
   }
-  setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), url, ok: Boolean(sig) });
   const previous = getSetting<RemoteSignature>(db(), "ofsp.signature");
   const changed = !previous || !sig || previous.etag !== sig.etag || previous.lastModified !== sig.lastModified || previous.length !== sig.length || previous.url !== sig.url;
-  if (!changed && !force) return "Aucune nouvelle publication.";
+  if (!changed && !force) {
+    setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), url, ok: true });
+    return "Aucune nouvelle publication.";
+  }
 
   const started = startImport({ kind: "download", url }, async (outcome) => {
-    if (sig) setSetting(db(), "ofsp.signature", sig);
+    // Signature mémorisée seulement si le fichier a été pris en compte : un import refusé
+    // (FAILED) sera retenté au prochain contrôle sans attendre une nouvelle publication.
+    if (sig && (outcome.status === "IMPORTED" || outcome.status === "ALREADY")) setSetting(db(), "ofsp.signature", sig);
     if (outcome.status === "IMPORTED" && outcome.report.year) {
       const year = outcome.report.year;
       await notifyAll(
@@ -39,6 +44,8 @@ export async function checkForNewPremiums(force = false): Promise<string> {
       );
     }
   });
+  // Le contrôle ne compte que si l'import a pu démarrer ; sinon on réessaie à la prochaine passe.
+  if (started) setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), url, ok: Boolean(sig) });
   return started ? "Import lancé." : "Un import est déjà en cours.";
 }
 
@@ -79,7 +86,13 @@ function ensureBaseDatasets(): boolean {
       if (outcome.status === "IMPORTED") setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), ok: true });
     });
   }
-  if (!activeDataset(db(), year)) return startYearImport(year);
+  if (!activeDataset(db(), year)) {
+    // Archive de l'année pas encore publiée : au plus une tentative par jour, pas une par heure.
+    const key = yearAttemptKey(year);
+    if (!yearRetryDue(getSetting<{ at: string }>(db(), key), Date.now())) return false;
+    setSetting(db(), key, { at: new Date().toISOString() });
+    return startYearImport(year);
+  }
   return false;
 }
 

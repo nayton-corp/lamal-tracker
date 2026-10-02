@@ -1,7 +1,7 @@
 import { ChevronRight, FileUp, Plus, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getHousehold, listLca, listPersons, listPolicies } from "@/application/household";
+import { getHousehold, getHouseholdMode, listLca, listPersons, listPolicies } from "@/application/household";
 import { ageClassForYear } from "@/domain/age";
 import { AGE_CLASS_LABEL } from "@/domain/lamal";
 import { formatDateShort } from "@/domain/dates";
@@ -9,11 +9,10 @@ import { insurerLabel } from "@/infrastructure/db/queries";
 import { db, today } from "@/server/context";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, Section } from "@/ui/card";
+import { Section } from "@/ui/card";
 import { Chf } from "@/ui/money";
 import { EmptyState, Page, PageHeader } from "@/ui/page";
 import { HouseholdCard } from "./household-card";
-import { HouseholdForm } from "./household-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Foyer" };
@@ -22,23 +21,19 @@ export default function FoyerPage() {
   const h = getHousehold(db());
   if (!h) redirect("/bienvenue");
   const year = Number(today().slice(0, 4));
-  const persons = h ? listPersons(db(), h.id) : [];
+  const persons = listPersons(db(), h.id);
+  const solo = getHouseholdMode(db()) === "SOLO" && persons.length <= 1;
+  const first = persons[0];
 
   return (
-    <Page wide={Boolean(h)}>
-      <PageHeader title="Foyer" subtitle={h ? undefined : "Commencez par décrire votre foyer : l'adresse sert d'expéditeur des lettres, le code postal donne la région de primes."} />
+    <Page wide>
+      <PageHeader title={solo ? "Moi" : "Foyer"} />
 
-      {h ? (
-        <HouseholdCard household={h} />
-      ) : (
-        <Card>
-          <HouseholdForm household={null} />
-        </Card>
-      )}
+      <HouseholdCard household={h} person={solo ? (first ? { firstName: first.firstName, lastName: first.lastName, birthDate: first.birthDate } : null) : undefined} />
 
-      {h && (
+      {(
         <Section
-          title="Membres"
+          title={solo ? "Mes contrats" : "Membres"}
           action={
             <div className="flex gap-1">
               {persons.length > 0 && (
@@ -50,15 +45,15 @@ export default function FoyerPage() {
               )}
               <Button asChild size="sm" variant="ghost">
                 <Link href="/foyer/personne/nouvelle">
-                  <Plus aria-hidden className="size-4" /> Ajouter une personne
+                  <Plus aria-hidden className="size-4" /> {solo ? "Passer en foyer" : "Ajouter une personne"}
                 </Link>
               </Button>
             </div>
           }
         >
           {persons.length === 0 ? (
-            <EmptyState icon={<Users aria-hidden />} title="Aucun membre" action={<Button asChild><Link href="/foyer/personne/nouvelle">Ajouter une personne</Link></Button>}>
-              Ajoutez chaque personne assurée, puis son contrat LAMal de l&apos;année en cours.
+            <EmptyState icon={<Users aria-hidden />} title="Personne n'est encore enregistré" action={<Button asChild><Link href="/bienvenue">Commencer</Link></Button>}>
+              L&apos;accueil guide la saisie, à partir de la police si vous l&apos;avez.
             </EmptyState>
           ) : (
             <ul className="grid gap-3 lg:grid-cols-2">

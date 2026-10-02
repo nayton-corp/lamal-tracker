@@ -26,9 +26,12 @@ ENV NODE_ENV=production \
 # Node embarque ses certificats racines et les fuseaux horaires (ICU) : pas de paquet système requis.
 RUN mkdir -p /data && chown node:node /data
 COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --chown=node:node scripts/entrypoint.sh ./entrypoint.sh
 USER node
 VOLUME ["/data"]
 EXPOSE 3000
 HEALTHCHECK --interval=60s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# Vérifie les droits sur /data (message clair si le bind mount appartient à root).
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]
 CMD ["node", "server.js"]

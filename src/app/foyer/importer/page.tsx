@@ -10,16 +10,12 @@ export const metadata = { title: "Importer une police" };
 
 export default function ImportPolicyPage() {
   const h = getHousehold(db());
-  if (!h) redirect("/foyer");
+  if (!h) redirect("/bienvenue");
   const persons = listPersons(db(), h.id);
   const year = Number(today().slice(0, 4));
   return (
     <Page>
-      <PageHeader
-        title="Importer une police"
-        subtitle="Photographiez votre police ou votre carte d'assuré, ou choisissez le PDF reçu de la caisse : la caisse, les personnes, le produit, la franchise, la prime et les complémentaires sont repris. Vous vérifiez avant d'enregistrer."
-        back="/foyer"
-      />
+      <PageHeader title="Importer une police" subtitle="Le PDF de la police : tout est rempli, vous vérifiez." back="/foyer" />
       <ImportFlow
         hasPersons={persons.length > 0}
         insurers={listInsurers(db()).map((i) => ({ id: i.id, name: insurerLabel(i) })).sort((a, b) => a.name.localeCompare(b.name, "fr"))}

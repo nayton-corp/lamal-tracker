@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { getHouseholdMode } from "@/application/household";
+import { db } from "@/server/context";
 import { AppNav } from "@/ui/app-nav";
 import { ServiceWorker } from "@/ui/service-worker";
 
@@ -24,6 +26,7 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const solo = getHouseholdMode(db()) === "SOLO";
   return (
     <html lang="fr-CH">
       <body className="antialiased">
@@ -31,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Aller au contenu
         </a>
         <div className="lg:pl-64">{children}</div>
-        <AppNav />
+        <AppNav solo={solo} />
         <ServiceWorker />
       </body>
     </html>
