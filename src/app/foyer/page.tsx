@@ -23,7 +23,7 @@ export default function FoyerPage() {
   const persons = h ? listPersons(db(), h.id) : [];
 
   return (
-    <Page>
+    <Page wide={Boolean(h)}>
       <PageHeader title="Foyer" subtitle={h ? undefined : "Commencez par décrire votre foyer : l'adresse sert d'expéditeur des lettres, le code postal donne la région de primes."} />
 
       {h ? (
@@ -40,7 +40,7 @@ export default function FoyerPage() {
           action={
             <Button asChild size="sm" variant="ghost">
               <Link href="/foyer/personne/nouvelle">
-                <Plus aria-hidden className="size-4" /> Ajouter
+                <Plus aria-hidden className="size-4" /> Ajouter une personne
               </Link>
             </Button>
           }
@@ -50,7 +50,7 @@ export default function FoyerPage() {
               Ajoutez chaque personne assurée, puis son contrat LAMal de l&apos;année en cours.
             </EmptyState>
           ) : (
-            <ul className="space-y-3">
+            <ul className="grid gap-3 lg:grid-cols-2">
               {persons.map((p) => {
                 const policies = listPolicies(db(), p.id);
                 const current = policies.find((x) => x.policy.coverageYear === year);
@@ -58,7 +58,7 @@ export default function FoyerPage() {
                 const ageClass = ageClassForYear(p.birthDate, year);
                 return (
                   <li key={p.id}>
-                    <Link href={`/foyer/personne/${p.id}`} className="block rounded-2xl border border-border bg-surface p-4 shadow-card transition-colors hover:bg-surface-2">
+                    <Link href={`/foyer/personne/${p.id}`} className="block h-full rounded-2xl border border-border bg-surface p-4 shadow-card transition-colors hover:bg-surface-2">
                       <div className="flex items-center gap-3">
                         <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
                           <UserRound aria-hidden className="size-5" />
@@ -84,7 +84,7 @@ export default function FoyerPage() {
                             </span>
                           </>
                         ) : (
-                          <Badge tone="increase">Contrat {year} à saisir</Badge>
+                          <Badge tone="increase">Contrat {year} à indiquer</Badge>
                         )}
                         {lca.length > 0 && <Badge tone="lca">{lca.length} LCA</Badge>}
                       </div>

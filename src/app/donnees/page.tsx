@@ -1,4 +1,4 @@
-import { ChevronRight, Download, Landmark } from "lucide-react";
+import { CheckCircle2, ChevronRight, Download, Landmark } from "lucide-react";
 import Link from "next/link";
 import { desc } from "drizzle-orm";
 import { listInsurers } from "@/application/household";
@@ -17,7 +17,7 @@ import { ImportPanel } from "./import-panel";
 import { PushPanel } from "./push-panel";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Données" };
+export const metadata = { title: "Réglages" };
 
 const STATUS = {
   ACTIVE: { label: "actif", tone: "saving" },
@@ -43,89 +43,95 @@ export default function DataPage() {
   const lastCheck = getSetting<{ at: string; ok: boolean }>(db(), "ofsp.lastCheck");
 
   return (
-    <Page>
-      <PageHeader title="Données" subtitle="Primes officielles, paramètres annuels et réglages." />
+    <Page wide>
+      <PageHeader title="Réglages" subtitle="Tout se met à jour tout seul : vous n'avez en principe rien à faire ici." />
 
-      <Section title="Primes officielles (OFSP)">
-        <Card>
-          <ImportPanel initial={importJob()} />
-          <p className="mt-3 text-sm text-muted">
-            Contrôle automatique : quotidien de mi-septembre à fin novembre, hebdomadaire sinon.
-            {lastCheck && ` Dernier contrôle : ${new Date(lastCheck.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich" })}${lastCheck.ok ? "" : " (échec)"}.`}
-          </p>
-        </Card>
-        {visibleDatasets.length > 0 && (
-          <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
-            {visibleDatasets.map((d) => {
-              const report = d.report as ValidationReport | null;
-              const s = STATUS[d.status];
-              return (
-                <li key={d.id} className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-12 font-bold tabular">{d.year ?? "—"}</span>
-                    {d.status !== "ACTIVE" && <Badge tone={s.tone}>{s.label}</Badge>}
-                    {report && (
-                      <span className="text-sm text-muted">
-                        {report.stats.rowsKept.toLocaleString("fr-CH")} primes · {report.stats.insurers} caisses
-                      </span>
-                    )}
-                  </div>
-                  {report && [...report.errors, ...report.warnings].length > 0 && (
-                    <details className="text-sm">
-                      <summary className="min-h-11 cursor-pointer content-center text-primary">
-                        {report.errors.length + report.warnings.length} remarque(s)
-                      </summary>
-                      <ul className="list-disc space-y-1 pl-5 text-muted">
-                        {[...report.errors, ...report.warnings].map((w) => (
-                          <li key={w}>{w}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+        <div className="space-y-6">
+          <Section title="Primes officielles">
+            <Card className="space-y-4">
+              <p className="text-sm text-muted">
+                L&apos;Office fédéral de la santé publique (OFSP) publie fin septembre les primes de toutes les caisses. L&apos;app les télécharge seule, chaque jour de mi-septembre à fin novembre.
+                {lastCheck && ` Dernière vérification : ${new Date(lastCheck.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" })}${lastCheck.ok ? "" : " (échec, nouvel essai prévu)"}.`}
+              </p>
+              {visibleDatasets.length > 0 && (
+                <ul className="divide-y divide-border rounded-xl border border-border">
+                  {visibleDatasets.map((d) => {
+                    const report = d.report as ValidationReport | null;
+                    const s = STATUS[d.status];
+                    const notes = report ? [...report.errors, ...report.warnings] : [];
+                    return (
+                      <li key={d.id} className="px-3 py-2">
+                        <div className="flex min-h-9 items-center gap-2">
+                          {d.status === "ACTIVE" ? <CheckCircle2 aria-hidden className="size-4 text-saving" /> : <Badge tone={s.tone}>{s.label}</Badge>}
+                          <span className="font-semibold tabular">Primes {d.year ?? "—"}</span>
+                          {report && (
+                            <span className="ml-auto text-sm text-muted">
+                              {report.stats.insurers} caisses
+                            </span>
+                          )}
+                        </div>
+                        {notes.length > 0 && (
+                          <details className="text-sm">
+                            <summary className="min-h-9 cursor-pointer content-center text-muted">Détails techniques ({notes.length})</summary>
+                            <ul className="list-disc space-y-1 pb-2 pl-5 text-muted">
+                              {notes.map((w) => (
+                                <li key={w}>{w}</li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <ImportPanel initial={importJob()} />
+            </Card>
+          </Section>
 
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
+          <Section title="Redistribution CO2">
+            <Card className="space-y-3">
+              <p className="text-sm text-muted">
+                Chaque année, la Confédération reverse à chaque habitant une part de la taxe CO2, déduite de vos factures de caisse-maladie. Le montant (en CHF par personne et par an) est déjà rempli ; corrigez-le seulement s&apos;il est différent sur votre facture.
+              </p>
+              {params.map((p) => (
+                <Co2Form key={p.year} year={p.year} amountRp={p.co2AnnualRp} />
+              ))}
+            </Card>
+          </Section>
+        </div>
 
-      <Section title="Redistribution CO2 (CHF par personne et par an)">
-        <Card className="space-y-3">
-          <p className="text-sm text-muted">Déduite de la prime par la caisse ; change chaque année. Ne modifie pas le classement, seulement la prime nette.</p>
-          {params.map((p) => (
-            <Co2Form key={p.year} year={p.year} amountRp={p.co2AnnualRp} />
-          ))}
-        </Card>
-      </Section>
+        <div className="space-y-6">
+          <Section title="Caisses-maladie">
+            <Link href="/donnees/caisses" className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
+              <Landmark aria-hidden className="size-5 text-primary" />
+              <div className="flex-1">
+                <p className="font-medium">Adresses pour les lettres de résiliation</p>
+                <p className="text-sm text-muted">Seules les caisses que vous quittez ont besoin d&apos;une adresse ({insurers.length - missingAddresses} renseignée(s)).</p>
+              </div>
+              <ChevronRight aria-hidden className="size-5 text-muted" />
+            </Link>
+          </Section>
 
-      <Section title="Caisses">
-        <Link href="/donnees/caisses" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
-          <Landmark aria-hidden className="size-5 text-primary" />
-          <div className="flex-1">
-            <p className="font-medium">Adresses de résiliation</p>
-            <p className="text-sm text-muted">{missingAddresses} caisse(s) sans adresse sur {insurers.length}</p>
-          </div>
-          <ChevronRight aria-hidden className="size-5 text-muted" />
-        </Link>
-      </Section>
+          <Section title="Rappels">
+            <Card>
+              <PushPanel devices={subscriptionCount(db())} />
+            </Card>
+          </Section>
 
-      <Section title="Notifications">
-        <Card>
-          <PushPanel devices={subscriptionCount(db())} />
-        </Card>
-      </Section>
-
-      <Section title="Sauvegarde">
-        <Card className="space-y-3">
-          <p className="text-sm text-muted">Copie complète de la base (foyer, contrats, décisions, primes importées). À conserver hors du Pi.</p>
-          <Button asChild variant="secondary" block>
-            <a href="/api/backup" download={`primes-lamal-${today()}.db`}>
-              <Download aria-hidden className="size-4" /> Télécharger une sauvegarde
-            </a>
-          </Button>
-        </Card>
-      </Section>
+          <Section title="Sauvegarde">
+            <Card className="space-y-3">
+              <p className="text-sm text-muted">Une copie de tout ce que vous avez saisi (foyer, contrats, choix). Gardez-la ailleurs, par exemple sur une clé USB, au cas où.</p>
+              <Button asChild variant="secondary" block>
+                <a href="/api/backup" download={`primes-lamal-${today()}.db`}>
+                  <Download aria-hidden className="size-4" /> Télécharger une sauvegarde
+                </a>
+              </Button>
+            </Card>
+          </Section>
+        </div>
+      </div>
     </Page>
   );
 }

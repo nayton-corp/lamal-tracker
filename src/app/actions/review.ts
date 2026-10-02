@@ -7,6 +7,7 @@ import { generateLetters } from "@/application/letters";
 import {
   acknowledgeLca,
   closeReview,
+  deleteReview,
   confirmLineage,
   decide,
   deleteLetter,
@@ -14,6 +15,7 @@ import {
   markLetterAcknowledged,
   markLetterSent,
   openReview,
+  reopenReview,
   setLineFlags,
   undoDecision,
 } from "@/application/review";
@@ -153,6 +155,28 @@ export async function closeReviewAction(_: ActionState, form: FormData): Promise
   const year = Number(form.get("year"));
   try {
     closeReview(db(), Number(form.get("reviewId")), nowIso());
+  } catch (e) {
+    return toActionError(e);
+  }
+  done(year);
+  return null;
+}
+
+export async function reopenReviewAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const year = Number(form.get("year"));
+  try {
+    reopenReview(db(), Number(form.get("reviewId")));
+  } catch (e) {
+    return toActionError(e);
+  }
+  done(year);
+  return null;
+}
+
+export async function deleteReviewAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const year = Number(form.get("year"));
+  try {
+    deleteReview(db(), Number(form.get("reviewId")));
   } catch (e) {
     return toActionError(e);
   }

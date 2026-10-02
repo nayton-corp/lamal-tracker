@@ -439,6 +439,58 @@ export function closeReview(db: Db, reviewId: number, nowIso: string) {
   });
 }
 
+/**
+ * Annule la clôture : retire les contrats de l'année cible créés par la clôture et rouvre la revue.
+ * Les décisions restent, on peut les modifier puis clôturer à nouveau.
+ */
+export function reopenReview(db: Db, reviewId: number) {
+  const r = db.select().from(review).where(eq(review.id, reviewId)).get();
+  if (!r) throw new UserError("Rituel introuvable.");
+  if (r.status !== "CLOSED") return;
+  const created = createdPolicies(db, r.id, r.targetYear);
+  const ids = created.map((p) => p.id);
+  if (ids.length) {
+    const usedBy = db.select().from(reviewLine).where(inArray(reviewLine.currentPolicyId, ids)).get();
+    if (usedBy) {
+      const later = db.select().from(review).where(eq(review.id, usedBy.reviewId)).get()!;
+      throw new UserError(`Le rituel ${later.targetYear} s'appuie sur ces contrats : supprimez-le d'abord.`);
+    }
+  }
+  db.transaction((tx) => {
+    if (ids.length) tx.delete(lamalPolicy).where(inArray(lamalPolicy.id, ids)).run();
+    tx.update(review).set({ status: "OPEN", closedAt: null }).where(eq(review.id, r.id)).run();
+  });
+}
+
+/** Supprime le rituel (décisions et lettres comprises), même clôturé : on revient à l'état d'avant. */
+export function deleteReview(db: Db, reviewId: number) {
+  const r = db.select().from(review).where(eq(review.id, reviewId)).get();
+  if (!r) return;
+  reopenReview(db, reviewId);
+  db.delete(review).where(eq(review.id, reviewId)).run();
+}
+
+function createdPolicies(db: Db, reviewId: number, targetYear: number) {
+  const personIds = db
+    .select({ personId: reviewLine.personId })
+    .from(reviewLine)
+    .where(eq(reviewLine.reviewId, reviewId))
+    .all()
+    .map((l) => l.personId);
+  if (!personIds.length) return [];
+  return db
+    .select()
+    .from(lamalPolicy)
+    .where(
+      and(
+        inArray(lamalPolicy.personId, personIds),
+        eq(lamalPolicy.coverageYear, targetYear),
+        eq(lamalPolicy.source, "REVIEW"),
+      ),
+    )
+    .all();
+}
+
 export function deleteLetter(db: Db, letterId: number) {
   const l = db.select().from(letter).where(eq(letter.id, letterId)).get();
   if (!l) return;

@@ -17,7 +17,8 @@ src/
   infrastructure/  SQLite (Drizzle), import OFSP en flux, rendu PDF, notifications push
   server/          Contexte serveur (horloge Europe/Zurich, tâches d'import, planificateur)
   app/             Pages Next.js (App Router) et server actions
-  ui/              Composants d'interface (design system)
+  ui/              Composants d'interface (design system) : mobile d'abord ; dès 1024 px, navigation latérale (AppNav),
+                   pages élargies (Page wide) et panneaux (Sheet) affichés en fenêtre centrée
 ```
 
 Les frontières sont imposées par ESLint (`no-restricted-imports`) : le domaine n'importe rien

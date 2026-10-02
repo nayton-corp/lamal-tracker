@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { BottomNav } from "@/ui/bottom-nav";
+import { AppNav } from "@/ui/app-nav";
 import { ServiceWorker } from "@/ui/service-worker";
 
 export const metadata: Metadata = {
@@ -30,8 +30,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#contenu" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-surface focus:p-3">
           Aller au contenu
         </a>
-        {children}
-        <BottomNav />
+        <div className="lg:pl-64">{children}</div>
+        <AppNav />
         <ServiceWorker />
       </body>
     </html>

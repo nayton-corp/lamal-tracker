@@ -17,7 +17,7 @@ export default function HistoryPage() {
     return (
       <Page>
         <PageHeader title="Historique" />
-        <EmptyState icon={<LineIcon aria-hidden />} title="Pas encore d'historique" action={<Button asChild><Link href="/foyer">Saisir les contrats</Link></Button>}>
+        <EmptyState icon={<LineIcon aria-hidden />} title="Pas encore d'historique" action={<Button asChild><Link href="/foyer">Indiquer les contrats</Link></Button>}>
           L&apos;historique se construit à partir des contrats de chaque année. Saisissez aussi les années passées si vous avez les polices.
         </EmptyState>
       </Page>
@@ -26,8 +26,8 @@ export default function HistoryPage() {
   const first = h.totals[0]!;
   const last = h.totals.at(-1)!;
   return (
-    <Page>
-      <PageHeader title="Historique" subtitle={`${h.years[0]}–${h.years.at(-1)} · primes réellement facturées`} />
+    <Page wide>
+      <PageHeader title="Historique" subtitle={`${h.years[0]}–${h.years.at(-1)} · primes réellement payées`} />
       {h.totals.length > 1 && (
         <Card className="flex items-center justify-between gap-3">
           <div>
@@ -40,16 +40,18 @@ export default function HistoryPage() {
           </div>
         </Card>
       )}
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:space-y-0">
       <Section title="Foyer, prime mensuelle">
         <Card>
           <TotalsChart totals={h.totals} />
         </Card>
       </Section>
-      <Section title="Par personne, prime nette de CO2">
+      <Section title="Par personne, après redistribution CO2">
         <Card>
           <PersonChart persons={h.persons} years={h.years} />
         </Card>
       </Section>
+      </div>
       <Section title="Détail">
         <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-card">
           <table className="w-full text-sm">

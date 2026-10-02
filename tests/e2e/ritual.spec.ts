@@ -20,7 +20,7 @@ async function importFile(page: Page, file: string, year: number) {
 test("rituel annuel complet sur mobile", async ({ page }) => {
   // Accueil vide → foyer
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /rituel d'automne/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /juste prix/ })).toBeVisible();
   await shot(page, "01-accueil-vide");
   await page.getByRole("link", { name: "Commencer" }).click();
 
@@ -148,4 +148,49 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await shot(page, "10-historique");
   await page.goto("/");
   await shot(page, "11-accueil");
+});
+
+test.describe("sur ordinateur", () => {
+  test.use({ viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
+
+  test("navigation latérale, toutes les pages, et retour en arrière sur un rituel clôturé", async ({ page }) => {
+    const nav = page.getByRole("navigation", { name: "Navigation principale" });
+    await page.goto("/");
+    await expect(nav.getByRole("link", { name: /Foyer/ })).toBeVisible();
+    await shot(page, "d01-accueil");
+    for (const [name, file] of [["Foyer", "d02-foyer"], ["Historique", "d03-historique"], ["Réglages", "d04-reglages"]] as const) {
+      await nav.getByRole("link", { name: new RegExp(name) }).click();
+      await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+      await shot(page, file);
+    }
+    await page.goto("/foyer");
+    await page.getByRole("link", { name: /Alex Test/ }).click();
+    await shot(page, "d05-personne");
+    await page.getByRole("button", { name: "Ajouter un contrat LAMal" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.waitForTimeout(300);
+    await shot(page, "d06-dialogue");
+    await page.keyboard.press("Escape");
+
+    // Rituel clôturé : on peut le rouvrir…
+    await nav.getByRole("link", { name: /Rituel/ }).click();
+    await expect(page.getByText("Clôturé · contrats 2027 créés.")).toBeVisible();
+    await shot(page, "d07-rituel-cloture");
+    await page.getByRole("button", { name: "Rouvrir le rituel" }).click();
+    await page.waitForTimeout(300);
+    await shot(page, "d08-confirmation");
+    await page.getByRole("dialog").getByRole("button", { name: "Rouvrir" }).click();
+    await expect(page.getByRole("button", { name: "Clôturer le rituel 2027" })).toBeVisible();
+    await expect(page.getByText("Je change de caisse")).toBeVisible();
+    await page.getByRole("link", { name: "Revoir" }).click();
+    await expect(page.getByText("Sans rien faire en 2027")).toBeVisible();
+    await shot(page, "d09-comparateur");
+    await page.goto("/rituel/2027");
+
+    // … ou le supprimer complètement.
+    await page.getByRole("button", { name: "Supprimer ce rituel" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Supprimer le rituel" }).click();
+    await expect(page.getByRole("button", { name: "Lancer l'analyse 2027" })).toBeVisible();
+    await shot(page, "d10-rituel-supprime");
+  });
 });

@@ -29,11 +29,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const hasCurrent = policies.some((x) => x.policy.coverageYear === year);
 
   return (
-    <Page>
+    <Page wide>
       <PageHeader title={`${p.firstName} ${p.lastName}`} back="/foyer" />
 
       <ProfileCard person={p} insurers={insurers} year={year} ageLabel={`${AGE_CLASS_LABEL[ageClassForYear(p.birthDate, year)]} en ${year}`} />
 
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
       <Section
         title="Contrats LAMal"
         action={
@@ -49,7 +50,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         {policies.length === 0 ? (
           <Card>
             <p className="text-muted">
-              Ajoutez le contrat {year} (et les années précédentes si vous les avez : l&apos;historique se construit à partir d&apos;eux).
+              Indiquez le contrat {year} : choisissez la caisse et la franchise, la prime est retrouvée toute seule. Les années précédentes sont facultatives (elles alimentent l&apos;historique).
             </p>
           </Card>
         ) : (
@@ -70,7 +71,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                   <PolicySheet personId={p.id} insurers={insurers} years={years} label="edit" policy={{ ...policy, insurerId: policy.insurerId }} />
                   <form action={deletePolicyAction}>
                     <input type="hidden" name="id" value={policy.id} />
-                    <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer le contrat ${policy.coverageYear}`} className="text-increase" message={`Supprimer le contrat ${policy.coverageYear} ?`}>
+                    <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer le contrat ${policy.coverageYear}`} className="text-increase" message={`Supprimer le contrat ${policy.coverageYear} ?`} confirmLabel="Supprimer" details={<p>Le contrat disparaît de l&apos;historique. Votre vraie assurance n&apos;est pas touchée : rien n&apos;est envoyé à la caisse.</p>}>
                       <Trash2 aria-hidden className="size-4" />
                     </ConfirmButton>
                   </form>
@@ -101,7 +102,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                 <LcaSheet personId={p.id} insurers={insurers} lca={c} />
                 <form action={deleteLcaAction}>
                   <input type="hidden" name="id" value={c.id} />
-                  <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer ${c.productName}`} className="text-increase" message={`Supprimer ${c.productName} ?`}>
+                  <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer ${c.productName}`} className="text-increase" message={`Supprimer ${c.productName} ?`} confirmLabel="Supprimer" details={<p>Elle ne sera plus surveillée lors d&apos;un changement de caisse. Rien n&apos;est envoyé à l&apos;assureur.</p>}>
                     <Trash2 aria-hidden className="size-4" />
                   </ConfirmButton>
                 </form>
@@ -110,11 +111,11 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </ul>
         )}
       </Section>
+      </div>
 
-
-      <form action={deletePersonAction} className="pt-2">
+      <form action={deletePersonAction} className="pt-2 lg:max-w-sm">
         <input type="hidden" name="id" value={p.id} />
-        <ConfirmButton variant="secondary" block className="text-increase" message={`Supprimer ${p.firstName} et tout son historique ?`}>
+        <ConfirmButton variant="secondary" block className="text-increase" message={`Supprimer ${p.firstName} ?`} confirmLabel={`Supprimer ${p.firstName}`} details={<p>{p.firstName}, ses contrats, ses complémentaires et son historique seront effacés de l&apos;app. Rien n&apos;est envoyé à la caisse.</p>}>
           <Trash2 aria-hidden className="size-4" /> Supprimer {p.firstName} et ses contrats
         </ConfirmButton>
       </form>

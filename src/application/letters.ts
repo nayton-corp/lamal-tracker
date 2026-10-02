@@ -4,7 +4,6 @@ import { reviewDeadlines } from "@/domain/deadlines";
 import { buildLetter, type LetterContent } from "@/domain/letter";
 import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
-import { insurerLabel } from "@/infrastructure/db/queries";
 import { insurer, letter } from "@/infrastructure/db/schema";
 import { getHousehold } from "./household";
 import { getReviewView, UserError } from "./review";

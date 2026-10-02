@@ -15,9 +15,9 @@ export function Co2Form({ year, amountRp }: { year: number; amountRp: number | n
         <Input name="co2Annual" inputMode="decimal" aria-label={`Redistribution CO2 ${year} en CHF par personne et par an`} defaultValue={amountRp === null ? "" : (amountRp / 100).toFixed(2)} placeholder="à saisir" />
       </label>
       <SubmitButton size="sm" variant="secondary" pendingLabel="…">
-        OK
+        Enregistrer
       </SubmitButton>
-      {state?.error && <span className="text-sm text-increase">{state.error}</span>}
+      {state?.error && <span className="col-span-3 text-sm text-increase">{state.error}</span>}
     </form>
   );
 }

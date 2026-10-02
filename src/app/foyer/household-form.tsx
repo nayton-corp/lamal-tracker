@@ -71,7 +71,7 @@ export function HouseholdForm({ household, onDone }: { household: Household | nu
         <Input id="street" name="street" defaultValue={household?.street ?? ""} autoComplete="street-address" />
       </Field>
       <div className="grid grid-cols-[7rem_1fr] gap-3">
-        <Field label="NPA" htmlFor="postalCode" error={fe.canton || fe.region}>
+        <Field label="Code postal (NPA)" htmlFor="postalCode" error={fe.canton || fe.region}>
           <Input id="postalCode" name="postalCode" inputMode="numeric" maxLength={4} required value={npa} onChange={(e) => setNpa(e.target.value.replace(/\D/g, ""))} autoComplete="postal-code" />
         </Field>
         <Field label="Localité" htmlFor="city">

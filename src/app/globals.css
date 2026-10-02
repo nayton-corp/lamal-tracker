@@ -157,3 +157,24 @@ label,
     transform: scaleX(1);
   }
 }
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.animate-fade {
+  animation: fade 160ms ease-out both;
+}
+
+.animate-pop {
+  animation: pop 200ms var(--ease-out-soft) both;
+}

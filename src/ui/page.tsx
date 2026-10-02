@@ -3,8 +3,19 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 
-export function Page({ children, className }: { children: ReactNode; className?: string }) {
-  return <main id="contenu" className={cn("mx-auto max-w-xl space-y-6 px-4 pt-4 pb-28", className)}>{children}</main>;
+/**
+ * Conteneur de page. Étroit et centré sur téléphone ; sur ordinateur, `wide` ouvre la place
+ * aux grilles (tableaux de bord), sinon la colonne reste lisible (formulaires, textes).
+ */
+export function Page({ children, className, wide }: { children: ReactNode; className?: string; wide?: boolean }) {
+  return (
+    <main
+      id="contenu"
+      className={cn("mx-auto max-w-xl space-y-6 px-4 pt-4 pb-28 lg:px-8 lg:pt-10 lg:pb-16", wide ? "md:max-w-3xl lg:max-w-5xl" : "md:max-w-2xl", className)}
+    >
+      {children}
+    </main>
+  );
 }
 
 export function PageHeader({ title, subtitle, back, action }: { title: string; subtitle?: ReactNode; back?: string; action?: ReactNode }) {
