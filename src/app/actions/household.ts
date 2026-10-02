@@ -13,10 +13,12 @@ import {
   getHousehold,
 } from "@/application/household";
 import { tariffOptions, type TariffOptions } from "@/application/tariffs";
+import { analyzePolicyText, applyPolicyImport, type ConfirmedImport, type PolicyImport } from "@/application/policy-import";
+import { readPdfText } from "@/infrastructure/pdf/read-text";
 import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/postal";
 import { UserError } from "@/application/review";
 import { chfField, toActionError, type ActionState } from "@/server/action";
-import { db } from "@/server/context";
+import { db, today } from "@/server/context";
 
 const str = (f: FormData, k: string) => {
   const v = f.get(k);
@@ -140,4 +142,27 @@ export async function postalCodeAction(npa: string): Promise<CommuneOption[]> {
 
 export async function tariffOptionsAction(personId: number, year: number, insurerId: number): Promise<TariffOptions> {
   return tariffOptions(db(), personId, year, insurerId);
+}
+
+export async function analyzePolicyAction(form: FormData): Promise<{ result?: PolicyImport; error?: string }> {
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choisissez le PDF de votre police." };
+  if (file.size > 20 * 1024 * 1024) return { error: "Fichier trop volumineux (20 Mo au plus)." };
+  try {
+    const text = await readPdfText(new Uint8Array(await file.arrayBuffer()));
+    return { result: analyzePolicyText(db(), text, Number(today().slice(0, 4))) };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    return { error: "Ce fichier n'a pas pu être lu comme un PDF." };
+  }
+}
+
+export async function applyPolicyImportAction(input: ConfirmedImport): Promise<{ ok?: string; error?: string }> {
+  try {
+    const n = applyPolicyImport(db(), input);
+    revalidatePath("/", "layout");
+    return { ok: `${n} contrat(s) ${input.year} enregistré(s).` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Enregistrement impossible." };
+  }
 }

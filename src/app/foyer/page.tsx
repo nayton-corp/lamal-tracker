@@ -1,4 +1,4 @@
-import { ChevronRight, Plus, UserRound, Users } from "lucide-react";
+import { ChevronRight, FileUp, Plus, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { getHousehold, listLca, listPersons, listPolicies } from "@/application/household";
 import { ageClassForYear } from "@/domain/age";
@@ -38,11 +38,20 @@ export default function FoyerPage() {
         <Section
           title="Membres"
           action={
-            <Button asChild size="sm" variant="ghost">
-              <Link href="/foyer/personne/nouvelle">
-                <Plus aria-hidden className="size-4" /> Ajouter une personne
-              </Link>
-            </Button>
+            <div className="flex gap-1">
+              {persons.length > 0 && (
+                <Button asChild size="sm" variant="ghost">
+                  <Link href="/foyer/importer">
+                    <FileUp aria-hidden className="size-4" /> Importer une police
+                  </Link>
+                </Button>
+              )}
+              <Button asChild size="sm" variant="ghost">
+                <Link href="/foyer/personne/nouvelle">
+                  <Plus aria-hidden className="size-4" /> Ajouter une personne
+                </Link>
+              </Button>
+            </div>
           }
         >
           {persons.length === 0 ? (
