@@ -102,11 +102,14 @@ export function parseCanton(v: string): Canton | null {
   return m && isCanton(m[1]!) ? m[1] : null;
 }
 
-/** Hoheitsgebiet : « CH », « HGB_CH », « Schweiz »… → true ; un autre pays → false ; vide → null. */
+/**
+ * Hoheitsgebiet : « CH », « P_OKPCH » (valeur réelle 2027 : primes AOS Suisse), « Schweiz »… → true ;
+ * un autre territoire (« DE », « P_OKPEU »…) → false ; vide → null.
+ */
 export function parseSwissTerritory(v: string): boolean | null {
   const u = v.trim().toUpperCase();
   if (!u) return null;
-  return /(^|[^A-Z])CH$|^CHE$|SCHWEIZ|SUISSE|SVIZZERA/.test(u);
+  return /CH$|^CHE$|SCHWEIZ|SUISSE|SVIZZERA/.test(u);
 }
 
 export function parseRegion(v: string): number | null {

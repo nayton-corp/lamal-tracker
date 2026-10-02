@@ -57,6 +57,8 @@ describe("ligne", () => {
     expect(parseCanton("XX")).toBeNull();
     expect(parseSwissTerritory("CH")).toBe(true);
     expect(parseSwissTerritory("HGB_CH")).toBe(true);
+    expect(parseSwissTerritory("P_OKPCH")).toBe(true);
+    expect(parseSwissTerritory("P_OKPEU")).toBe(false);
     expect(parseSwissTerritory("Schweiz")).toBe(true);
     expect(parseSwissTerritory("DE")).toBe(false);
     expect(parseSwissTerritory("EU_DE")).toBe(false);

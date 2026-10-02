@@ -64,7 +64,7 @@ function rows(year: number): unknown[][] {
                   ? `FRA_${String(i + 1).padStart(2, "0")}_${age.letter}_${String(f).padStart(4, "0")}`
                   : `FRA-${f}`;
                 const row = [
-                  ins.bag, canton, newFormat ? `PR_REG_${region}` : `PR-REG CH${region}`, "CH", year, year - 1,
+                  ins.bag, canton, newFormat ? `PR_REG_${region}` : `PR-REG CH${region}`, newFormat ? "P_OKPCH" : "CH", year, year - 1,
                   newFormat ? age.key : age.old, newFormat ? sub : kid ? sub : "",
                   newFormat ? (accident ? "MIT_UNF" : "OHN_UNF") : accident ? "MIT-UNF" : "OHN-UNF",
                   codeFor(m), newFormat ? m.key : m.old, `${m.label} ${ins.prefix}`,
