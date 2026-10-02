@@ -1,0 +1,38 @@
+name: Référentiels officiels (caisses, surveillance, CO2)
+
+# Régénère les référentiels embarqués : annuaire des caisses (OFSP, deux fois par an),
+# données de surveillance (OFSP, chaque automne), redistribution CO2 (OFEV, fin août).
+# Contrôle chaque mois ; une mise à jour est proposée sous forme de pull request.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 3 * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsx --tsconfig tsconfig.json scripts/build-reference.ts
+      - name: Proposer la mise à jour
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- src/infrastructure/reference/data; then echo "Aucun changement"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B auto/reference-data
+          git add src/infrastructure/reference/data
+          git commit -m "Référentiels officiels : mise à jour (caisses, surveillance, CO2)"
+          git push -f origin auto/reference-data
+          gh pr create --title "Référentiels officiels : mise à jour" --body "Annuaire des caisses et données de surveillance (OFSP), redistribution CO2 (OFEV), régénérés depuis les sources officielles." --base main --head auto/reference-data || true
