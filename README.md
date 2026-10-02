@@ -24,7 +24,7 @@ sudo usermod -aG docker $USER   # puis se déconnecter / reconnecter
 
 ### 2. Récupérer l'image
 
-L'image `linux/arm64` est construite automatiquement par GitHub Actions à chaque mise à jour de `main` et publiée sur `ghcr.io/naythanb/lamal-tracker`. Le dépôt étant privé, l'image l'est aussi : il faut se connecter une fois avec un jeton GitHub.
+L'image `linux/arm64` est construite automatiquement par GitHub Actions à chaque mise à jour de `main` et publiée sur `ghcr.io/nayton-corp/lamal-tracker`. Le dépôt étant privé, l'image l'est aussi : il faut se connecter une fois avec un jeton GitHub.
 
 1. Sur GitHub : *Settings › Developer settings › Personal access tokens › Tokens (classic)*, créer un jeton avec la seule permission **`read:packages`**.
 2. Sur le Pi :
