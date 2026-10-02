@@ -25,11 +25,11 @@ export function openDatabase(file: string): Db {
 }
 
 export function dataDir(): string {
-  return process.env.DATA_DIR ?? path.join(process.cwd(), "data");
+  return process.env.DATA_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), "data");
 }
 
 export function databasePath(): string {
-  return process.env.DATABASE_PATH ?? path.join(dataDir(), "lamal.sqlite");
+  return process.env.DATABASE_PATH ?? path.join(/*turbopackIgnore: true*/ dataDir(), "lamal.sqlite");
 }
 
 const globalForDb = globalThis as unknown as { __lamalDb?: Db };

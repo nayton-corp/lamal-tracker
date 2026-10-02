@@ -352,8 +352,4 @@ export class TariffRepository {
   insurerName(id: number): string {
     return this.db.select({ name: insurer.name }).from(insurer).where(eq(insurer.id, id)).get()?.name ?? `Assureur n° ${id}`;
   }
-
-  premiumTariffTable() {
-    return premiumTariff;
-  }
 }

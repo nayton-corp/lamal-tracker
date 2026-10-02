@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   applicationName: "LAMal Tracker",
   appleWebApp: { capable: true, title: "LAMal", statusBarStyle: "default" },
   formatDetection: { telephone: false },
-  icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  icons: { icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192" }], apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
