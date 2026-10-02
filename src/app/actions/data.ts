@@ -10,7 +10,7 @@ import { lamalParameters } from "@/infrastructure/db/schema";
 import { saveSubscription, removeSubscription, notifyAll } from "@/infrastructure/push/push";
 import { chfField, toActionError, type ActionState } from "@/server/action";
 import { db, nowIso } from "@/server/context";
-import { dataDir, startImport } from "@/server/jobs";
+import { dataDir, startArchivesImport, startImport } from "@/server/jobs";
 import { checkForNewPremiums } from "@/server/watch";
 
 export async function checkPremiumsAction(): Promise<ActionState> {
@@ -21,11 +21,15 @@ export async function checkPremiumsAction(): Promise<ActionState> {
   }
 }
 
+export async function importArchivesAction(): Promise<ActionState> {
+  return startArchivesImport() ? { ok: "Import des archives lancé." } : { error: "Un import est déjà en cours." };
+}
+
 export async function uploadPremiumsAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const file = form.get("file");
     if (!(file instanceof File) || file.size === 0) throw new UserError("Choisissez un fichier .xlsx ou .csv.");
-    if (!/\.(xlsx|csv)$/i.test(file.name)) throw new UserError("Format attendu : .xlsx ou .csv (fichier « Prämien_CH » de l'OFSP).");
+    if (!/\.(xlsx|csv|zip)$/i.test(file.name)) throw new UserError("Format attendu : .xlsx, .csv ou archive .zip de l'OFSP.");
     const dir = path.join(dataDir(), "uploads");
     fs.mkdirSync(dir, { recursive: true });
     const target = path.join(dir, `${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`);

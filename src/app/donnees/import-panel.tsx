@@ -1,10 +1,10 @@
 "use client";
 
-import { CloudDownload, FileUp, Loader2 } from "lucide-react";
+import { CloudDownload, FileUp, History, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import type { ActionState } from "@/server/action";
-import { checkPremiumsAction, uploadPremiumsAction } from "@/app/actions/data";
+import { checkPremiumsAction, importArchivesAction, uploadPremiumsAction } from "@/app/actions/data";
 import type { ImportJob } from "@/server/jobs";
 import { Alert } from "@/ui/alert";
 import { Button } from "@/ui/button";
@@ -53,13 +53,28 @@ export function ImportPanel({ initial }: { initial: ImportJob }) {
         {checking ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <CloudDownload aria-hidden className="size-5" />}
         Télécharger les primes depuis l&apos;OFSP
       </Button>
+      <Button
+        block
+        variant="secondary"
+        disabled={checking || job.running}
+        onClick={() =>
+          startCheck(async () => {
+            const res = await importArchivesAction();
+            setCheckMsg(res);
+            if (res?.ok) setPolling(true);
+          })
+        }
+      >
+        <History aria-hidden className="size-5" />
+        Importer les années précédentes (archives)
+      </Button>
       {checkMsg?.error && <FormError message={`Téléchargement impossible : ${checkMsg.error}. Vous pouvez importer le fichier à la main ci-dessous.`} />}
 
       <form action={upload} className="space-y-2 rounded-xl border border-dashed border-border p-3">
         <label htmlFor="file" className="flex items-center gap-2 text-sm font-medium">
-          <FileUp aria-hidden className="size-4" /> Ou importer le fichier « Prämien_CH » (.xlsx / .csv)
+          <FileUp aria-hidden className="size-4" /> Ou importer un fichier OFSP (.xlsx, .csv ou archive .zip)
         </label>
-        <input id="file" name="file" type="file" accept=".xlsx,.csv" className="block w-full text-sm file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:font-medium file:text-primary" />
+        <input id="file" name="file" type="file" accept=".xlsx,.csv,.zip" className="block w-full text-sm file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:font-medium file:text-primary" />
         <SubmitButton size="sm" variant="secondary" disabled={job.running} pendingLabel="Envoi…">
           Importer le fichier
         </SubmitButton>
@@ -76,6 +91,15 @@ export function ImportPanel({ initial }: { initial: ImportJob }) {
               </p>
               <p className="mt-1 opacity-80">{job.label}. Sur un Raspberry Pi, comptez une à quelques minutes.</p>
             </div>
+          )}
+          {job.log.length > 0 && (
+            <Alert tone="info" title="Archives">
+              <ul className="list-disc pl-4">
+                {job.log.map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
+            </Alert>
           )}
           {job.phase === "error" && <Alert tone="danger" title="L'import a échoué">{job.error}</Alert>}
           {outcome?.status === "IMPORTED" && (

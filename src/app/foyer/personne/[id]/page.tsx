@@ -24,7 +24,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const insurers = listInsurers(db()).map((i) => ({ id: i.id, name: insurerLabel(i) }));
   const policies = listPolicies(db(), p.id).reverse();
   const lca = listLca(db(), p.id);
-  const years = Array.from({ length: 8 }, (_, i) => year + 1 - i);
+  // Contrats saisissables de 2010 à l'année prochaine (historique personnel).
+  const years = Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i);
   const hasCurrent = policies.some((x) => x.policy.coverageYear === year);
 
   return (

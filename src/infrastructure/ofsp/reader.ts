@@ -1,11 +1,13 @@
 import ExcelJS from "exceljs";
 import fs from "node:fs";
 import readline from "node:readline";
+import { extractPremiumFile, isXlsxZip } from "./archive";
 
 /** Lit les lignes d'un fichier de primes (xlsx en flux, ou csv) sous forme de tableaux de cellules. */
 export async function* readRows(file: string): AsyncGenerator<unknown[]> {
-  if (await isZip(file)) yield* readXlsx(file);
-  else yield* readCsv(file);
+  if (!(await isZip(file))) yield* readCsv(file);
+  else if (isXlsxZip(file)) yield* readXlsx(file);
+  else yield* readRows(extractPremiumFile(file)); // archive annuelle .zip
 }
 
 async function isZip(file: string): Promise<boolean> {

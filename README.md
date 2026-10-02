@@ -97,6 +97,8 @@ Cloner le dépôt sur le Pi, décommenter `build: .` dans `docker-compose.yml`, 
 
 - Source : [opendata.swiss — Krankenversicherungsprämien](https://opendata.swiss/de/dataset/health-insurance-premiums) (fichier `Prämien_CH.xlsx`). Depuis les primes 2027, le fichier n'est plus sur priminfo.admin.ch.
 - L'OFSP a changé **tous les codes** en 2027 (régions `PR_REG_1`, classes d'âge `AKA_03_ERW`, franchises `FRA_01_E_0300`, types de tarif `BASE/PRAXIS/FLEX/TEL_DIG/PHARM`). Le parseur lit les deux générations et les ramène à une seule forme ; une ligne illisible est rejetée et comptée, jamais devinée.
+- **Années précédentes** : *Données › Importer les années précédentes* télécharge les archives annuelles de l'OFSP (`Archiv_Praemien_AAAA.zip`, ancien format de codes) pour les repères de marché de l'historique et le pré-remplissage des anciens contrats. Une archive plus ancienne (par ex. depuis [l'archive Priminfo](https://www.priminfo.admin.ch/de/downloads/archiv)) peut être importée à la main (.zip, .xlsx ou .csv).
+- Vos **propres contrats** des années passées (2010 et suivantes) se saisissent dans *Foyer* : l'historique se construit à partir d'eux.
 - Chaque import est un **jeu immuable** identifié par son empreinte SHA-256, validé (années, cantons, bornes de primes, variation par rapport à l'année précédente) avant d'être activé.
 - Le workflow *Surveillance du format OFSP* importe le vrai fichier chaque jour en septembre-octobre : s'il échoue, GitHub vous prévient avant le rituel.
 - L'Open Data ne contient **pas** : listes de médecins des modèles alternatifs, adresses de résiliation, contrats LCA, redistribution CO2. Ces informations sont saisies dans l'app.
@@ -112,6 +114,7 @@ pnpm lint && pnpm typecheck
 pnpm build && pnpm e2e   # parcours complet sur mobile (Playwright)
 pnpm cli import tests/fixtures/generated/primes-2027.xlsx
 pnpm cli download  # importe le fichier OFSP réel
+pnpm cli download-archives  # importe les archives des années précédentes
 ```
 
 Architecture : voir [`docs/architecture.md`](docs/architecture.md).

@@ -63,6 +63,48 @@ export function pickPremiumResource(payload: unknown): string | null {
   return scored[0]?.url ?? null;
 }
 
+export interface ArchiveResource {
+  year: number;
+  url: string;
+  /** false : URL déduite du schéma connu, pas annoncée par le catalogue. */
+  listed: boolean;
+}
+
+/** Archives annuelles annoncées dans la réponse CKAN (Archiv_Praemien_AAAA.zip). */
+export function pickArchiveResources(payload: unknown): ArchiveResource[] {
+  const resources: CkanResource[] =
+    (payload as { result?: { resources?: CkanResource[] } })?.result?.resources ?? [];
+  const found = new Map<number, string>();
+  for (const r of resources) {
+    const url = r.download_url || r.url || "";
+    const text = `${label(r.name)} ${label(r.title)} ${url} ${decodedPath(url)}`;
+    const m = /archiv[^0-9]{0,20}(20\d\d)/i.exec(text);
+    if (url && m) found.set(Number(m[1]), url);
+  }
+  return [...found.entries()].sort((a, b) => b[0] - a[0]).map(([year, url]) => ({ year, url, listed: true }));
+}
+
+/** URL déduite (même hébergement que le fichier courant) quand le catalogue est muet. */
+export function guessedArchiveUrl(year: number): string {
+  const p = Buffer.from(`/Praemien/Archiv_Praemien_${year}.zip`).toString("base64");
+  return `https://opendata.bagnet.ch/?r=/download&path=${encodeURIComponent(p)}`;
+}
+
+/** Archives disponibles, des plus récentes aux plus anciennes. */
+export async function listArchives(fetchImpl: typeof fetch = fetch): Promise<ArchiveResource[]> {
+  try {
+    const res = await fetchImpl(CKAN_PACKAGE_URL, { headers: HEADERS, signal: AbortSignal.timeout(20_000) });
+    if (res.ok) {
+      const listed = pickArchiveResources(await res.json());
+      if (listed.length) return listed;
+    }
+  } catch {
+    // catalogue injoignable : repli sur les URL déduites
+  }
+  const year = new Date().getFullYear();
+  return [year, year - 1, year - 2].map((y) => ({ year: y, url: guessedArchiveUrl(y), listed: false }));
+}
+
 export async function resolvePremiumsUrl(fetchImpl: typeof fetch = fetch): Promise<string> {
   if (process.env.OFSP_PREMIUMS_URL) return process.env.OFSP_PREMIUMS_URL;
   try {
@@ -101,7 +143,8 @@ export async function download(url: string, dir: string): Promise<string> {
   const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(10 * 60_000) });
   if (!res.ok || !res.body) throw new Error(`Téléchargement ${url} : HTTP ${res.status}`);
   const type = res.headers.get("content-type") ?? "";
-  const ext = /csv/i.test(type) ? ".csv" : ".xlsx";
+  const disposition = res.headers.get("content-disposition") ?? "";
+  const ext = /\.zip/i.test(disposition) || /zip/i.test(type) || /\.zip/i.test(decodedPath(url)) ? ".zip" : /csv/i.test(type) ? ".csv" : ".xlsx";
   const target = path.join(dir, `primes-${new Date().toISOString().replace(/[:.]/g, "-")}${ext}`);
   const partial = `${target}.part`;
   await pipeline(Readable.fromWeb(res.body as never), fs.createWriteStream(partial));

@@ -4,6 +4,8 @@
  *   pnpm cli import <fichier.xlsx|csv>   importe un fichier de primes
  *   pnpm cli download                    télécharge et importe le fichier OFSP courant
  *   pnpm cli url                         affiche l'URL OFSP résolue
+ *   pnpm cli archives                    liste les archives annuelles disponibles
+ *   pnpm cli download-archives           importe les archives absentes de la base
  *
  * Base : DATABASE_PATH (défaut ./data/lamal.db). Code de sortie 1 si le fichier est refusé.
  */
@@ -11,7 +13,8 @@ import os from "node:os";
 import path from "node:path";
 import { openDb } from "@/infrastructure/db/client";
 import { importPremiumFile, type ImportOutcome } from "@/infrastructure/ofsp/importer";
-import { download, resolvePremiumsUrl } from "@/infrastructure/ofsp/source";
+import { activeDataset } from "@/infrastructure/db/queries";
+import { download, listArchives, resolvePremiumsUrl } from "@/infrastructure/ofsp/source";
 
 function print(outcome: ImportOutcome) {
   if (outcome.status === "ALREADY") {
@@ -34,6 +37,33 @@ async function main() {
     console.log(await resolvePremiumsUrl());
     return;
   }
+  if (command === "archives") {
+    for (const a of await listArchives()) console.log(`${a.year}${a.listed ? "" : " (URL déduite)"} : ${a.url}`);
+    return;
+  }
+  if (command === "download-archives") {
+    let imported = 0;
+    let failed = 0;
+    for (const a of await listArchives()) {
+      if (activeDataset(db, a.year)) {
+        console.log(`${a.year} : déjà présent`);
+        continue;
+      }
+      console.log(`\n== Archive ${a.year} : ${a.url}`);
+      try {
+        const file = await download(a.url, path.join(os.tmpdir(), "lamal-downloads"));
+        const outcome = await importPremiumFile(db, file, a.url);
+        print(outcome);
+        if (outcome.status === "IMPORTED") imported++;
+        if (outcome.status === "FAILED") failed++;
+      } catch (e) {
+        console.log(`indisponible : ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    console.log(`\nArchives importées : ${imported}, refusées : ${failed}`);
+    if (failed > 0 || imported === 0) process.exit(1);
+    return;
+  }
   let file: string;
   let source: string;
   if (command === "import" && arg) {
@@ -44,7 +74,7 @@ async function main() {
     console.log(`Téléchargement : ${source}`);
     file = await download(source, path.join(os.tmpdir(), "lamal-downloads"));
   } else {
-    console.error("Usage : cli import <fichier> | cli download | cli url");
+    console.error("Usage : cli import <fichier> | download | url | archives | download-archives");
     process.exit(2);
   }
   const started = Date.now();
