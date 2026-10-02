@@ -123,3 +123,18 @@ export function percentileOf(premiumRp: Rappen, premiumsRp: readonly Rappen[]): 
   const cheaper = premiumsRp.filter((p) => p < premiumRp).length;
   return Math.round((cheaper * 100) / premiumsRp.length);
 }
+
+/**
+ * Garde la meilleure offre de chaque caisse (la première dans l'ordre du classement) et
+ * renumérote : une caisse = une ligne, comme dans les comparateurs grand public.
+ */
+export function bestPerInsurer(ranked: readonly RankedOffer[]): RankedOffer[] {
+  const seen = new Set<number>();
+  const out: RankedOffer[] = [];
+  for (const o of ranked) {
+    if (seen.has(o.insurerId)) continue;
+    seen.add(o.insurerId);
+    out.push({ ...o, rank: out.length + 1 });
+  }
+  return out;
+}

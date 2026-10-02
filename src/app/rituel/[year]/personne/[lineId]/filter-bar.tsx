@@ -18,6 +18,7 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
   const franchise = params.get("f") ?? "";
   const sort = params.get("sort") ?? "total";
   const all = params.get("all") === "1";
+  const every = params.get("every") === "1";
 
   function update(patch: Record<string, string | null>) {
     const next = new URLSearchParams(params);
@@ -71,6 +72,10 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
           </button>
         ))}
       </div>
+      <label className="flex min-h-11 items-center gap-3 text-sm">
+        <input type="checkbox" className="size-5 accent-[var(--primary)]" checked={!every} onChange={(e) => update({ every: e.target.checked ? null : "1" })} />
+        Une seule offre par caisse (la meilleure)
+      </label>
       <div className="flex items-center gap-2">
         <Sheet
           title="Modèles d'assurance"

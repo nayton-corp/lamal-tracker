@@ -1,4 +1,4 @@
-import { BadgeCheck, CircleAlert, Stethoscope } from "lucide-react";
+import { BadgeCheck, CircleAlert, ExternalLink, Stethoscope, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
@@ -6,7 +6,8 @@ import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/re
 import { compareForLine, type CompareView } from "@/application/compare";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { insurer, lamalPolicy, reviewLine } from "@/infrastructure/db/schema";
-import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
+import type { InsurerProfile } from "@/domain/insurer-profile";
+import { AGE_CLASS_LABEL, MODEL_HINT, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import type { RankedOffer } from "@/domain/comparison";
 import { db } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
@@ -24,7 +25,7 @@ import { FranchiseSimulator } from "./simulator";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Comparateur" };
 
-type Search = { m?: string; f?: string; sort?: string; all?: string; n?: string };
+type Search = { m?: string; f?: string; sort?: string; all?: string; n?: string; every?: string };
 
 export default async function ComparePage({ params, searchParams }: { params: Promise<{ year: string; lineId: string }>; searchParams: Promise<Search> }) {
   const { year: y, lineId: l } = await params;
@@ -42,7 +43,9 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
     franchises: sp.f ? [Number(sp.f)] : undefined,
     sort: sp.sort === "premium" ? "premium" : "total",
     all: sp.all === "1",
+    everyOffer: sp.every === "1",
   });
+  const every = sp.every === "1";
   const limit = sp.n === "all" ? view.offers.length : 30;
 
   return (
@@ -82,7 +85,8 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
       </Section>
       </aside>
 
-      <Section title={`${view.offers.length} offre(s) ${year}, les moins chères d'abord`}>
+      <Section title={every ? `${view.offers.length} offre(s) ${year}, les moins chères d'abord` : `${view.offers.length} caisse(s) en ${year}, la moins chère d'abord`}>
+        <BestSummary view={view} every={every} />
         {view.offers.length === 0 ? (
           <Alert tone="info" title="Aucune offre avec ces filtres">
             Choisissez « Toutes franchises » ou d&apos;autres modèles d&apos;assurance.
@@ -106,6 +110,31 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
       </Section>
       </div>
     </Page>
+  );
+}
+
+function BestSummary({ view, every }: { view: CompareView; every: boolean }) {
+  const best = view.offers[0];
+  if (!best) return null;
+  return (
+    <Card className="space-y-1">
+      {best.savingsRp !== null && best.savingsRp > 0 ? (
+        <p className="flex items-start gap-2">
+          <TrendingDown aria-hidden className="mt-0.5 size-5 shrink-0 text-saving" />
+          <span>
+            En changeant pour <strong>{best.insurerName}</strong> ({displayTariffLabel(best.tariffLabel, best.modelType)}, franchise {best.franchiseChf}), vous économiseriez{" "}
+            <Chf rp={best.savingsRp} whole className="font-semibold text-saving" /> par an par rapport au renouvellement.
+          </span>
+        </p>
+      ) : (
+        <p>Avec ces filtres, aucune offre ne coûte moins que votre renouvellement.</p>
+      )}
+      <p className="text-sm text-muted">
+        {every
+          ? `${view.matchingOffers} offres sur ${view.totalOffers} pour ce profil.`
+          : `Meilleure offre de chaque caisse, parmi ${view.matchingOffers} offres (${view.totalOffers} pour ce profil).`}
+      </p>
+    </Card>
   );
 }
 
@@ -209,7 +238,11 @@ function OfferCard({ offer: o, view, year, lineId }: { offer: RankedOffer; view:
           <dt className="font-medium">Coût total attendu</dt>
           <dd className="text-right font-semibold tabular"><Chf rp={o.cost.totalRp} /></dd>
         </dl>
-        {o.doctorCheck && <p className="text-muted">Modèle avec premier recours : vérifiez sur le site de la caisse que votre médecin figure dans la liste.</p>}
+        <p className="text-muted">
+          <strong className="font-medium text-foreground">{MODEL_LABEL[o.modelType]} :</strong> {MODEL_HINT[o.modelType]}
+          {o.doctorCheck && " Vérifiez sur le site de la caisse que votre médecin figure dans la liste."}
+        </p>
+        <InsurerFacts name={o.insurerName} card={view.insurers[o.insurerId]} />
         {!isChosen && (
           <ActionForm action={decideAction} hidden={{ year, lineId, tariffId: o.tariffId, franchiseChf: o.franchiseChf }}>
             <SubmitButton block pendingLabel="Enregistrement…">
@@ -219,5 +252,70 @@ function OfferCard({ offer: o, view, year, lineId }: { offer: RankedOffer; view:
         )}
       </div>
     </details>
+  );
+}
+
+const LEVEL_WORD = { LOW: "bas", MID: "moyen", HIGH: "élevé" } as const;
+
+/** Portrait public de la caisse : solidité, frais, évolution des primes dans la région. */
+function InsurerFacts({ name, card }: { name: string; card: { website: string | null; profile: InsurerProfile | null } | undefined }) {
+  const p = card?.profile;
+  if (!p && !card?.website) return null;
+  const trendText = p?.trend
+    ? `${p.trend.insurerPermille >= 0 ? "+" : ""}${(p.trend.insurerPermille / 10).toFixed(1)} % par an de ${p.trend.fromYear} à ${p.trend.toYear} (marché ${p.trend.marketPermille >= 0 ? "+" : ""}${(p.trend.marketPermille / 10).toFixed(1)} %)`
+    : null;
+  return (
+    <div className="space-y-2 rounded-xl bg-surface-2 p-3">
+      <p className="font-medium">La caisse {name}</p>
+      {p && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          {p.insured !== null && (
+            <>
+              <dt className="text-muted">Assurés</dt>
+              <dd className="text-right tabular">{p.insured.toLocaleString("fr-CH")}</dd>
+            </>
+          )}
+          {p.reservesMonths !== null && (
+            <>
+              <dt className="text-muted">Réserves</dt>
+              <dd className="text-right">
+                {p.reservesMonths.toLocaleString("fr-CH")} mois de primes{" "}
+                <Badge tone={p.reservesLevel === "LOW" ? "increase" : p.reservesLevel === "HIGH" ? "saving" : "neutral"} className="text-xs">
+                  {p.reservesLevel === "LOW" ? "plutôt faibles" : p.reservesLevel === "HIGH" ? "solides" : "dans la moyenne"}
+                </Badge>
+              </dd>
+            </>
+          )}
+          {p.adminPerInsuredRp !== null && (
+            <>
+              <dt className="text-muted">Frais administratifs</dt>
+              <dd className="text-right">
+                <Chf rp={p.adminPerInsuredRp} whole /> par assuré et par an
+                {p.adminLevel && <span className="text-muted"> ({LEVEL_WORD[p.adminLevel]})</span>}
+              </dd>
+            </>
+          )}
+          {trendText && (
+            <>
+              <dt className="text-muted">Primes</dt>
+              <dd className="text-right">
+                {trendText}{" "}
+                {p.trendLevel !== "SIMILAR" && (
+                  <Badge tone={p.trendLevel === "BETTER" ? "saving" : "increase"} className="text-xs">
+                    {p.trendLevel === "BETTER" ? "hausses modérées" : "hausses fortes"}
+                  </Badge>
+                )}
+              </dd>
+            </>
+          )}
+        </dl>
+      )}
+      {p?.year && <p className="text-xs text-muted">Comptes {p.year} publiés par l&apos;OFSP ; primes du modèle standard dans votre région.</p>}
+      {card?.website && (
+        <a href={card.website} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 text-primary">
+          Site de la caisse <ExternalLink aria-hidden className="size-4" />
+        </a>
+      )}
+    </div>
   );
 }

@@ -109,14 +109,16 @@ describe("rituel annuel", () => {
 
   it("compare et décide", () => {
     const cmp = compareForLine(db, lines.adult, { sort: "total" });
-    expect(cmp.offers.length).toBeGreaterThan(10);
+    expect(cmp.offers.length).toBeGreaterThan(3);
+    expect(new Set(cmp.offers.map((o) => o.insurerId)).size).toBe(cmp.offers.length);
+    expect(cmp.matchingOffers).toBeGreaterThan(cmp.offers.length);
     expect(cmp.offers[0]!.rank).toBe(1);
     expect(cmp.renewal?.franchiseChf).toBe(2500);
     expect(cmp.curve.points.length).toBeGreaterThan(10);
     const best = cmp.offers[0]!;
     expect(decide(db, lines.adult, { tariffId: best.tariffId, franchiseChf: best.franchiseChf }, NOW)).toBe("SWITCH");
 
-    const teenCmp = compareForLine(db, lines.teen, { all: true });
+    const teenCmp = compareForLine(db, lines.teen, { all: true, everyOffer: true });
     const sameInsurerOther = teenCmp.offers.find((o) => o.insurerId === insurerId(8) && o.tariffCode === "CSS-TEL")!;
     expect(decide(db, lines.teen, { tariffId: sameInsurerOther.tariffId, franchiseChf: sameInsurerOther.franchiseChf }, NOW)).toBe("ADJUST");
   });
