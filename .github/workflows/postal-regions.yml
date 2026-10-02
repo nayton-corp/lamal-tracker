@@ -1,0 +1,35 @@
+name: Régions de primes par code postal
+
+# Régénère la table code postal → région à partir des sources officielles (BAG, swisstopo).
+# Les régions changent au 1er janvier (fusions de communes) : contrôle chaque année en septembre.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 5 20 9 *"
+  push:
+    branches: [claude/explore-data]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsx scripts/build-postal-regions.ts
+      - name: Enregistrer la table si elle a changé
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/infrastructure/regions/postal-regions.json
+          if git diff --cached --quiet; then echo "Aucun changement"; exit 0; fi
+          git commit -m "Régions de primes par code postal : mise à jour depuis les sources officielles"
+          git push
