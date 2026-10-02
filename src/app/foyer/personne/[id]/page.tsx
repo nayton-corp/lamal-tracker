@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ShieldAlert, Trash2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { deleteLcaAction, deletePersonAction, deletePolicyAction } from "@/app/actions/household";
@@ -56,6 +57,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             <p className="text-muted">
               Indiquez le contrat {year} : choisissez la caisse et la franchise, la prime est retrouvée toute seule. Les années précédentes sont facultatives (elles alimentent l&apos;historique).
             </p>
+            <Link href="/foyer/importer" className="mt-2 inline-flex min-h-11 items-center text-primary underline">
+              Ou importer le PDF de la police
+            </Link>
           </Card>
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface shadow-card">

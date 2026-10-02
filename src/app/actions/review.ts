@@ -215,3 +215,20 @@ export async function lcaWishesAction(_: ActionState, form: FormData): Promise<A
   revalidatePath("/", "layout");
   return { ok: "Complémentaires à demander enregistrées." };
 }
+
+/** Prépare d'un coup les demandes aux nouvelles caisses et les lettres aux caisses actuelles. */
+export async function prepareAllAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const reviewId = Number(form.get("reviewId"));
+    const offers = generateOfferRequests(db(), reviewId, today());
+    const res = generateLetters(db(), reviewId, today());
+    revalidatePath("/", "layout");
+    if (res.blocked.length) {
+      return { error: res.blocked.map((b) => `${b.person} : ${b.reasons.join(" ")}`).join("\n") };
+    }
+    const n = offers.length + res.created.length;
+    return { ok: n ? `${n} courrier(s) prêt(s).` : "Rien de nouveau à préparer." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}

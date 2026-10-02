@@ -364,7 +364,6 @@ export function getReviewView(db: Db, reviewId: number, today: IsoDate): ReviewV
 
   const needsLetter = persons.filter((x) => x.line.decision === "SWITCH" || x.line.decision === "ADJUST");
   const switching = persons.filter((x) => x.line.decision === "SWITCH");
-  const letterLineIds = new Set(letters.flatMap((l) => l.lineIds));
   const sentLineIds = new Set(letters.filter((l) => l.sentAt).flatMap((l) => l.lineIds));
 
   return {
@@ -387,10 +386,11 @@ export function getReviewView(db: Db, reviewId: number, today: IsoDate): ReviewV
     // Une étape n'est faite que si les précédentes le sont (pas de coche « vide » avant les décisions).
     steps: sequential([
       { key: "renewal", label: "Hausse connue", done: persons.length > 0 && persons.every((x) => x.line.renewalMonthlyRp !== null) },
-      { key: "decide", label: "Décisions", done: persons.length > 0 && persons.every((x) => x.line.decision !== "UNDECIDED") },
-      { key: "lca", label: "Contrôle LCA", done: switching.every((x) => x.line.lcaAckAt) },
-      { key: "letters", label: "Lettres", done: needsLetter.every((x) => letterLineIds.has(x.line.id)) },
-      { key: "sent", label: "Envois", done: needsLetter.every((x) => sentLineIds.has(x.line.id)) },
+      { key: "decide", label: "Choix", done: persons.length > 0 && persons.every((x) => x.line.decision !== "UNDECIDED") },
+      { key: "lca", label: "Complé­mentaires", done: switching.every((x) => x.line.lcaAckAt) },
+      { key: "request", label: "Nouvelle caisse", done: switching.every((x) => x.line.affiliationRequestedAt) },
+      { key: "sent", label: "Résiliation", done: needsLetter.every((x) => sentLineIds.has(x.line.id)) },
+      { key: "confirmed", label: "Confir­mations", done: switching.every((x) => x.line.affiliationConfirmedAt) && letters.filter((l) => l.kind === "TERMINATION").every((l) => l.acknowledgedAt) },
     ]),
   };
 }

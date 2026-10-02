@@ -188,6 +188,15 @@ describe("rituel annuel", () => {
     // Redistribution CO2 2027 : 57.00 / 12 = 4.75
     const p = history.persons[0]!.points[1]!;
     expect(p.billedMonthlyRp - p.netMonthlyRp).toBe(475);
+    // Statistiques : total payé, économie du rituel 2027, position dans le marché.
+    const s = history.stats;
+    expect(s.totalPaidRp).toBe(history.persons.reduce((a, x) => a + x.points.reduce((b, pt) => b + pt.billedMonthlyRp * 12, 0), 0));
+    expect(s.ritualSavings).toHaveLength(1);
+    expect(s.ritualSavings[0]!.year).toBe(2027);
+    expect(s.ritualSavings[0]!.annualRp).toBeGreaterThan(0);
+    expect(s.avgChangePermille).not.toBeNull();
+    expect(history.totals[1]!.marketMinMonthlyRp).toBeLessThanOrEqual(history.totals[1]!.marketMedianMonthlyRp!);
+    expect(s.gapToCheapestAnnualRp).toBeGreaterThanOrEqual(0);
   });
 
   it("rouvre un rituel clôturé : les contrats créés disparaissent, les décisions restent", () => {

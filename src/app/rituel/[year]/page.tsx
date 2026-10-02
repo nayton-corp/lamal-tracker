@@ -244,7 +244,7 @@ function Hero({ view }: { view: ReviewView }) {
 
 function Steps({ view }: { view: ReviewView }) {
   return (
-    <ol className="grid grid-cols-5 gap-1" aria-label="Étapes du rituel">
+    <ol className="grid grid-cols-6 gap-1" aria-label="Étapes du rituel">
       {view.steps.map((s, i) => (
         <li key={s.key} className="flex flex-col items-center gap-1 text-center">
           <span
@@ -378,7 +378,7 @@ function NextAction({ view, year }: { view: ReviewView; year: number }) {
     Icon = ShieldAlert;
   } else if (needsLetters) {
     href = `/rituel/${year}/lettres`;
-    label = "Préparer et suivre les lettres";
+    label = "Faire les démarches";
     Icon = FileText;
   } else {
     return (
