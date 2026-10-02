@@ -1,7 +1,7 @@
 # Déploiement sur le Raspberry Pi : `docker compose up -d`
 services:
   lamal:
-    image: ghcr.io/naythanb/lamal-tracker:latest
+    image: ghcr.io/nayton-corp/lamal-tracker:latest
     # Pour construire sur le Pi à la place : décommentez la ligne suivante et lancez `docker compose up -d --build`.
     # build: .
     container_name: lamal-tracker
