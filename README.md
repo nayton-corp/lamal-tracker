@@ -1,1 +1,117 @@
-# lamal-tracker
+# Primes LAMal — suivi et comparateur annuel
+
+PWA personnelle, mobile d'abord, auto-hébergée sur un Raspberry Pi. Chaque automne :
+
+1. **les primes officielles de l'OFSP sont importées automatiquement** dès leur publication (fin septembre) ;
+2. l'app calcule **la hausse de chaque membre du foyer** pour l'année suivante, sans rien changer ;
+3. le **comparateur** classe toutes les offres LAMal de votre région selon le **coût total attendu** (prime nette de CO2 + franchise + quote-part), avec un simulateur de franchise ;
+4. un **garde-fou LCA** (confirmation par appui long) empêche de résilier une complémentaire par erreur ;
+5. les **lettres de résiliation PDF** (format enveloppe à fenêtre suisse) sont générées en un geste, avec suivi des envois recommandés et rappels avant le 30 novembre ;
+6. l'**historique pluriannuel** garde les primes réellement payées et les repères de marché.
+
+> Outil d'aide à la décision, pas un conseil en assurance. Vérifiez toujours les conditions des modèles (liste de médecins, Telmed…) auprès de la caisse.
+
+## Déploiement sur le Raspberry Pi
+
+Prérequis : Raspberry Pi 4 ou 5 avec un **OS 64 bits** (Raspberry Pi OS 64-bit ou Ubuntu), 2 Go de RAM minimum, et Docker.
+
+### 1. Installer Docker (une fois)
+
+```sh
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER   # puis se déconnecter / reconnecter
+```
+
+### 2. Récupérer l'image
+
+L'image `linux/arm64` est construite automatiquement par GitHub Actions à chaque mise à jour de `main` et publiée sur `ghcr.io/naythanb/lamal-tracker`. Le dépôt étant privé, l'image l'est aussi : il faut se connecter une fois avec un jeton GitHub.
+
+1. Sur GitHub : *Settings › Developer settings › Personal access tokens › Tokens (classic)*, créer un jeton avec la seule permission **`read:packages`**.
+2. Sur le Pi :
+
+```sh
+echo "<le-jeton>" | docker login ghcr.io -u NaYthanB --password-stdin
+```
+
+### 3. Lancer
+
+```sh
+mkdir -p ~/lamal-tracker && cd ~/lamal-tracker
+# copier docker-compose.yml de ce dépôt dans ce dossier, puis :
+docker compose up -d
+```
+
+L'app répond sur `http://<ip-du-pi>:3000`. Les données vivent dans `~/lamal-tracker/data` (un seul fichier SQLite).
+
+Variables utiles (dans `docker-compose.yml`) :
+
+| Variable | Rôle |
+|---|---|
+| `APP_PASSWORD` | Mot de passe d'accès (recommandé dès que le Pi est joignable hors de chez vous). |
+| `IMPORT_CANTONS` | Ex. `VD` : n'importe que votre canton (≈ 3 Mo par an au lieu de ≈ 60 Mo). |
+| `VAPID_SUBJECT` | `mailto:` de contact pour les notifications push. |
+| `OFSP_AUTO_CHECK=false` | Désactive le contrôle automatique des nouvelles primes. |
+| `OFSP_PREMIUMS_URL` | Force l'URL du fichier de primes si l'OFSP la change. |
+
+### 4. HTTPS pour l'installation sur le téléphone et les notifications
+
+Un navigateur n'autorise l'installation d'une PWA, le mode hors ligne et les notifications que sur **HTTPS**. Le plus simple : [Tailscale](https://tailscale.com) (gratuit), qui donne aussi l'accès depuis l'extérieur sans ouvrir de port.
+
+```sh
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+sudo tailscale serve --bg 3000
+```
+
+L'app est alors disponible sur `https://<nom-du-pi>.<votre-tailnet>.ts.net` depuis tout appareil connecté à Tailscale. Sur iPhone : Safari › Partager › *Sur l'écran d'accueil*, puis *Données › Notifications › Activer*.
+
+Sans HTTPS, l'app fonctionne normalement dans le navigateur ; seules l'installation, le hors-ligne et les notifications sont indisponibles.
+
+### Mise à jour, sauvegarde
+
+```sh
+cd ~/lamal-tracker && docker compose pull && docker compose up -d
+```
+
+- **Sauvegarde** : *Données › Sauvegarde* télécharge une copie cohérente de la base. Ou, sur le Pi : `cp data/lamal.db* /un/autre/disque/` (app arrêtée), ou `sqlite3 data/lamal.db ".backup '/chemin/sauvegarde.db'"`.
+- **Restauration** : arrêter le conteneur, remettre le fichier `lamal.db` dans `data/`, relancer.
+- Les migrations du schéma s'appliquent seules au démarrage.
+
+### Construire l'image sur le Pi (alternative)
+
+Cloner le dépôt sur le Pi, décommenter `build: .` dans `docker-compose.yml`, puis `docker compose up -d --build` (compter une dizaine de minutes sur un Pi 4).
+
+## Le rituel d'automne, pas à pas
+
+| Quand | Quoi |
+|---|---|
+| Une fois | *Foyer* : adresse, canton, **région de primes** (sur la police), membres, et le contrat LAMal de l'année en cours de chacun (caisse, tarif, franchise, prime facturée). Ajouter les **complémentaires LCA**. *Données › Caisses* : adresses de résiliation de vos caisses. |
+| Fin septembre | L'OFSP publie les primes ; l'app les importe (contrôle quotidien du 15 septembre au 30 novembre) et envoie une notification. Import manuel possible dans *Données*. |
+| Octobre | *Rituel* : lancer l'analyse. Pour chaque personne : hausse, tarif de renouvellement (à confirmer si la caisse a renommé son tarif), comparateur, simulateur de franchise, choix. |
+| Avant de résilier | Demander l'**affiliation** à la nouvelle caisse (en ligne). Passer le **contrôle LCA**. |
+| Avant ~23 novembre | Générer les lettres, imprimer, signer, envoyer en **recommandé** (réception au plus tard le 30 novembre). Saisir le n° de suivi. |
+| Décembre / janvier | Marquer les confirmations reçues, puis **clôturer** : les contrats de la nouvelle année sont créés et l'historique mis à jour. Ajuster la prime facturée si elle diffère. |
+| Chaque année | *Données* : vérifier le montant de la **redistribution CO2** (2026 : 61.80, 2027 : 57.00 CHF/personne/an). |
+
+## Données OFSP
+
+- Source : [opendata.swiss — Krankenversicherungsprämien](https://opendata.swiss/de/dataset/health-insurance-premiums) (fichier `Prämien_CH.xlsx`). Depuis les primes 2027, le fichier n'est plus sur priminfo.admin.ch.
+- L'OFSP a changé **tous les codes** en 2027 (régions `PR_REG_1`, classes d'âge `AKA_03_ERW`, franchises `FRA_01_E_0300`, types de tarif `BASE/PRAXIS/FLEX/TEL_DIG/PHARM`). Le parseur lit les deux générations et les ramène à une seule forme ; une ligne illisible est rejetée et comptée, jamais devinée.
+- Chaque import est un **jeu immuable** identifié par son empreinte SHA-256, validé (années, cantons, bornes de primes, variation par rapport à l'année précédente) avant d'être activé.
+- Le workflow *Surveillance du format OFSP* importe le vrai fichier chaque jour en septembre-octobre : s'il échoue, GitHub vous prévient avant le rituel.
+- L'Open Data ne contient **pas** : listes de médecins des modèles alternatifs, adresses de résiliation, contrats LCA, redistribution CO2. Ces informations sont saisies dans l'app.
+
+## Développement
+
+```sh
+pnpm install
+pnpm fixtures      # fichiers de primes synthétiques (formats 2026 et 2027)
+pnpm dev           # http://localhost:3000
+pnpm test          # tests unitaires et d'intégration (Vitest)
+pnpm lint && pnpm typecheck
+pnpm build && pnpm e2e   # parcours complet sur mobile (Playwright)
+pnpm cli import tests/fixtures/generated/primes-2027.xlsx
+pnpm cli download  # importe le fichier OFSP réel
+```
+
+Architecture : voir [`docs/architecture.md`](docs/architecture.md).

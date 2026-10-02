@@ -1,0 +1,159 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+
+/*
+ * Jetons sémantiques. Chaque couleur a un sens unique dans toute l'app :
+ *  - primary   : action principale, navigation active
+ *  - saving    : économie (toujours accompagnée d'un signe −/flèche)
+ *  - increase  : hausse de prime, erreur
+ *  - lca       : ambre RÉSERVÉ aux alertes complémentaires LCA
+ */
+:root {
+  --background: #f3f5f9;
+  --surface: #ffffff;
+  --surface-2: #eef2f7;
+  --foreground: #0f172a;
+  --muted: #475569;
+  --border: #dde3ec;
+  --primary: #1e40af;
+  --primary-hover: #1b3a9c;
+  --on-primary: #ffffff;
+  --primary-soft: #e3eafc;
+  --saving: #047857;
+  --saving-soft: #dcf5ea;
+  --increase: #b91c1c;
+  --increase-soft: #fde7e7;
+  --lca: #92400e;
+  --lca-strong: #d97706;
+  --lca-soft: #fef3c7;
+  --info-soft: #e0f2fe;
+  --info: #075985;
+  --ring: #2563eb;
+  --shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 16px rgb(15 23 42 / 0.05);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --surface: #131c2e;
+    --surface-2: #1a2539;
+    --foreground: #f1f5f9;
+    --muted: #a3b1c6;
+    --border: #253149;
+    --primary: #7aa7ff;
+    --primary-hover: #93b8ff;
+    --on-primary: #0b1220;
+    --primary-soft: #1b2a4d;
+    --saving: #4ade80;
+    --saving-soft: #12301f;
+    --increase: #fb8a8a;
+    --increase-soft: #3a1717;
+    --lca: #fcd34d;
+    --lca-strong: #f59e0b;
+    --lca-soft: #33260a;
+    --info-soft: #0c2a3d;
+    --info: #7dd3fc;
+    --ring: #93b8ff;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-saving: var(--saving);
+  --color-saving-soft: var(--saving-soft);
+  --color-increase: var(--increase);
+  --color-increase-soft: var(--increase-soft);
+  --color-lca: var(--lca);
+  --color-lca-strong: var(--lca-strong);
+  --color-lca-soft: var(--lca-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-ring: var(--ring);
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --shadow-card: var(--shadow);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 100dvh;
+}
+
+button,
+a,
+summary,
+label,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise 280ms var(--ease-out-soft) both;
+}
+
+@keyframes hold-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
