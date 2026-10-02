@@ -52,3 +52,7 @@ jobs:
           DATABASE_PATH: /tmp/ofsp-check.db
         run: |
           for i in 1 2 3; do pnpm cli download && exit 0; echo "nouvel essai dans 30 s"; sleep 30; done; exit 1
+      - name: Import des archives des années précédentes (ancien format)
+        env:
+          DATABASE_PATH: /tmp/ofsp-check.db
+        run: pnpm cli download-archives
