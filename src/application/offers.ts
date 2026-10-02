@@ -120,8 +120,14 @@ export function markOfferRequestSent(db: Db, id: number, at: IsoDate | null) {
   });
 }
 
+/** Réponse de la caisse (confirmation d'affiliation) : l'ancienne caisse pourra libérer la personne. */
 export function markOfferRequestAnswered(db: Db, id: number, at: IsoDate | null) {
-  db.update(offerRequest).set({ answeredAt: at }).where(eq(offerRequest.id, id)).run();
+  const row = getOfferRequest(db, id);
+  if (!row) throw new UserError("Demande introuvable.");
+  db.transaction((tx) => {
+    tx.update(offerRequest).set({ answeredAt: at }).where(eq(offerRequest.id, id)).run();
+    for (const lineId of row.lineIds) tx.update(reviewLine).set({ affiliationConfirmedAt: at }).where(eq(reviewLine.id, lineId)).run();
+  });
 }
 
 export function deleteOfferRequest(db: Db, id: number) {

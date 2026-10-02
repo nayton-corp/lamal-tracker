@@ -1,17 +1,20 @@
-import { CheckCircle2, FileText, Mail, Printer, Send, Trash2 } from "lucide-react";
+import { ArrowRight, Check, FileText, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { deleteLetterAction, deleteOfferAction, generateLettersAction, generateOffersAction, letterAckAction, letterSentAction, offerAnsweredAction, offerSentAction } from "@/app/actions/review";
+import type { ReactNode } from "react";
+import { deleteLetterAction, deleteOfferAction, letterAckAction, letterSentAction, offerAnsweredAction, offerSentAction, prepareAllAction } from "@/app/actions/review";
 import { listOfferRequests } from "@/application/offers";
 import { getReviewByYear, getReviewView } from "@/application/review";
 import { formatDateLong, formatDateShort } from "@/domain/dates";
+import { displayTariffLabel, type ModelType } from "@/domain/lamal";
 import type { LetterContent } from "@/domain/letter";
 import { db, today } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
 import { Alert } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, Section } from "@/ui/card";
+import { Card } from "@/ui/card";
+import { cn } from "@/ui/cn";
 import { ConfirmButton } from "@/ui/confirm-button";
 import { Input } from "@/ui/form";
 import { Page, PageHeader } from "@/ui/page";
@@ -19,28 +22,109 @@ import { SubmitButton } from "@/ui/submit";
 import { ShareButton } from "./share-button";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Lettres" };
+export const metadata = { title: "Démarches" };
 
-export default async function LettersPage({ params }: { params: Promise<{ year: string }> }) {
+function Step({ n, title, done, children, hint }: { n: number; title: string; done: boolean; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="space-y-3" aria-labelledby={`etape-${n}`}>
+      <div className="flex items-start gap-3">
+        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold", done ? "bg-saving text-white dark:text-black" : "bg-primary text-on-primary")} aria-hidden>
+          {done ? <Check className="size-4" /> : n}
+        </span>
+        <div>
+          <h2 id={`etape-${n}`} className="text-lg font-semibold">
+            {title}
+            <span className="sr-only">{done ? " : fait" : " : à faire"}</span>
+          </h2>
+          {hint && <p className="text-sm text-muted">{hint}</p>}
+        </div>
+      </div>
+      <div className="space-y-3 sm:pl-11">{children}</div>
+    </section>
+  );
+}
+
+function PdfButtons({ url, filename, mailto, primary }: { url: string; filename: string; mailto?: string | null; primary?: boolean }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {mailto && (
+        <Button asChild size="sm">
+          <a href={mailto}>
+            <Send aria-hidden className="size-4" /> Envoyer par e-mail
+          </a>
+        </Button>
+      )}
+      <Button asChild size="sm" variant={mailto || !primary ? "secondary" : "primary"}>
+        <a href={url} target="_blank" rel="noopener">
+          <FileText aria-hidden className="size-4" /> Ouvrir le PDF
+        </a>
+      </Button>
+      <ShareButton url={url} filename={filename} />
+    </div>
+  );
+}
+
+export default async function ProceduresPage({ params }: { params: Promise<{ year: string }> }) {
   const year = Number((await params).year);
   const r = getReviewByYear(db(), year);
   if (!r) redirect(`/rituel/${year}`);
   const view = getReviewView(db(), r.id, today());
-  const concerned = view.persons.filter((p) => p.line.decision === "SWITCH" || p.line.decision === "ADJUST");
   const switching = view.persons.filter((p) => p.line.decision === "SWITCH");
+  const adjusting = view.persons.filter((p) => p.line.decision === "ADJUST");
+  const keeping = view.persons.filter((p) => p.line.decision === "KEEP");
+  const undecided = view.persons.filter((p) => p.line.decision === "UNDECIDED");
   const offers = listOfferRequests(db(), r.id);
-  const warnings = concerned.flatMap((p) => p.letterCheck.warnings.map((w) => `${p.person.firstName} : ${w}`));
+  const terminations = view.letters.filter((l) => l.kind === "TERMINATION");
+  const changes = view.letters.filter((l) => l.kind === "CHANGE");
+  const warnings = [...switching, ...adjusting].flatMap((p) => p.letterCheck.warnings.filter((w) => !/Demandez d'abord/.test(w)).map((w) => `${p.person.firstName} : ${w}`));
+  const lcaPending = switching.filter((p) => !p.line.lcaAckAt);
+  const nothing = switching.length === 0 && adjusting.length === 0;
+
+  const requestsDone = switching.length > 0 && switching.every((p) => p.line.affiliationRequestedAt);
+  const lettersDone = [...switching, ...adjusting].length > 0 && [...terminations, ...changes].length > 0 && [...terminations, ...changes].every((l) => l.sentAt);
+  const confirmDone = offers.every((o) => o.answeredAt) && terminations.every((l) => l.acknowledgedAt) && offers.length + terminations.length > 0;
+  let n = 0;
 
   return (
     <Page>
-      <PageHeader title="Lettres" subtitle={`À envoyer en recommandé avant le ${formatDateLong(view.deadlines.sendBy, true)}.`} back={`/rituel/${year}`} />
+      <PageHeader title="Démarches" subtitle={`Ce qu'il reste à faire pour ${year}, dans l'ordre. Résiliations reçues au plus tard le ${formatDateLong(view.deadlines.receiptDeadline)}.`} back={`/rituel/${year}`} />
 
-      <Card className="space-y-3">
-        <ol className="space-y-2 text-sm">
-          <li className="flex gap-2"><Printer aria-hidden className="size-5 shrink-0 text-primary" /><span>Imprimez la lettre (ou partagez-la vers une imprimante).</span></li>
-          <li className="flex gap-2"><FileText aria-hidden className="size-5 shrink-0 text-primary" /><span>Signez : chaque adulte concerné ; un parent pour les mineurs.</span></li>
-          <li className="flex gap-2"><Mail aria-hidden className="size-5 shrink-0 text-primary" /><span>Envoyez en <strong>recommandé</strong> : la caisse doit la <strong>recevoir</strong> au plus tard le {formatDateLong(view.deadlines.receiptDeadline)}.</span></li>
-        </ol>
+      <Card className="space-y-2">
+        <p className="font-medium">Qui change quoi</p>
+        <ul className="space-y-1 text-sm">
+          {switching.map((p) => (
+            <li key={p.line.id}>
+              <strong>{p.person.firstName}</strong> quitte {p.currentInsurer} pour <strong>{p.chosenInsurer}</strong> : demande à {p.chosenInsurer}, puis résiliation chez {p.currentInsurer}.
+            </li>
+          ))}
+          {adjusting.map((p) => (
+            <li key={p.line.id}>
+              <strong>{p.person.firstName}</strong> reste chez {p.currentInsurer} avec {displayTariffLabel(p.line.chosenLabel, (p.line.chosenModelType ?? "OTHER") as ModelType)}, franchise {p.line.chosenFranchiseChf} : un courrier de changement.
+            </li>
+          ))}
+          {keeping.map((p) => (
+            <li key={p.line.id} className="text-muted">
+              {p.person.firstName} garde son contrat : rien à envoyer.
+            </li>
+          ))}
+          {undecided.map((p) => (
+            <li key={p.line.id}>
+              {p.person.firstName} : <Link className="text-primary underline" href={`/rituel/${year}/personne/${p.line.id}`}>choix à faire</Link>
+            </li>
+          ))}
+        </ul>
+        {lcaPending.length > 0 && (
+          <Alert tone="lca" title="Complémentaires à contrôler d'abord">
+            {lcaPending.map((p) => p.person.firstName).join(", ")} : <Link className="underline" href={`/rituel/${year}/lca`}>passez le contrôle des complémentaires</Link> avant de résilier.
+          </Alert>
+        )}
+        {!nothing && (
+          <ActionForm action={prepareAllAction} hidden={{ reviewId: r.id }}>
+            <SubmitButton block variant={offers.length + view.letters.length ? "secondary" : "primary"} pendingLabel="Préparation…">
+              {offers.length + view.letters.length ? "Mettre à jour les courriers pas encore envoyés" : "Préparer tous les courriers"}
+            </SubmitButton>
+          </ActionForm>
+        )}
         {warnings.length > 0 && (
           <Alert tone="info" title="À vérifier">
             <ul className="list-disc pl-4">
@@ -50,186 +134,154 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
             </ul>
           </Alert>
         )}
-        <ActionForm action={generateLettersAction} hidden={{ reviewId: r.id }}>
-          <SubmitButton block variant={view.letters.length ? "secondary" : "primary"} pendingLabel="Génération…" disabled={concerned.length === 0}>
-            {view.letters.length ? "Refaire les lettres pas encore envoyées" : "Générer les lettres"}
-          </SubmitButton>
-        </ActionForm>
       </Card>
 
-      {switching.length > 0 && (
-        <Section title="Demandes aux nouvelles caisses">
-          <Card className="space-y-3">
-            <p className="text-sm">
-              Demandez l&apos;offre et l&apos;affiliation à la nouvelle caisse, par e-mail ou par courrier. L&apos;assurance de base ne peut pas vous être refusée ; les
-              complémentaires demandées passent par un questionnaire de santé.{" "}
-              <Link href={`/rituel/${year}/lca`} className="text-primary underline">
-                Choisir les complémentaires à demander
-              </Link>
-            </p>
-            <ActionForm action={generateOffersAction} hidden={{ reviewId: r.id }}>
-              <SubmitButton block variant={offers.length ? "secondary" : "primary"} pendingLabel="Préparation…">
-                {offers.length ? "Refaire les demandes pas encore envoyées" : "Préparer les demandes d'offre"}
-              </SubmitButton>
-            </ActionForm>
-          </Card>
-          {offers.length > 0 && (
-            <ul className="space-y-3">
-              {offers.map((o) => {
-                const url = `/api/offers/${o.id}/pdf`;
-                return (
-                  <li key={o.id}>
-                    <Card className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold">{o.insurerName}</p>
-                          <p className="text-sm text-muted">{o.content.personRows.map((p) => p.split(",")[0]).join(", ")}</p>
-                          {(o.content.extraRows?.length ?? 0) > 0 && <p className="text-sm text-muted">Avec offre de complémentaires</p>}
-                        </div>
-                        <Badge tone="saving">Demande d&apos;offre</Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {o.mailto && (
-                          <Button asChild size="sm">
-                            <a href={o.mailto}>
-                              <Send aria-hidden className="size-4" /> Envoyer par e-mail
-                            </a>
-                          </Button>
-                        )}
-                        <Button asChild size="sm" variant={o.mailto ? "secondary" : "primary"}>
-                          <a href={url} target="_blank" rel="noopener">
-                            <FileText aria-hidden className="size-4" /> Ouvrir le PDF
-                          </a>
-                        </Button>
-                        <ShareButton url={url} filename={`demande-offre-${o.id}.pdf`} />
-                        {!o.sentAt && (
-                          <form action={deleteOfferAction}>
-                            <input type="hidden" name="offerId" value={o.id} />
-                            <Button size="sm" variant="ghost" className="text-increase" aria-label="Supprimer la demande">
-                              <Trash2 aria-hidden className="size-4" />
-                            </Button>
-                          </form>
-                        )}
-                      </div>
-                      {o.email && <p className="text-xs text-muted">E-mail de la caisse selon l&apos;annuaire officiel : {o.email}. Beaucoup de caisses proposent aussi un formulaire en ligne{o.website ? ` sur ${o.website.replace(/^https?:\/\//, "")}` : ""}.</p>}
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 p-3 text-sm">
-                        {o.sentAt ? (
-                          <>
-                            <span className="flex items-center gap-2 font-medium text-saving">
-                              <CheckCircle2 aria-hidden className="size-4 shrink-0" /> Envoyée le {formatDateShort(o.sentAt)}
-                            </span>
-                            <form action={offerAnsweredAction} className="flex items-center gap-2">
-                              <input type="hidden" name="offerId" value={o.id} />
-                              {o.answeredAt ? (
-                                <>
-                                  <span>Réponse reçue le {formatDateShort(o.answeredAt)}</span>
-                                  <input type="hidden" name="undo" value="1" />
-                                  <Button size="sm" variant="ghost">Annuler</Button>
-                                </>
-                              ) : (
-                                <Button size="sm" variant="secondary">Réponse reçue</Button>
-                              )}
-                            </form>
-                          </>
-                        ) : (
-                          <form action={offerSentAction} className="w-full">
-                            <input type="hidden" name="offerId" value={o.id} />
-                            <Button size="sm" variant="secondary" block>
-                              Marquer comme envoyée
-                            </Button>
-                          </form>
-                        )}
-                      </div>
-                    </Card>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Section>
+      {nothing && (
+        <Alert tone="success" title="Rien à envoyer">
+          Personne ne change de caisse, de franchise ou de modèle.
+        </Alert>
       )}
 
-      <Section title="Résiliations et changements">
-        {view.letters.length === 0 ? (
-          <p className="px-1 text-muted">Aucune lettre pour l&apos;instant.</p>
-        ) : (
-          <ul className="space-y-3">
-            {view.letters.map((l) => {
-              const content = l.content as LetterContent;
-              const url = `/api/letters/${l.id}/pdf`;
-              return (
-                <li key={l.id}>
-                  <Card className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold">{l.insurerName}</p>
-                        <p className="text-sm text-muted">{content.personRows.map((p) => p.split(",")[0]).join(", ")}</p>
-                      </div>
-                      <Badge tone={l.kind === "TERMINATION" ? "increase" : "primary"}>{l.kind === "TERMINATION" ? "Résiliation LAMal" : "Changement"}</Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button asChild size="sm">
-                        <a href={url} target="_blank" rel="noopener">
-                          <FileText aria-hidden className="size-4" /> Ouvrir le PDF
-                        </a>
-                      </Button>
-                      <ShareButton url={url} filename={`lettre-${l.id}.pdf`} />
-                      {!l.sentAt && (
-                        <form action={deleteLetterAction}>
-                          <input type="hidden" name="letterId" value={l.id} />
-                          <ConfirmButton size="sm" variant="ghost" className="text-increase" message="Supprimer cette lettre ?" confirmLabel="Supprimer" details={<p>Vous pourrez la préparer à nouveau avec « Générer les lettres ».</p>} aria-label="Supprimer la lettre">
-                            <Trash2 aria-hidden className="size-4" />
-                          </ConfirmButton>
-                        </form>
-                      )}
-                    </div>
-                    {l.sentAt ? (
-                      <div className="space-y-2 rounded-xl bg-surface-2 p-3 text-sm">
-                        <p className="flex items-center gap-2 font-medium text-saving">
-                          <CheckCircle2 aria-hidden className="size-4 shrink-0" />
-                          <span>
-                            Envoyée le {formatDateShort(l.sentAt)}
-                            {l.trackingNumber && <span className="block font-normal break-all text-muted">Suivi : {l.trackingNumber}</span>}
-                          </span>
-                        </p>
-                        <form action={letterAckAction} className="flex items-center justify-between gap-2">
-                          <input type="hidden" name="letterId" value={l.id} />
-                          {l.acknowledgedAt ? (
-                            <>
-                              <span>Confirmation de la caisse reçue le {formatDateShort(l.acknowledgedAt)}</span>
-                              <input type="hidden" name="undo" value="1" />
-                              <Button size="sm" variant="ghost">Annuler</Button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-muted">Confirmation de la caisse attendue</span>
-                              <Button size="sm" variant="secondary">Reçue</Button>
-                            </>
-                          )}
-                        </form>
-                      </div>
-                    ) : (
-                      <ActionForm action={letterSentAction} hidden={{ letterId: l.id }} className="grid grid-cols-[1fr_1fr] items-end gap-2">
-                        <label className="space-y-1 text-sm">
-                          <span className="font-medium">Envoyée le</span>
-                          <Input type="date" name="sentAt" defaultValue={today()} />
-                        </label>
-                        <label className="space-y-1 text-sm">
-                          <span className="font-medium">N° de suivi</span>
-                          <Input name="tracking" placeholder="98.xx…" autoComplete="off" />
-                        </label>
-                        <SubmitButton size="sm" variant="secondary" className="col-span-2">
-                          Marquer comme envoyée
-                        </SubmitButton>
-                      </ActionForm>
-                    )}
-                  </Card>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
+      {switching.length > 0 && (
+        <Step
+          n={++n}
+          title="Demander l'affiliation à la nouvelle caisse"
+          done={requestsDone}
+          hint="La caisse doit vous accepter pour l'assurance de base, sans questionnaire de santé. Par e-mail, c'est fait en une minute ; les complémentaires demandées passent, elles, par un questionnaire."
+        >
+          {offers.length === 0 && <p className="text-sm text-muted">Préparez les courriers ci-dessus.</p>}
+          {offers.map((o) => (
+            <Card key={o.id} className="space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-semibold">{o.insurerName}</p>
+                  <p className="text-sm text-muted">
+                    {o.content.personRows.map((p) => p.split(",")[0]).join(", ")}
+                    {(o.content.extraRows?.length ?? 0) > 0 && " · avec offre de complémentaires"}
+                  </p>
+                </div>
+                <Badge tone={o.sentAt ? "saving" : "neutral"}>{o.sentAt ? `Envoyée le ${formatDateShort(o.sentAt)}` : "À envoyer"}</Badge>
+              </div>
+              <PdfButtons url={`/api/offers/${o.id}/pdf`} filename={`demande-offre-${o.id}.pdf`} mailto={o.mailto} primary />
+              {o.email && <p className="text-xs text-muted">Adresse de la caisse (annuaire officiel) : {o.email}{o.website ? ` · formulaire en ligne possible sur ${o.website.replace(/^https?:\/\//, "")}` : ""}.</p>}
+              <div className="flex gap-2">
+                <form action={offerSentAction} className="flex-1">
+                  <input type="hidden" name="offerId" value={o.id} />
+                  {o.sentAt && <input type="hidden" name="undo" value="1" />}
+                  <Button size="sm" variant={o.sentAt ? "ghost" : "secondary"} block>
+                    {o.sentAt ? "Annuler l'envoi" : "Marquer comme envoyée"}
+                  </Button>
+                </form>
+                {!o.sentAt && (
+                  <form action={deleteOfferAction}>
+                    <input type="hidden" name="offerId" value={o.id} />
+                    <Button size="sm" variant="ghost" className="text-increase" aria-label="Supprimer la demande">
+                      <Trash2 aria-hidden className="size-4" />
+                    </Button>
+                  </form>
+                )}
+              </div>
+            </Card>
+          ))}
+        </Step>
+      )}
+
+      {(switching.length > 0 || adjusting.length > 0) && (
+        <Step
+          n={++n}
+          title={switching.length ? "Résilier chez la caisse actuelle" : "Annoncer le changement à votre caisse"}
+          done={lettersDone}
+          hint={
+            <>
+              Imprimez, signez (chaque adulte ; un parent pour les mineurs) et envoyez en <strong>recommandé</strong> avant le {formatDateLong(view.deadlines.sendBy, true)}. Vos complémentaires ne sont pas touchées : la lettre le précise.
+            </>
+          }
+        >
+          {terminations.length + changes.length === 0 && <p className="text-sm text-muted">Préparez les courriers ci-dessus.</p>}
+          {[...terminations, ...changes].map((l) => {
+            const content = l.content as LetterContent;
+            return (
+              <Card key={l.id} className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">{l.insurerName}</p>
+                    <p className="text-sm text-muted">{content.personRows.map((p) => p.split(",")[0]).join(", ")}</p>
+                  </div>
+                  <Badge tone={l.sentAt ? "saving" : l.kind === "TERMINATION" ? "increase" : "primary"}>
+                    {l.sentAt ? `Envoyée le ${formatDateShort(l.sentAt)}` : l.kind === "TERMINATION" ? "Résiliation LAMal" : "Changement"}
+                  </Badge>
+                </div>
+                <PdfButtons url={`/api/letters/${l.id}/pdf`} filename={`lettre-${l.id}.pdf`} primary={!l.sentAt} />
+                {l.sentAt ? (
+                  l.trackingNumber && <p className="text-sm break-all text-muted">Suivi : {l.trackingNumber}</p>
+                ) : (
+                  <ActionForm action={letterSentAction} hidden={{ letterId: l.id }} className="grid grid-cols-2 items-end gap-2">
+                    <label className="space-y-1 text-sm">
+                      <span className="font-medium">Envoyée le</span>
+                      <Input type="date" name="sentAt" defaultValue={today()} />
+                    </label>
+                    <label className="space-y-1 text-sm">
+                      <span className="font-medium">N° de suivi</span>
+                      <Input name="tracking" placeholder="98.xx…" autoComplete="off" />
+                    </label>
+                    <SubmitButton size="sm" variant="secondary" className="col-span-2">
+                      Marquer comme envoyée
+                    </SubmitButton>
+                  </ActionForm>
+                )}
+                {!l.sentAt && (
+                  <form action={deleteLetterAction}>
+                    <input type="hidden" name="letterId" value={l.id} />
+                    <ConfirmButton size="sm" variant="ghost" block className="text-increase" message="Supprimer cette lettre ?" confirmLabel="Supprimer" details={<p>Vous pourrez la préparer à nouveau.</p>}>
+                      <Trash2 aria-hidden className="size-4" /> Supprimer la lettre
+                    </ConfirmButton>
+                  </form>
+                )}
+              </Card>
+            );
+          })}
+        </Step>
+      )}
+
+      {offers.length + terminations.length > 0 && (
+        <Step n={++n} title="Recevoir les confirmations" done={confirmDone} hint="Gardez-les : la nouvelle caisse confirme l'affiliation, l'ancienne la fin du contrat au 31 décembre.">
+          <Card className="divide-y divide-border p-0">
+            {offers.map((o) => (
+              <form key={`o${o.id}`} action={offerAnsweredAction} className="flex items-center justify-between gap-2 p-3 text-sm">
+                <input type="hidden" name="offerId" value={o.id} />
+                <span>
+                  <span className="block font-medium">{o.insurerName} : affiliation</span>
+                  <span className="text-muted">{o.answeredAt ? `Reçue le ${formatDateShort(o.answeredAt)}` : o.sentAt ? "Attendue" : "Après l'envoi de la demande"}</span>
+                </span>
+                {o.answeredAt && <input type="hidden" name="undo" value="1" />}
+                <Button size="sm" variant={o.answeredAt ? "ghost" : "secondary"} disabled={!o.sentAt}>
+                  {o.answeredAt ? "Annuler" : "Reçue"}
+                </Button>
+              </form>
+            ))}
+            {terminations.map((l) => (
+              <form key={`l${l.id}`} action={letterAckAction} className="flex items-center justify-between gap-2 p-3 text-sm">
+                <input type="hidden" name="letterId" value={l.id} />
+                <span>
+                  <span className="block font-medium">{l.insurerName} : fin du contrat</span>
+                  <span className="text-muted">{l.acknowledgedAt ? `Reçue le ${formatDateShort(l.acknowledgedAt)}` : l.sentAt ? "Attendue" : "Après l'envoi de la résiliation"}</span>
+                </span>
+                {l.acknowledgedAt && <input type="hidden" name="undo" value="1" />}
+                <Button size="sm" variant={l.acknowledgedAt ? "ghost" : "secondary"} disabled={!l.sentAt}>
+                  {l.acknowledgedAt ? "Annuler" : "Reçue"}
+                </Button>
+              </form>
+            ))}
+          </Card>
+          {confirmDone && (
+            <Button asChild block>
+              <Link href={`/rituel/${year}`}>
+                Clôturer le rituel <ArrowRight aria-hidden className="size-4" />
+              </Link>
+            </Button>
+          )}
+        </Step>
+      )}
     </Page>
   );
 }

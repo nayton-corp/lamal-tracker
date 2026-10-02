@@ -101,10 +101,8 @@ export default async function LcaPage({ params }: { params: Promise<{ year: stri
               ))}
             </ul>
 
+            {requiresDoctorCheck((pr.line.chosenModelType ?? "STANDARD") as ModelType) && (
             <ActionForm action={lineFlagsAction} hidden={{ lineId: pr.line.id }} className="space-y-2 rounded-xl bg-surface-2 p-3">
-              <input type="hidden" name="affiliation" value="off" />
-              <Checkbox name="affiliation" value="on" defaultChecked={Boolean(pr.line.affiliationRequestedAt)} label={`J'ai demandé l'affiliation chez ${pr.chosenInsurer} (en ligne ou par formulaire). L'ancienne caisse ne me libère qu'à réception de sa confirmation.`} />
-              {requiresDoctorCheck((pr.line.chosenModelType ?? "STANDARD") as ModelType) && (
                 <label className="block space-y-1 text-sm">
                   <span className="font-medium">Médecin{pr.person.doctorName ? ` (${pr.person.doctorName})` : ""} présent dans la liste du modèle choisi ?</span>
                   <Select name="doctorCheck" defaultValue={pr.line.doctorCheck}>
@@ -113,9 +111,9 @@ export default async function LcaPage({ params }: { params: Promise<{ year: stri
                     <option value="NO">Non</option>
                   </Select>
                 </label>
-              )}
               <SubmitButton size="sm" variant="secondary">Enregistrer</SubmitButton>
             </ActionForm>
+            )}
 
             <LcaConfirm lineId={pr.line.id} person={pr.person.firstName} currentInsurer={pr.currentInsurer} acknowledgedAt={pr.line.lcaAckAt} />
           </Card>
@@ -124,7 +122,7 @@ export default async function LcaPage({ params }: { params: Promise<{ year: stri
 
       {switching.length > 0 && allDone && (
         <Button asChild block size="lg">
-          <Link href={`/rituel/${year}/lettres`}>Préparer les lettres</Link>
+          <Link href={`/rituel/${year}/lettres`}>Passer aux démarches</Link>
         </Button>
       )}
     </Page>
