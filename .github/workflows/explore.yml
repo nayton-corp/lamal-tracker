@@ -1,0 +1,20 @@
+name: Exploration données (temporaire)
+on:
+  push:
+    branches: [claude/explore-data]
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsx --tsconfig tsconfig.json scripts/explore.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tariffs
+          path: tariffs-2026-2027.json
