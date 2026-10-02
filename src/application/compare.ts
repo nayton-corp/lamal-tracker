@@ -9,7 +9,7 @@ import {
   type RankedOffer,
   type SortKey,
 } from "@/domain/comparison";
-import { breakEvenRp, franchiseCurve, type CurvePoint } from "@/domain/cost";
+import { breakEvenRp, costScenarios, franchiseCurve, type CostScenarios, type CurvePoint } from "@/domain/cost";
 import type { InsurerProfile } from "@/domain/insurer-profile";
 import type { ModelType } from "@/domain/lamal";
 import { coinsuranceMaxFor, franchisesFor } from "@/domain/parameters";
@@ -33,8 +33,18 @@ export interface CompareOptions {
 
 export interface InsurerCard {
   website: string | null;
+  phone: string | null;
+  email: string | null;
   profile: InsurerProfile | null;
 }
+
+export interface DetailedOffer extends RankedOffer {
+  scenarios: CostScenarios;
+  /** Prime du modèle standard de la même caisse (même franchise, même couverture accident). */
+  standardMonthlyRp: number | null;
+}
+
+export const offerKey = (o: { tariffId: number; franchiseChf: number }) => `${o.tariffId}-${o.franchiseChf}`;
 
 export interface CompareView {
   lineId: number;
@@ -42,7 +52,7 @@ export interface CompareView {
   personName: string;
   allowedFranchises: number[];
   healthCostsRp: number;
-  offers: RankedOffer[];
+  offers: DetailedOffer[];
   totalOffers: number;
   renewal: { monthlyRp: number; totalRp: number; label: string | null; franchiseChf: number } | null;
   chosen: { tariffCode: string | null; franchiseChf: number | null; insurerId: number | null };
@@ -54,6 +64,8 @@ export interface CompareView {
   market: ReturnType<typeof marketStats>;
   /** Portrait de chaque caisse présente dans les offres (comptes OFSP, évolution des primes). */
   insurers: Record<number, InsurerCard>;
+  /** Plafond annuel de quote-part de la personne. */
+  coinsuranceMaxRp: number;
   /** Nombre d'offres avant regroupement par caisse. */
   matchingOffers: number;
 }
@@ -106,9 +118,29 @@ export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}
     targetYear: r.targetYear,
   });
   const insurers: Record<number, InsurerCard> = {};
-  for (const row of db.select({ id: insurer.id, website: insurer.website }).from(insurer).all()) {
-    insurers[row.id] = { website: row.website, profile: profiles.get(row.id) ?? null };
+  for (const row of db.select({ id: insurer.id, website: insurer.website, phone: insurer.phone, email: insurer.email }).from(insurer).all()) {
+    insurers[row.id] = { website: row.website, phone: row.phone, email: row.email, profile: profiles.get(row.id) ?? null };
   }
+  const standard = new Map<string, number>();
+  for (const o of all) {
+    if (o.modelType !== "STANDARD") continue;
+    const k = `${o.insurerId}-${o.franchiseChf}`;
+    const prev = standard.get(k);
+    if (prev === undefined || o.monthlyPremiumRp < prev) standard.set(k, o.monthlyPremiumRp);
+  }
+  const coinsuranceMaxRp = coinsuranceMaxFor(params, line.targetAgeClass);
+  const detailed: DetailedOffer[] = ranked.map((o) => ({
+    ...o,
+    scenarios: costScenarios({
+      monthlyPremiumRp: o.monthlyPremiumRp,
+      franchiseChf: o.franchiseChf,
+      healthCostsRp,
+      coinsuranceRateBp: params.coinsuranceRateBp,
+      coinsuranceMaxRp,
+      co2AnnualRp: params.co2AnnualRp,
+    }),
+    standardMonthlyRp: standard.get(`${o.insurerId}-${o.franchiseChf}`) ?? null,
+  }));
 
   const cheapest = cheapestPerFranchise(filterOffers(all, { models: opts.models }));
   const base = {
@@ -123,9 +155,10 @@ export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}
     personName: `${p.firstName} ${p.lastName}`,
     allowedFranchises,
     healthCostsRp,
-    offers: ranked,
+    offers: detailed,
     totalOffers: all.length,
     matchingOffers: rankedAll.length,
+    coinsuranceMaxRp,
     insurers,
     renewal,
     chosen: { tariffCode: line.chosenTariffCode, franchiseChf: line.chosenFranchiseChf, insurerId: line.chosenInsurerId },

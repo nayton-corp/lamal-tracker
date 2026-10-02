@@ -106,3 +106,20 @@ export function breakEvenRp(
   }
   return hi;
 }
+
+export interface CostScenarios {
+  /** Aucune facture de santé : prime nette seulement. */
+  noCostsRp: Rappen;
+  /** Frais attendus de la personne. */
+  expectedRp: Rappen;
+  /** Année chargée : franchise et quote-part maximale épuisées. */
+  worstRp: Rappen;
+}
+
+/** Trois années types pour comparer les offres sur leur risque, pas seulement sur la moyenne. */
+export function costScenarios(input: CostInput): CostScenarios {
+  const expected = annualCost(input).totalRp;
+  const none = annualCost({ ...input, healthCostsRp: 0 }).totalRp;
+  const worst = annualCost(input).netPremiumRp + input.franchiseChf * 100 + input.coinsuranceMaxRp;
+  return { noCostsRp: none, expectedRp: expected, worstRp: worst };
+}

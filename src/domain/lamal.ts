@@ -43,6 +43,57 @@ export const MODEL_HINT: Record<ModelType, string> = {
   OTHER: "Modèle propre à la caisse : lisez ses conditions avant de choisir.",
 };
 
+export interface ModelDetails {
+  /** Premier interlocuteur en cas de problème de santé. */
+  firstContact: string;
+  /** Situations où l'on peut consulter directement. */
+  exceptions: string;
+  /** Ce qui arrive si on ne respecte pas le parcours. */
+  rule: string;
+  /** Pour qui le modèle est intéressant. */
+  goodFor: string;
+}
+
+/** Fonctionnement général des modèles (art. 41 al. 4 et 62 LAMal) ; les conditions exactes sont dans le règlement de la caisse. */
+export const MODEL_DETAILS: Record<ModelType, ModelDetails> = {
+  STANDARD: {
+    firstContact: "Le médecin de votre choix, généraliste ou spécialiste.",
+    exceptions: "Aucune démarche préalable.",
+    rule: "Aucune règle de parcours.",
+    goodFor: "Qui veut aller directement chez un spécialiste ou garder plusieurs médecins.",
+  },
+  PRAXIS: {
+    firstContact: "Votre médecin de famille ou le cabinet de groupe (HMO) choisi dans la liste de la caisse.",
+    exceptions: "Urgences, gynécologie et ophtalmologie (contrôles), pédiatrie selon la caisse.",
+    rule: "Le spécialiste n'est remboursé que sur délégation du médecin ; sinon, refus de prise en charge ou exclusion du modèle.",
+    goodFor: "Qui a déjà un médecin de famille figurant dans la liste de la caisse.",
+  },
+  TELMED: {
+    firstContact: "Un centre de conseil médical par téléphone ou application, avant toute consultation.",
+    exceptions: "Urgences, gynécologie et ophtalmologie (contrôles) ; parfois dentiste et pédiatre.",
+    rule: "Il faut appeler avant chaque nouveau problème et suivre la recommandation ; sinon, refus de prise en charge.",
+    goodFor: "Qui consulte peu et n'est pas attaché à un médecin.",
+  },
+  PHARMACY: {
+    firstContact: "Une pharmacie partenaire, qui conseille, traite les cas simples ou oriente vers un médecin.",
+    exceptions: "Urgences, gynécologie et ophtalmologie (contrôles).",
+    rule: "Sans passage préalable à la pharmacie, la consultation peut ne pas être remboursée.",
+    goodFor: "Qui a une pharmacie partenaire proche et consulte surtout pour des problèmes courants.",
+  },
+  FLEX: {
+    firstContact: "Au choix à chaque fois : médecin de famille, conseil téléphonique ou pharmacie, selon la liste de la caisse.",
+    exceptions: "Urgences, gynécologie et ophtalmologie (contrôles).",
+    rule: "Il faut passer par l'un des premiers recours proposés ; sinon, refus de prise en charge.",
+    goodFor: "Qui veut un rabais sans s'engager sur un seul premier recours.",
+  },
+  OTHER: {
+    firstContact: "Selon le règlement du modèle de la caisse.",
+    exceptions: "Urgences au minimum.",
+    rule: "Lisez le règlement : les conditions varient d'une caisse à l'autre.",
+    goodFor: "À juger d'après les conditions de la caisse.",
+  },
+};
+
 /**
  * Libellé lisible d'un tarif. L'OFSP nomme le tarif standard « BASE » (2027) ou
  * « Grundversicherung » (avant) : on affiche « Standard (libre choix) ».

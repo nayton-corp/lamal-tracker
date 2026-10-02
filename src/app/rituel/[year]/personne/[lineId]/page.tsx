@@ -1,14 +1,12 @@
-import { BadgeCheck, CircleAlert, ExternalLink, Stethoscope, TrendingDown } from "lucide-react";
+import { BadgeCheck, CircleAlert, Stethoscope, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/review";
-import { compareForLine, type CompareView } from "@/application/compare";
+import { compareForLine, offerKey, type CompareView, type DetailedOffer } from "@/application/compare";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { insurer, lamalPolicy, reviewLine } from "@/infrastructure/db/schema";
-import type { InsurerProfile } from "@/domain/insurer-profile";
-import { AGE_CLASS_LABEL, MODEL_HINT, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
-import type { RankedOffer } from "@/domain/comparison";
+import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { db } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
 import { Alert } from "@/ui/alert";
@@ -19,7 +17,9 @@ import { cn } from "@/ui/cn";
 import { Chf, Saving } from "@/ui/money";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
+import { CompareBar, CompareToggle } from "./compare-select";
 import { FilterBar } from "./filter-bar";
+import { InsurerFacts, ModelBlock, OfferCosts } from "./offer-details";
 import { FranchiseSimulator } from "./simulator";
 
 export const dynamic = "force-dynamic";
@@ -100,6 +100,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
             ))}
           </ol>
         )}
+        <CompareBar />
         {view.offers.length > limit && (
           <Button asChild variant="secondary" block>
             <Link href={`?${new URLSearchParams({ ...sp, n: "all" } as Record<string, string>).toString()}`} scroll={false}>
@@ -193,7 +194,7 @@ function RenewalChoices({ view, lineId, modelType }: { view: CompareView; lineId
   );
 }
 
-function OfferCard({ offer: o, view, year, lineId }: { offer: RankedOffer; view: CompareView; year: number; lineId: number }) {
+function OfferCard({ offer: o, view, year, lineId }: { offer: DetailedOffer; view: CompareView; year: number; lineId: number }) {
   const isCurrent = o.insurerId === view.currentInsurerId;
   const isChosen = view.chosen.tariffCode === o.tariffCode && view.chosen.franchiseChf === o.franchiseChf && view.chosen.insurerId === o.insurerId;
   return (
@@ -225,24 +226,19 @@ function OfferCard({ offer: o, view, year, lineId }: { offer: RankedOffer; view:
           <Saving rp={o.savingsRp} className="block text-sm" />
         </span>
       </summary>
-      <div className="space-y-3 border-t border-border p-3 text-sm">
-        <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
-          <dt className="text-muted">Prime brute / an</dt>
-          <dd className="text-right tabular"><Chf rp={o.cost.grossPremiumRp} /></dd>
-          <dt className="text-muted">Redistribution CO2</dt>
-          <dd className="text-right tabular">−<Chf rp={o.cost.co2Rp} /></dd>
-          <dt className="text-muted">Franchise payée</dt>
-          <dd className="text-right tabular"><Chf rp={o.cost.franchisePartRp} /></dd>
-          <dt className="text-muted">Quote-part (10 %)</dt>
-          <dd className="text-right tabular"><Chf rp={o.cost.coinsurancePartRp} /></dd>
-          <dt className="font-medium">Coût total attendu</dt>
-          <dd className="text-right font-semibold tabular"><Chf rp={o.cost.totalRp} /></dd>
-        </dl>
-        <p className="text-muted">
-          <strong className="font-medium text-foreground">{MODEL_LABEL[o.modelType]} :</strong> {MODEL_HINT[o.modelType]}
-          {o.doctorCheck && " Vérifiez sur le site de la caisse que votre médecin figure dans la liste."}
-        </p>
+      <div className="space-y-4 border-t border-border p-3 text-sm">
+        <OfferCosts offer={o} healthCostsRp={view.healthCostsRp} />
+        <ModelBlock offer={o} />
         <InsurerFacts name={o.insurerName} card={view.insurers[o.insurerId]} />
+        <div className="space-y-1">
+          <p className="font-medium">Avant de choisir</p>
+          <ul className="list-disc space-y-1 pl-5 text-muted">
+            {o.doctorCheck && <li>Vérifiez sur le site de la caisse que votre médecin figure dans la liste du modèle.</li>}
+            <li>Lisez le règlement du modèle (conditions particulières) sur le site de la caisse.</li>
+            <li>Les complémentaires (hospitalisation, dentaire…) n&apos;ont pas de tarif public : elles se demandent avec la demande d&apos;offre, après votre choix.</li>
+          </ul>
+        </div>
+        <CompareToggle k={offerKey(o)} name={`${o.insurerName}, ${displayTariffLabel(o.tariffLabel, o.modelType)}, franchise ${o.franchiseChf}`} />
         {!isChosen && (
           <ActionForm action={decideAction} hidden={{ year, lineId, tariffId: o.tariffId, franchiseChf: o.franchiseChf }}>
             <SubmitButton block pendingLabel="Enregistrement…">
@@ -255,67 +251,3 @@ function OfferCard({ offer: o, view, year, lineId }: { offer: RankedOffer; view:
   );
 }
 
-const LEVEL_WORD = { LOW: "bas", MID: "moyen", HIGH: "élevé" } as const;
-
-/** Portrait public de la caisse : solidité, frais, évolution des primes dans la région. */
-function InsurerFacts({ name, card }: { name: string; card: { website: string | null; profile: InsurerProfile | null } | undefined }) {
-  const p = card?.profile;
-  if (!p && !card?.website) return null;
-  const trendText = p?.trend
-    ? `${p.trend.insurerPermille >= 0 ? "+" : ""}${(p.trend.insurerPermille / 10).toFixed(1)} % par an de ${p.trend.fromYear} à ${p.trend.toYear} (marché ${p.trend.marketPermille >= 0 ? "+" : ""}${(p.trend.marketPermille / 10).toFixed(1)} %)`
-    : null;
-  return (
-    <div className="space-y-2 rounded-xl bg-surface-2 p-3">
-      <p className="font-medium">La caisse {name}</p>
-      {p && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-          {p.insured !== null && (
-            <>
-              <dt className="text-muted">Assurés</dt>
-              <dd className="text-right tabular">{p.insured.toLocaleString("fr-CH")}</dd>
-            </>
-          )}
-          {p.reservesMonths !== null && (
-            <>
-              <dt className="text-muted">Réserves</dt>
-              <dd className="text-right">
-                {p.reservesMonths.toLocaleString("fr-CH")} mois de primes{" "}
-                <Badge tone={p.reservesLevel === "LOW" ? "increase" : p.reservesLevel === "HIGH" ? "saving" : "neutral"} className="text-xs">
-                  {p.reservesLevel === "LOW" ? "plutôt faibles" : p.reservesLevel === "HIGH" ? "solides" : "dans la moyenne"}
-                </Badge>
-              </dd>
-            </>
-          )}
-          {p.adminPerInsuredRp !== null && (
-            <>
-              <dt className="text-muted">Frais administratifs</dt>
-              <dd className="text-right">
-                <Chf rp={p.adminPerInsuredRp} whole /> par assuré et par an
-                {p.adminLevel && <span className="text-muted"> ({LEVEL_WORD[p.adminLevel]})</span>}
-              </dd>
-            </>
-          )}
-          {trendText && (
-            <>
-              <dt className="text-muted">Primes</dt>
-              <dd className="text-right">
-                {trendText}{" "}
-                {p.trendLevel !== "SIMILAR" && (
-                  <Badge tone={p.trendLevel === "BETTER" ? "saving" : "increase"} className="text-xs">
-                    {p.trendLevel === "BETTER" ? "hausses modérées" : "hausses fortes"}
-                  </Badge>
-                )}
-              </dd>
-            </>
-          )}
-        </dl>
-      )}
-      {p?.year && <p className="text-xs text-muted">Comptes {p.year} publiés par l&apos;OFSP ; primes du modèle standard dans votre région.</p>}
-      {card?.website && (
-        <a href={card.website} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 text-primary">
-          Site de la caisse <ExternalLink aria-hidden className="size-4" />
-        </a>
-      )}
-    </div>
-  );
-}
