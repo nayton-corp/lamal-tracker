@@ -1,0 +1,11 @@
+name: Exploration sources (temporaire)
+on:
+  push:
+    branches: [claude/project-thread-7bxcj9]
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install openpyxl requests beautifulsoup4 pdfplumber >/dev/null
+      - run: python3 scripts/explore_sources.py
