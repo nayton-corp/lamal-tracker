@@ -6,6 +6,7 @@
  *   pnpm cli url                         affiche l'URL OFSP résolue
  *   pnpm cli archives                    liste les archives annuelles disponibles
  *   pnpm cli download-archives           importe les archives absentes de la base
+ *   pnpm cli inspect <fichier>           diagnostic : contenu, feuilles, premières lignes
  *
  * Base : DATABASE_PATH (défaut ./data/lamal.db). Code de sortie 1 si le fichier est refusé.
  */
@@ -14,6 +15,7 @@ import path from "node:path";
 import { openDb } from "@/infrastructure/db/client";
 import { importPremiumFile, type ImportOutcome } from "@/infrastructure/ofsp/importer";
 import { activeDataset } from "@/infrastructure/db/queries";
+import { inspectFile } from "@/infrastructure/ofsp/inspect";
 import { download, listArchives, resolvePremiumsUrl } from "@/infrastructure/ofsp/source";
 
 function print(outcome: ImportOutcome) {
@@ -37,6 +39,10 @@ async function main() {
     console.log(await resolvePremiumsUrl());
     return;
   }
+  if (command === "inspect" && arg) {
+    for (const line of await inspectFile(path.resolve(arg))) console.log(line);
+    return;
+  }
   if (command === "archives") {
     for (const a of await listArchives()) console.log(`${a.year}${a.listed ? "" : " (URL déduite)"} : ${a.url}`);
     return;
@@ -55,7 +61,10 @@ async function main() {
         const outcome = await importPremiumFile(db, file, a.url);
         print(outcome);
         if (outcome.status === "IMPORTED") imported++;
-        if (outcome.status === "FAILED") failed++;
+        if (outcome.status === "FAILED") {
+          failed++;
+          if (failed <= 3) for (const line of await inspectFile(file)) console.log(line);
+        }
       } catch (e) {
         console.log(`indisponible : ${e instanceof Error ? e.message : e}`);
       }
