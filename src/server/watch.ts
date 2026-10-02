@@ -7,7 +7,8 @@ import { notifyAll } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
 import { activeDataset } from "@/infrastructure/db/queries";
 import { db, ritualYear, today } from "./context";
-import { startImport } from "./jobs";
+import { importJob, startBootstrapImport, startImport, startYearImport } from "./jobs";
+import { latestActiveYear } from "@/infrastructure/db/queries";
 
 /**
  * Vérifie si l'OFSP a publié un nouveau fichier (signature HTTP), et l'importe si oui.
@@ -65,8 +66,28 @@ function inPublicationSeason(iso: string): boolean {
   return md >= "09-15" && md <= "11-30";
 }
 
+/**
+ * Primes indispensables : les plus récentes publiées et celles de l'année en cours (pour
+ * pré-remplir les contrats actuels). Importées sans intervention au premier démarrage.
+ */
+function ensureBaseDatasets(): boolean {
+  if (process.env.OFSP_AUTO_CHECK === "false" || importJob().running) return false;
+  const year = Number(today().slice(0, 4));
+  if (latestActiveYear(db()) === null) {
+    return startBootstrapImport(year, async (outcome) => {
+      if (outcome.status === "IMPORTED") setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), ok: true });
+    });
+  }
+  if (!activeDataset(db(), year)) return startYearImport(year);
+  return false;
+}
+
 /** Une passe du planificateur : en saison, contrôle quotidien ; sinon hebdomadaire. */
 export async function schedulerTick(): Promise<void> {
+  if (ensureBaseDatasets()) {
+    console.log("[watch] import initial des primes lancé");
+    return;
+  }
   const last = getSetting<{ at: string }>(db(), "ofsp.lastCheck");
   const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
   const every = inPublicationSeason(today()) ? 20 : 24 * 7;

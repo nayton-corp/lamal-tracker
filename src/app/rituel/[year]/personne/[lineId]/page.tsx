@@ -6,7 +6,7 @@ import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/re
 import { compareForLine, type CompareView } from "@/application/compare";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { insurer, lamalPolicy, reviewLine } from "@/infrastructure/db/schema";
-import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, type ModelType } from "@/domain/lamal";
+import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import type { RankedOffer } from "@/domain/comparison";
 import { db } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
@@ -46,20 +46,22 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
   const limit = sp.n === "all" ? view.offers.length : 30;
 
   return (
-    <Page>
+    <Page wide>
       <PageHeader
         title={view.personName}
         subtitle={`${AGE_CLASS_LABEL[line.targetAgeClass]} en ${year} · ${line.accident ? "avec" : "sans"} accident`}
         back={`/rituel/${year}#ligne-${lineId}`}
       />
 
+      <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-8 lg:space-y-0">
+      <aside className="space-y-6 lg:sticky lg:top-8">
       <Card className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted">Contrat actuel ({year - 1})</p>
             <p className="font-semibold">{insurerLabel(currentInsurer)}</p>
             <p className="text-sm text-muted">
-              {policy.tariffLabel || MODEL_LABEL[policy.modelType as ModelType]} · F {policy.franchiseChf}
+              {displayTariffLabel(policy.tariffLabel, policy.modelType as ModelType)} · franchise {policy.franchiseChf}
             </p>
           </div>
           <p className="text-right">
@@ -67,20 +69,23 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
             <span className="block text-sm text-muted">/mois</span>
           </p>
         </div>
-        <RenewalBlock view={view} year={year} lineId={lineId} />
+        <RenewalBlock view={view} year={year} lineId={lineId} modelType={policy.modelType as ModelType} />
       </Card>
 
-      <Section title={`Offres ${year}`}>
+      <Section title="Filtrer les offres">
         <FilterBar franchises={view.allowedFranchises} />
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
-          <span>
-            {view.offers.length} offre(s) sur {view.totalOffers} · frais attendus <Chf rp={view.healthCostsRp} whole />
-          </span>
-          <FranchiseSimulator lineId={lineId} franchises={view.curve.franchises} points={view.curve.points} breakEvenRp={view.curve.breakEvenRp} healthCostsRp={view.healthCostsRp} />
-        </div>
+        <p className="text-sm text-muted">
+          Le coût total compte la prime et ce que vous paieriez de votre poche (franchise, 10 % de quote-part) pour des frais de santé de{" "}
+          <Chf rp={view.healthCostsRp} whole /> par an.
+        </p>
+        <FranchiseSimulator lineId={lineId} franchises={view.curve.franchises} points={view.curve.points} breakEvenRp={view.curve.breakEvenRp} healthCostsRp={view.healthCostsRp} />
+      </Section>
+      </aside>
+
+      <Section title={`${view.offers.length} offre(s) ${year}, les moins chères d'abord`}>
         {view.offers.length === 0 ? (
           <Alert tone="info" title="Aucune offre avec ces filtres">
-            Élargissez les modèles ou cochez « Ignorer les préférences » dans Filtres.
+            Choisissez « Toutes franchises » ou d&apos;autres modèles d&apos;assurance.
           </Alert>
         ) : (
           <ol className="space-y-2">
@@ -99,17 +104,25 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
           </Button>
         )}
       </Section>
+      </div>
     </Page>
   );
 }
 
-function RenewalBlock({ view, year, lineId }: { view: CompareView; year: number; lineId: number }) {
-  if (view.renewalStatus === "MATCHED" && view.renewal) {
+function RenewalBlock({ view, year, lineId, modelType }: { view: CompareView; year: number; lineId: number; modelType: ModelType }) {
+  if ((view.renewalStatus === "MATCHED" || view.renewalStatus === "PROBABLE") && view.renewal) {
     return (
       <div className="space-y-2 rounded-xl bg-surface-2 p-3">
         <p className="text-sm">
-          Sans rien faire en {year} : <strong>{view.renewal.label}</strong>, F {view.renewal.franchiseChf}, <Chf rp={view.renewal.monthlyRp} className="font-semibold" />/mois.
+          Sans rien faire en {year} : <strong>{displayTariffLabel(view.renewal.label, modelType)}</strong>, franchise {view.renewal.franchiseChf},{" "}
+          <Chf rp={view.renewal.monthlyRp} className="font-semibold" />/mois.
         </p>
+        {view.renewalStatus === "PROBABLE" && view.renewalCandidates.length > 1 && (
+          <details className="text-sm">
+            <summary className="min-h-11 cursor-pointer content-center text-primary">Ce n&apos;est pas le bon produit ?</summary>
+            <RenewalChoices view={view} lineId={lineId} modelType={modelType} />
+          </details>
+        )}
         <ActionForm action={keepAction} hidden={{ year, lineId }}>
           <SubmitButton variant="secondary" block size="sm">
             Garder ce contrat
@@ -121,17 +134,23 @@ function RenewalBlock({ view, year, lineId }: { view: CompareView; year: number;
   return (
     <div className="space-y-2 rounded-xl border border-border p-3">
       <p className="flex items-center gap-2 text-sm font-medium">
-        <CircleAlert aria-hidden className="size-4 text-increase" />
-        {view.renewalStatus === "PROBABLE"
-          ? `Votre tarif a changé de code en ${year}. Nous pensons qu'il s'agit de « ${view.renewal?.label} » : confirmez.`
-          : view.renewalStatus === "MISSING"
-            ? `Aucun tarif ${year} trouvé chez votre caisse avec cette franchise.`
-            : `Plusieurs tarifs possibles chez votre caisse en ${year} : lequel remplace le vôtre ?`}
+        <CircleAlert aria-hidden className="size-4 shrink-0 text-increase" />
+        {view.renewalStatus === "MISSING"
+          ? `Votre caisse ne propose plus ce contrat dans votre région en ${year} : choisissez une nouvelle offre ci-dessous.`
+          : `Votre caisse propose plusieurs produits proches en ${year} : lequel remplace le vôtre ?`}
       </p>
+      <RenewalChoices view={view} lineId={lineId} modelType={modelType} />
+    </div>
+  );
+}
+
+function RenewalChoices({ view, lineId, modelType }: { view: CompareView; lineId: number; modelType: ModelType }) {
+  return (
+    <div className="space-y-2">
       {view.renewalCandidates.map((c) => (
         <ActionForm key={c.code} action={confirmLineageAction} hidden={{ lineId, toCode: c.code }} className="flex items-center gap-2">
           <div className="min-w-0 flex-1 text-sm">
-            <p className="truncate font-medium">{c.label}</p>
+            <p className="truncate font-medium">{displayTariffLabel(c.label, c.modelType ?? modelType)}</p>
             <p className="text-muted">
               {MODEL_LABEL[c.modelType]} · <Chf rp={c.monthlyRp} />
             </p>
@@ -155,7 +174,7 @@ function OfferCard({ offer: o, view, year, lineId }: { offer: RankedOffer; view:
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold">{o.insurerName}</span>
           <span className="block truncate text-sm text-muted">
-            {o.tariffLabel} · F {o.franchiseChf}
+            {displayTariffLabel(o.tariffLabel, o.modelType)} · franchise {o.franchiseChf}
           </span>
           <span className="mt-1 flex flex-wrap gap-1">
             <Badge className="text-xs">{MODEL_LABEL[o.modelType]}</Badge>

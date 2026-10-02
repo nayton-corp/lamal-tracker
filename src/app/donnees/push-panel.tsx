@@ -37,14 +37,14 @@ export function PushPanel({ devices }: { devices: number }) {
     start(async () => {
       try {
         const permission = await Notification.requestPermission();
-        if (permission !== "granted") return setMsg({ error: "Notifications refusées dans le navigateur." });
+        if (permission !== "granted") return setMsg({ error: "Les notifications sont bloquées : autorisez-les dans les réglages du navigateur, puis réessayez." });
         const { publicKey } = await (await fetch("/api/push")).json();
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
         const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
         await subscribePushAction({ endpoint: json.endpoint, keys: json.keys });
         setSubscribed(true);
-        setMsg({ ok: "Cet appareil recevra les alertes." });
+        setMsg({ ok: "C'est fait : cet appareil recevra les rappels." });
       } catch (e) {
         setMsg({ error: e instanceof Error ? e.message : String(e) });
       }
@@ -64,11 +64,11 @@ export function PushPanel({ devices }: { devices: number }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
-        Alertes à la publication des nouvelles primes (fin septembre) et rappels avant l&apos;échéance de résiliation. {devices} appareil(s) abonné(s).
+        Recevez une alerte quand les nouvelles primes sont publiées (fin septembre), puis un rappel avant la date limite pour changer de caisse.{devices > 0 && ` Activé sur ${devices} appareil(s).`}
       </p>
       {support === "insecure" && (
-        <Alert tone="info" title="HTTPS requis">
-          Les notifications et l&apos;installation de l&apos;app demandent une connexion HTTPS (par exemple via Tailscale, voir le README).
+        <Alert tone="info" title="Rappels indisponibles sur cette adresse">
+          Les rappels et l&apos;installation sur l&apos;écran d&apos;accueil demandent une adresse sécurisée (qui commence par https://). La personne qui a installé l&apos;app peut l&apos;activer (voir le README).
         </Alert>
       )}
       {support === "unsupported" && <Alert tone="info" title="Navigateur non compatible">Sur iPhone, installez d&apos;abord l&apos;app sur l&apos;écran d&apos;accueil.</Alert>}
@@ -76,7 +76,7 @@ export function PushPanel({ devices }: { devices: number }) {
         (subscribed ? (
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => start(async () => setMsg(await testPushAction()))} disabled={pending}>
-              Tester
+              Envoyer un rappel d&apos;essai
             </Button>
             <Button variant="ghost" onClick={unsubscribe} disabled={pending}>
               <BellOff aria-hidden className="size-4" /> Désactiver
@@ -84,7 +84,7 @@ export function PushPanel({ devices }: { devices: number }) {
           </div>
         ) : (
           <Button onClick={subscribe} disabled={pending} block>
-            <Bell aria-hidden className="size-4" /> Activer les notifications
+            <Bell aria-hidden className="size-4" /> Activer les rappels sur cet appareil
           </Button>
         ))}
       {msg?.ok && <Alert tone="success" title={msg.ok} />}

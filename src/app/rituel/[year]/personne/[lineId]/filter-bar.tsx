@@ -37,7 +37,7 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
 
   const chip = (active: boolean) =>
     cn(
-      "min-h-11 shrink-0 rounded-full border px-4 text-sm font-medium transition-colors",
+      "min-h-11 shrink-0 cursor-pointer rounded-full border px-4 text-sm font-medium transition-colors",
       active ? "border-primary bg-primary text-on-primary" : "border-border bg-surface text-foreground hover:bg-surface-2",
     );
 
@@ -46,7 +46,7 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
       <div role="radiogroup" aria-label="Trier par" className="grid grid-cols-2 rounded-xl bg-surface-2 p-1">
         {(
           [
-            ["total", "Coût total attendu"],
+            ["total", "Coût total"],
             ["premium", "Prime seule"],
           ] as const
         ).map(([key, label]) => (
@@ -55,13 +55,13 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
             role="radio"
             aria-checked={sort === key}
             onClick={() => update({ sort: key === "total" ? null : key })}
-            className={cn("min-h-11 rounded-lg text-sm font-medium transition-colors", sort === key ? "bg-surface text-foreground shadow-card" : "text-muted")}
+            className={cn("min-h-11 cursor-pointer rounded-lg text-sm font-medium transition-colors", sort === key ? "bg-surface text-foreground shadow-card" : "text-muted")}
           >
             {label}
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] lg:flex-wrap lg:overflow-visible">
         <button className={chip(franchise === "")} onClick={() => update({ f: null })} aria-pressed={franchise === ""}>
           Toutes franchises
         </button>
@@ -73,11 +73,11 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
       </div>
       <div className="flex items-center gap-2">
         <Sheet
-          title="Filtres"
-          description="Les préférences de la personne s'appliquent si aucun modèle n'est choisi ici."
+          title="Modèles d'assurance"
+          description="Médecin de famille, télémédecine… Sans choix ici, on applique les préférences de la personne."
           trigger={
             <Button variant="secondary" size="sm">
-              <SlidersHorizontal aria-hidden className="size-4" /> Modèles{models.length ? ` (${models.length})` : ""}
+              <SlidersHorizontal aria-hidden className="size-4" /> Modèles d&apos;assurance{models.length ? ` (${models.length})` : ""}
             </Button>
           }
         >

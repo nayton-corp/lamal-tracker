@@ -8,11 +8,14 @@ import { generateLetters, getLetter } from "@/application/letters";
 import {
   acknowledgeLca,
   closeReview,
+  deleteReview,
+  getReviewByYear,
   confirmLineage,
   decide,
   getReviewView,
   markLetterSent,
   openReview,
+  reopenReview,
   undoDecision,
   UserError,
 } from "@/application/review";
@@ -93,7 +96,7 @@ describe("rituel annuel", () => {
     expect(teen!.line.renewalFranchiseChf).toBe(300);
     expect(teen!.transition).toMatch(/jeune adulte/);
     expect(view.deadlines.receiptDeadline).toBe("2026-11-30");
-    expect(adult!.best?.insurerName).toBe("Assura-Basis SA");
+    expect(adult!.best?.insurerName).toBe("Assura");
     expect(view.totals.potentialAnnualSavingsRp).toBeGreaterThan(0);
     expect(adult!.lcaWarnings[0]!.level).toBe("danger");
   });
@@ -157,5 +160,23 @@ describe("rituel annuel", () => {
     // Redistribution CO2 2027 : 57.00 / 12 = 4.75
     const p = history.persons[0]!.points[1]!;
     expect(p.billedMonthlyRp - p.netMonthlyRp).toBe(475);
+  });
+
+  it("rouvre un rituel clôturé : les contrats créés disparaissent, les décisions restent", () => {
+    reopenReview(db, 1);
+    expect(getReviewByYear(db, 2027)?.status).toBe("OPEN");
+    expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(0);
+    expect(getReviewView(db, 1, TODAY).persons.every((p) => p.line.decision !== "UNDECIDED")).toBe(true);
+    closeReview(db, 1, NOW);
+    expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(2);
+  });
+
+  it("supprime un rituel clôturé et revient à l'état d'avant", () => {
+    deleteReview(db, 1);
+    expect(getReviewByYear(db, 2027)).toBeNull();
+    expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(0);
+    expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2026)).all()).toHaveLength(2);
+    const { reviewId } = openReview(db, 2027);
+    expect(getReviewView(db, reviewId, TODAY).persons.every((p) => p.line.decision === "UNDECIDED")).toBe(true);
   });
 });

@@ -11,6 +11,7 @@ test.beforeAll(async () => {
 
 async function importFile(page: Page, file: string, year: number) {
   await page.goto("/donnees");
+  await page.getByText("Importer un fichier à la main").click();
   await page.setInputFiles("#file", path.join(FIXTURES_DIR, file));
   await page.getByRole("button", { name: "Importer le fichier", exact: true }).click();
   await expect(page.getByText(`Primes ${year} importées`)).toBeVisible({ timeout: 60_000 });
@@ -19,18 +20,19 @@ async function importFile(page: Page, file: string, year: number) {
 test("rituel annuel complet sur mobile", async ({ page }) => {
   // Accueil vide → foyer
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /rituel d'automne/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /juste prix/ })).toBeVisible();
   await shot(page, "01-accueil-vide");
   await page.getByRole("link", { name: "Commencer" }).click();
 
   await page.getByLabel("Nom du foyer").fill("Famille Test");
   await page.getByLabel("Rue et numéro").fill("Rue du Lac 1");
   await page.getByLabel("NPA").fill("1003");
-  await page.getByLabel("Localité").fill("Lausanne");
-  await page.getByLabel("Canton").selectOption("VD");
-  await page.getByLabel("Région de primes").selectOption("1");
+  // Le code postal suffit : commune, canton et région sont trouvés.
+  await expect(page.getByText(/Lausanne \(VD\) · région de primes 1/)).toBeVisible();
+  await expect(page.getByLabel("Localité")).toHaveValue("Lausanne");
+  await shot(page, "01b-foyer");
   await page.getByRole("button", { name: "Enregistrer le foyer" }).click();
-  await expect(page.getByText("Foyer enregistré.")).toBeVisible();
+  await expect(page.getByText("Canton VD · région de primes 1")).toBeVisible();
 
   // Primes officielles 2026 et 2027
   await importFile(page, "primes-2026.xlsx", 2026);
@@ -48,22 +50,25 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByRole("button", { name: "Ajouter un contrat LAMal" }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByLabel("Année").selectOption("2026");
-  await sheet.getByLabel("N° d'assuré").fill("HEL-123");
-  await sheet.getByLabel("Caisse-maladie (LAMal)").selectOption({ label: "Helsana Versicherungen AG" });
-  await expect(sheet.getByLabel("Tarif (données OFSP)")).toBeVisible();
-  await sheet.getByLabel("Tarif (données OFSP)").selectOption("HEL-TEL26");
-  await sheet.getByLabel("Franchise (CHF)").selectOption("2500");
-  await expect(sheet.getByLabel("Prime mensuelle facturée (CHF)")).not.toHaveValue("");
+  await sheet.getByLabel("Caisse-maladie").selectOption({ label: "Helsana" });
+  await expect(sheet.getByLabel("Produit")).toBeVisible();
+  await sheet.getByLabel("Produit").selectOption("HEL-TEL26");
+  await sheet.getByLabel("Franchise").selectOption("2500");
+  await sheet.getByLabel("Avec accident").uncheck();
+  // La prime officielle est reprise sans saisie.
+  await expect(sheet.getByText("Prime officielle OFSP")).toBeVisible();
+  await sheet.getByText("N° d'assuré (pour les lettres)").click();
+  await sheet.getByLabel("Numéro d'assuré").fill("HEL-123");
   await shot(page, "03-contrat");
   await sheet.getByRole("button", { name: "Enregistrer le contrat" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
-  await expect(page.getByText("Helsana Versicherungen AG").first()).toBeVisible();
+  await expect(page.getByText("Helsana", { exact: true }).first()).toBeVisible();
 
   // Complémentaire LCA chez le même groupe
   await page.getByRole("button", { name: "Ajouter une complémentaire LCA" }).click();
   const lca = page.getByRole("dialog");
   await lca.getByLabel("Assureur LCA").fill("Helsana Assurances complémentaires SA");
-  await lca.getByLabel("Groupe de la caisse LAMal").selectOption({ label: "Helsana Versicherungen AG" });
+  await lca.getByLabel("Groupe de la caisse LAMal").selectOption({ label: "Helsana" });
   await lca.getByLabel("Produit").fill("Hospitalisation mi-privée");
   await lca.getByRole("button", { name: "Enregistrer la complémentaire" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
@@ -73,12 +78,12 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByRole("link", { name: "Rituel" }).click();
   await page.getByRole("button", { name: "Lancer l'analyse 2027" }).click();
   await expect(page.getByText("Votre foyer en 2027, sans rien changer")).toBeVisible();
-  await expect(page.getByText("Tarif à confirmer")).toBeVisible();
+  // Le tarif renommé entre 2026 et 2027 est retrouvé sans rien demander.
+  await expect(page.getByText("Produit à préciser")).toHaveCount(0);
   await shot(page, "05-rituel");
 
-  // Comparateur : confirmer le renouvellement puis choisir la meilleure offre
+  // Comparateur : renouvellement connu, choisir la meilleure offre
   await page.getByRole("link", { name: "Comparer pour Alex" }).click();
-  await page.getByRole("button", { name: "C'est celui-ci" }).first().click();
   await expect(page.getByText("Sans rien faire en 2027")).toBeVisible();
   await shot(page, "06-comparateur");
   await page.getByRole("button", { name: "Simulateur de franchise" }).click();
@@ -112,7 +117,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText(/Adresse de la caisse actuelle manquante/)).toBeVisible();
 
   await page.goto("/donnees/caisses");
-  const helsana = page.locator("details", { hasText: "Helsana Versicherungen AG" });
+  const helsana = page.locator("details").filter({ has: page.getByText("Helsana", { exact: true }) });
   await helsana.locator("summary").click();
   await helsana.getByLabel("Adresse de résiliation").fill("Case postale\n8081 Zurich");
   await helsana.getByRole("button", { name: "Enregistrer" }).click();
@@ -143,4 +148,49 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await shot(page, "10-historique");
   await page.goto("/");
   await shot(page, "11-accueil");
+});
+
+test.describe("sur ordinateur", () => {
+  test.use({ viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
+
+  test("navigation latérale, toutes les pages, et retour en arrière sur un rituel clôturé", async ({ page }) => {
+    const nav = page.getByRole("navigation", { name: "Navigation principale" });
+    await page.goto("/");
+    await expect(nav.getByRole("link", { name: /Foyer/ })).toBeVisible();
+    await shot(page, "d01-accueil");
+    for (const [name, file] of [["Foyer", "d02-foyer"], ["Historique", "d03-historique"], ["Réglages", "d04-reglages"]] as const) {
+      await nav.getByRole("link", { name: new RegExp(name) }).click();
+      await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+      await shot(page, file);
+    }
+    await page.goto("/foyer");
+    await page.getByRole("link", { name: /Alex Test/ }).click();
+    await shot(page, "d05-personne");
+    await page.getByRole("button", { name: "Ajouter un contrat LAMal" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.waitForTimeout(300);
+    await shot(page, "d06-dialogue");
+    await page.keyboard.press("Escape");
+
+    // Rituel clôturé : on peut le rouvrir…
+    await nav.getByRole("link", { name: /Rituel/ }).click();
+    await expect(page.getByText("Clôturé · contrats 2027 créés.")).toBeVisible();
+    await shot(page, "d07-rituel-cloture");
+    await page.getByRole("button", { name: "Rouvrir le rituel" }).click();
+    await page.waitForTimeout(300);
+    await shot(page, "d08-confirmation");
+    await page.getByRole("dialog").getByRole("button", { name: "Rouvrir" }).click();
+    await expect(page.getByRole("button", { name: "Clôturer le rituel 2027" })).toBeVisible();
+    await expect(page.getByText("Je change de caisse")).toBeVisible();
+    await page.getByRole("link", { name: "Revoir" }).click();
+    await expect(page.getByText("Sans rien faire en 2027")).toBeVisible();
+    await shot(page, "d09-comparateur");
+    await page.goto("/rituel/2027");
+
+    // … ou le supprimer complètement.
+    await page.getByRole("button", { name: "Supprimer ce rituel" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Supprimer le rituel" }).click();
+    await expect(page.getByRole("button", { name: "Lancer l'analyse 2027" })).toBeVisible();
+    await shot(page, "d10-rituel-supprime");
+  });
 });

@@ -1,6 +1,6 @@
-import { ArrowRight, CalendarClock, CircleAlert, Database, FileSpreadsheet, Sparkles, Users } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Database, FileSpreadsheet, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
-import { getHousehold, listInsurers, listPersons, listPolicies } from "@/application/household";
+import { getHousehold, listPersons, listPolicies } from "@/application/household";
 import { getReviewByYear, getReviewView } from "@/application/review";
 import { daysBetween, formatDateLong } from "@/domain/dates";
 import { reviewDeadlines } from "@/domain/deadlines";
@@ -10,7 +10,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
 import { Chf, Delta } from "@/ui/money";
-import { Page } from "@/ui/page";
+import { EmptyState, Page } from "@/ui/page";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +23,16 @@ export default function Home() {
   if (!h) {
     return (
       <Page>
-        <header className="space-y-2 pt-6">
+        <header className="space-y-2 pt-6 lg:pt-0">
           <p className="text-sm font-semibold uppercase tracking-wide text-primary">Primes LAMal</p>
-          <h1 className="text-3xl font-bold leading-tight text-balance">Votre rituel d&apos;automne, sans prise de tête.</h1>
-          <p className="text-muted">Chaque fin septembre : la hausse de votre foyer, toutes les offres du marché, la meilleure caisse et la lettre de résiliation prête à signer.</p>
+          <h1 className="text-3xl font-bold leading-tight text-balance">Payez le juste prix pour votre assurance de base.</h1>
+          <p className="text-muted">Chaque automne, les primes changent. L&apos;app vous montre la hausse pour votre foyer, trouve la caisse la moins chère et prépare la lettre de résiliation, prête à signer.</p>
         </header>
         <ol className="space-y-3">
           {[
             { Icon: Users, title: "Décrire le foyer", text: "Adresse, région de primes et membres." },
-            { Icon: FileSpreadsheet, title: "Saisir les contrats actuels", text: "Caisse, modèle, franchise et prime de chaque personne." },
-            { Icon: Database, title: "Importer les primes officielles", text: "Automatique dès leur publication par l'OFSP." },
+            { Icon: FileSpreadsheet, title: "Indiquer les contrats actuels", text: "Choisissez la caisse et la franchise : la prime est retrouvée toute seule." },
+            { Icon: Database, title: "Comparer chaque automne", text: "Dès la publication des primes, l'app compare toutes les caisses et prépare la lettre." },
           ].map(({ Icon, title, text }, i) => (
             <li key={title}>
               <Card className="flex items-center gap-4">
@@ -67,20 +67,34 @@ export default function Home() {
   const totalCurrent = rows.reduce((a, r) => a + (r.current?.policy.billedMonthlyRp ?? 0), 0);
   const totalPrev = rows.every((r) => r.previous) ? rows.reduce((a, r) => a + r.previous!.policy.billedMonthlyRp, 0) : null;
   const missing = rows.filter((r) => !r.current);
-  const insurerIds = new Set(rows.map((r) => r.current?.policy.insurerId).filter(Boolean));
-  const noAddress = listInsurers(db()).filter((i) => insurerIds.has(i.id) && !i.terminationAddress);
 
   const dataset = activeDataset(db(), target);
   const reviewRow = getReviewByYear(db(), target);
   const reviewView = reviewRow ? getReviewView(db(), reviewRow.id, t) : null;
   const deadlines = reviewDeadlines(target);
 
+  if (persons.length === 0) {
+    return (
+      <Page>
+        <header className="pt-4">
+          <p className="text-sm text-muted">{h.name}</p>
+          <h1 className="text-2xl font-bold">Bonjour</h1>
+        </header>
+        <EmptyState icon={<Users aria-hidden />} title="Qui est assuré dans votre foyer ?" action={<Button asChild><Link href="/foyer/personne/nouvelle">Ajouter une personne</Link></Button>}>
+          Ajoutez chaque personne, puis sa caisse et sa franchise actuelles. C&apos;est tout.
+        </EmptyState>
+      </Page>
+    );
+  }
+
   return (
-    <Page>
-      <header className="pt-4">
+    <Page wide>
+      <header className="pt-4 lg:pt-0">
         <p className="text-sm text-muted">{h.name}</p>
         <h1 className="text-2xl font-bold">Bonjour</h1>
       </header>
+      <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-8 lg:space-y-0">
+      <div className="space-y-6">
 
       {reviewView ? (
         <Link href={`/rituel/${target}`} className="block">
@@ -133,7 +147,7 @@ export default function Home() {
               </p>
               {co2Monthly > 0 && (
                 <p className="text-sm text-muted">
-                  net de CO2 : <Chf rp={totalCurrent - co2Monthly * rows.filter((r) => r.current).length} />
+                  après redistribution CO2 : <Chf rp={totalCurrent - co2Monthly * rows.filter((r) => r.current).length} />
                 </p>
               )}
             </div>
@@ -145,7 +159,7 @@ export default function Home() {
                 <Link href={`/foyer/personne/${p.id}`} className="flex min-h-12 items-center gap-3 py-2">
                   <span className="flex-1">
                     <span className="block font-medium">{p.firstName}</span>
-                    <span className="block text-sm text-muted">{current ? `${insurerLabel(current.insurer)} · F ${current.policy.franchiseChf}` : "contrat à saisir"}</span>
+                    <span className="block text-sm text-muted">{current ? `${insurerLabel(current.insurer)} · franchise ${current.policy.franchiseChf}` : "contrat à saisir"}</span>
                   </span>
                   <Chf rp={current?.policy.billedMonthlyRp ?? null} className="font-semibold" />
                 </Link>
@@ -156,33 +170,37 @@ export default function Home() {
         </Card>
       </Section>
 
-      {(missing.length > 0 || noAddress.length > 0 || params.co2AnnualRp === null) && (
+      </div>
+      <div className="space-y-6">
+      {missing.length === 0 && params.co2AnnualRp !== null && (
+        <Section title="À compléter">
+          <p className="flex items-center gap-2 rounded-xl bg-surface p-3 text-sm text-muted shadow-card">
+            <CheckCircle2 aria-hidden className="size-4 text-saving" /> Rien à faire pour le moment.
+          </p>
+        </Section>
+      )}
+      {(missing.length > 0 || params.co2AnnualRp === null) && (
         <Section title="À compléter">
           <ul className="space-y-2">
             {missing.map((r) => (
               <li key={r.p.id}>
                 <Link href={`/foyer/personne/${r.p.id}`} className="flex min-h-12 items-center gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
-                  <CircleAlert aria-hidden className="size-4 text-increase" /> Contrat {year} de {r.p.firstName}
-                </Link>
-              </li>
-            ))}
-            {noAddress.map((i) => (
-              <li key={i.id}>
-                <Link href="/donnees/caisses" className="flex min-h-12 items-center gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
-                  <CircleAlert aria-hidden className="size-4 text-info" /> Adresse de résiliation de {insurerLabel(i)}
+                  <CircleAlert aria-hidden className="size-4 text-increase" /> Indiquer le contrat {year} de {r.p.firstName}
                 </Link>
               </li>
             ))}
             {params.co2AnnualRp === null && (
               <li>
                 <Link href="/donnees" className="flex min-h-12 items-center gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
-                  <CircleAlert aria-hidden className="size-4 text-info" /> Redistribution CO2 {year}
+                  <CircleAlert aria-hidden className="size-4 text-info" /> Montant de la redistribution CO2 {year}
                 </Link>
               </li>
             )}
           </ul>
         </Section>
       )}
+      </div>
+      </div>
     </Page>
   );
 }

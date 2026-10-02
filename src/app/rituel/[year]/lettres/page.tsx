@@ -47,8 +47,8 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
           </Alert>
         )}
         <ActionForm action={generateLettersAction} hidden={{ reviewId: r.id }}>
-          <SubmitButton block pendingLabel="Génération…" disabled={concerned.length === 0}>
-            {view.letters.length ? "Régénérer les lettres non envoyées" : "Générer les lettres"}
+          <SubmitButton block variant={view.letters.length ? "secondary" : "primary"} pendingLabel="Génération…" disabled={concerned.length === 0}>
+            {view.letters.length ? "Refaire les lettres pas encore envoyées" : "Générer les lettres"}
           </SubmitButton>
         </ActionForm>
       </Card>
@@ -81,7 +81,7 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
                       {!l.sentAt && (
                         <form action={deleteLetterAction}>
                           <input type="hidden" name="letterId" value={l.id} />
-                          <ConfirmButton size="sm" variant="ghost" className="text-increase" message="Supprimer cette lettre ?" aria-label="Supprimer la lettre">
+                          <ConfirmButton size="sm" variant="ghost" className="text-increase" message="Supprimer cette lettre ?" confirmLabel="Supprimer" details={<p>Vous pourrez la préparer à nouveau avec « Générer les lettres ».</p>} aria-label="Supprimer la lettre">
                             <Trash2 aria-hidden className="size-4" />
                           </ConfirmButton>
                         </form>

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getHousehold, listInsurers } from "@/application/household";
 import { insurerLabel } from "@/infrastructure/db/queries";
-import { db } from "@/server/context";
+import { db, today } from "@/server/context";
 import { Card } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
 import { PersonForm } from "../../person-form";
@@ -16,7 +16,7 @@ export default function NewPersonPage() {
     <Page>
       <PageHeader title="Nouvelle personne" back="/foyer" />
       <Card>
-        <PersonForm person={null} insurers={insurers} />
+        <PersonForm person={null} insurers={insurers} year={Number(today().slice(0, 4))} />
       </Card>
     </Page>
   );

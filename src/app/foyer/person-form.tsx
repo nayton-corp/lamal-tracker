@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { ageClassForYear } from "@/domain/age";
 import { savePersonAction } from "@/app/actions/household";
 import { KID_SUBGROUPS, MODEL_LABEL, MODEL_TYPES } from "@/domain/lamal";
 import { Alert } from "@/ui/alert";
@@ -20,9 +21,23 @@ export interface PersonDefaults {
   doctorName: string | null;
 }
 
-export function PersonForm({ person, insurers }: { person: PersonDefaults | null; insurers: { id: number; name: string }[] }) {
+function isMinorAround(birthDate: string, year: number): boolean {
+  try {
+    // Enfant cette année ou l'an prochain : l'échelon enfant compte pour le rituel.
+    return ageClassForYear(birthDate, year) === "KID" || ageClassForYear(birthDate, year + 1) === "KID";
+  } catch {
+    return false;
+  }
+}
+
+export function PersonForm({ person, insurers, year, onDone }: { person: PersonDefaults | null; insurers: { id: number; name: string }[]; year: number; onDone?: () => void }) {
   const [state, action] = useActionState(savePersonAction, null);
+  const [birthDate, setBirthDate] = useState(person?.birthDate ?? "");
   const fe = state?.fieldErrors ?? {};
+  const minor = /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && isMinorAround(birthDate, year);
+  useEffect(() => {
+    if (state?.ok) onDone?.();
+  }, [state, onDone]);
   return (
     <form action={action} className="space-y-4">
       {person?.id && <input type="hidden" name="id" value={person.id} />}
@@ -35,19 +50,25 @@ export function PersonForm({ person, insurers }: { person: PersonDefaults | null
         </Field>
       </div>
       <Field label="Date de naissance" htmlFor="birthDate" error={fe.birthDate} hint="Détermine la catégorie (enfant, jeune adulte, adulte) pour chaque année.">
-        <Input id="birthDate" name="birthDate" type="date" required defaultValue={person?.birthDate} />
+        <Input id="birthDate" name="birthDate" type="date" required value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
       </Field>
       <Field label="Frais de santé attendus par an (CHF)" htmlFor="healthCosts" hint="Factures médicales estimées. Sert à classer les offres selon le coût total (prime + franchise + quote-part).">
         <Input id="healthCosts" name="healthCosts" inputMode="decimal" defaultValue={((person?.healthCostsRp ?? 50000) / 100).toFixed(0)} />
       </Field>
-      <Field label="Échelon enfant (si mineur)" htmlFor="kidSubgroup" hint="K1 = tarif normal. Certaines caisses accordent un rabais dès le 2e/3e enfant (K3, K4, K5) : voir la police.">
-        <Select id="kidSubgroup" name="kidSubgroup" defaultValue={person?.kidSubgroup ?? "K1"}>
-          {KID_SUBGROUPS.map((k) => (
-            <option key={k}>{k}</option>
-          ))}
-        </Select>
-      </Field>
-      <Checkbox name="employedAccidentCover" defaultChecked={person?.employedAccidentCover} label="Employé·e au moins 8 h/semaine (accidents couverts par l'employeur : la LAMal peut exclure l'accident)" />
+      {minor ? (
+        <Field label="Échelon enfant" htmlFor="kidSubgroup" hint="K1 = tarif normal. Certaines caisses accordent un rabais dès le 2e ou 3e enfant (K3, K4, K5) : voir la police.">
+          <Select id="kidSubgroup" name="kidSubgroup" defaultValue={person?.kidSubgroup ?? "K1"}>
+            {KID_SUBGROUPS.map((k) => (
+              <option key={k}>{k}</option>
+            ))}
+          </Select>
+        </Field>
+      ) : (
+        <input type="hidden" name="kidSubgroup" value={person?.kidSubgroup ?? "K1"} />
+      )}
+      {!minor && (
+        <Checkbox name="employedAccidentCover" defaultChecked={person?.employedAccidentCover} label="Employé·e au moins 8 h/semaine (accidents couverts par l'employeur : la LAMal peut exclure l'accident)" />
+      )}
 
       <fieldset className="space-y-1">
         <legend className="mb-1 text-sm font-medium">Modèles acceptés pour le comparateur</legend>

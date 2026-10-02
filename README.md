@@ -63,7 +63,7 @@ sudo tailscale up
 sudo tailscale serve --bg 3000
 ```
 
-L'app est alors disponible sur `https://<nom-du-pi>.<votre-tailnet>.ts.net` depuis tout appareil connecté à Tailscale. Sur iPhone : Safari › Partager › *Sur l'écran d'accueil*, puis *Données › Notifications › Activer*.
+L'app est alors disponible sur `https://<nom-du-pi>.<votre-tailnet>.ts.net` depuis tout appareil connecté à Tailscale. Sur iPhone : Safari › Partager › *Sur l'écran d'accueil*, puis *Réglages › Rappels › Activer*.
 
 Sans HTTPS, l'app fonctionne normalement dans le navigateur ; seules l'installation, le hors-ligne et les notifications sont indisponibles.
 
@@ -73,7 +73,7 @@ Sans HTTPS, l'app fonctionne normalement dans le navigateur ; seules l'installat
 cd ~/lamal-tracker && docker compose pull && docker compose up -d
 ```
 
-- **Sauvegarde** : *Données › Sauvegarde* télécharge une copie cohérente de la base. Ou, sur le Pi : `cp data/lamal.db* /un/autre/disque/` (app arrêtée), ou `sqlite3 data/lamal.db ".backup '/chemin/sauvegarde.db'"`.
+- **Sauvegarde** : *Réglages › Sauvegarde* télécharge une copie cohérente de la base. Ou, sur le Pi : `cp data/lamal.db* /un/autre/disque/` (app arrêtée), ou `sqlite3 data/lamal.db ".backup '/chemin/sauvegarde.db'"`.
 - **Restauration** : arrêter le conteneur, remettre le fichier `lamal.db` dans `data/`, relancer.
 - Les migrations du schéma s'appliquent seules au démarrage.
 
@@ -85,19 +85,19 @@ Cloner le dépôt sur le Pi, décommenter `build: .` dans `docker-compose.yml`, 
 
 | Quand | Quoi |
 |---|---|
-| Une fois | *Foyer* : adresse, canton, **région de primes** (sur la police), membres, et le contrat LAMal de l'année en cours de chacun (caisse, tarif, franchise, prime facturée). Ajouter les **complémentaires LCA**. *Données › Caisses* : adresses de résiliation de vos caisses. |
-| Fin septembre | L'OFSP publie les primes ; l'app les importe (contrôle quotidien du 15 septembre au 30 novembre) et envoie une notification. Import manuel possible dans *Données*. |
+| Une fois | *Foyer* : adresse, canton, **région de primes** (sur la police), membres, et le contrat LAMal de l'année en cours de chacun (caisse, tarif, franchise, prime facturée). Ajouter les **complémentaires LCA**. *Réglages › Caisses-maladie* : adresses de résiliation de vos caisses. |
+| Fin septembre | L'OFSP publie les primes ; l'app les importe (contrôle quotidien du 15 septembre au 30 novembre) et envoie une notification. Import manuel possible dans *Réglages*. |
 | Octobre | *Rituel* : lancer l'analyse. Pour chaque personne : hausse, tarif de renouvellement (à confirmer si la caisse a renommé son tarif), comparateur, simulateur de franchise, choix. |
 | Avant de résilier | Demander l'**affiliation** à la nouvelle caisse (en ligne). Passer le **contrôle LCA**. |
 | Avant ~23 novembre | Générer les lettres, imprimer, signer, envoyer en **recommandé** (réception au plus tard le 30 novembre). Saisir le n° de suivi. |
-| Décembre / janvier | Marquer les confirmations reçues, puis **clôturer** : les contrats de la nouvelle année sont créés et l'historique mis à jour. Ajuster la prime facturée si elle diffère. |
-| Chaque année | *Données* : vérifier le montant de la **redistribution CO2** (2026 : 61.80, 2027 : 57.00 CHF/personne/an). |
+| Décembre / janvier | Marquer les confirmations reçues, puis **clôturer** : les contrats de la nouvelle année sont créés et l'historique mis à jour. Ajuster la prime facturée si elle diffère. Un rituel, même clôturé, peut être **rouvert** (les choix sont gardés, les contrats créés retirés) ou **supprimé** (retour à l'état d'avant). |
+| Chaque année | *Réglages* : vérifier le montant de la **redistribution CO2** (2026 : 61.80, 2027 : 57.00 CHF/personne/an). |
 
 ## Données OFSP
 
 - Source : [opendata.swiss — Krankenversicherungsprämien](https://opendata.swiss/de/dataset/health-insurance-premiums) (fichier `Prämien_CH.xlsx`). Depuis les primes 2027, le fichier n'est plus sur priminfo.admin.ch.
 - L'OFSP a changé **tous les codes** en 2027 (régions `PR_REG_1`, classes d'âge `AKA_03_ERW`, franchises `FRA_01_E_0300`, types de tarif `BASE/PRAXIS/FLEX/TEL_DIG/PHARM`). Le parseur lit les deux générations et les ramène à une seule forme ; une ligne illisible est rejetée et comptée, jamais devinée.
-- **Années précédentes** : *Données › Importer les années précédentes* télécharge les archives annuelles de l'OFSP (`Archiv_Praemien_AAAA.zip`, ancien format de codes, années **2015 et suivantes** ; avant 2015, l'OFSP utilisait un schéma où la couverture accident n'est pas identifiable avec certitude) pour les repères de marché de l'historique et le pré-remplissage des anciens contrats. Une archive plus ancienne (par ex. depuis [l'archive Priminfo](https://www.priminfo.admin.ch/de/downloads/archiv)) peut être importée à la main (.zip, .xlsx ou .csv).
+- **Années précédentes** : *Réglages › Récupérer les primes des années passées* télécharge les archives annuelles de l'OFSP (`Archiv_Praemien_AAAA.zip`, ancien format de codes, années **2015 et suivantes** ; avant 2015, l'OFSP utilisait un schéma où la couverture accident n'est pas identifiable avec certitude) pour les repères de marché de l'historique et le pré-remplissage des anciens contrats. Une archive plus ancienne (par ex. depuis [l'archive Priminfo](https://www.priminfo.admin.ch/de/downloads/archiv)) peut être importée à la main (.zip, .xlsx ou .csv).
 - Vos **propres contrats** des années passées (2010 et suivantes) se saisissent dans *Foyer* : l'historique se construit à partir d'eux.
 - Chaque import est un **jeu immuable** identifié par son empreinte SHA-256, validé (années, cantons, bornes de primes, variation par rapport à l'année précédente) avant d'être activé.
 - Le workflow *Surveillance du format OFSP* importe le vrai fichier chaque jour en septembre-octobre : s'il échoue, GitHub vous prévient avant le rituel.

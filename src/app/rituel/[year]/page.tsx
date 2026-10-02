@@ -1,10 +1,10 @@
-import { ArrowRight, CalendarClock, Check, CircleAlert, FileText, Scale, ShieldAlert, Sparkles, Users } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, CircleAlert, FileText, RotateCcw, Scale, ShieldAlert, Sparkles, Trash2, Users } from "lucide-react";
 import Link from "next/link";
-import { closeReviewAction, openReviewAction, undoAction } from "@/app/actions/review";
+import { closeReviewAction, deleteReviewAction, openReviewAction, reopenReviewAction, undoAction } from "@/app/actions/review";
 import { getHousehold, listPersons } from "@/application/household";
 import { getReviewByYear, getReviewView, type PersonReview, type ReviewView } from "@/application/review";
 import { formatDateLong } from "@/domain/dates";
-import { AGE_CLASS_LABEL, MODEL_LABEL, type ModelType } from "@/domain/lamal";
+import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { changePermille } from "@/domain/money";
 import { DECISION_LABEL } from "@/domain/review";
 import { activeDataset } from "@/infrastructure/db/queries";
@@ -15,6 +15,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
 import { cn } from "@/ui/cn";
+import { ConfirmButton } from "@/ui/confirm-button";
 import { Chf, Delta, Saving } from "@/ui/money";
 import { EmptyState, Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
@@ -32,11 +33,13 @@ const URGENCY = {
   late: "bg-increase text-white",
 };
 
+// Le renouvellement est retrouvé automatiquement ; on ne sollicite l'utilisateur que s'il
+// faut vraiment choisir (plusieurs produits possibles) ou si la caisse ne propose plus rien.
 const RENEWAL_BADGE = {
   MATCHED: null,
-  PROBABLE: { tone: "info", label: "Tarif à confirmer" },
-  AMBIGUOUS: { tone: "increase", label: "Tarif à choisir" },
-  MISSING: { tone: "increase", label: "Tarif introuvable" },
+  PROBABLE: null,
+  AMBIGUOUS: { tone: "increase", label: "Produit à préciser", hint: "Votre caisse propose plusieurs produits proches en {year} : indiquez lequel vous aurez." },
+  MISSING: { tone: "increase", label: "Plus proposé", hint: "Votre caisse ne propose plus ce contrat dans votre région en {year} : il faudra en choisir un autre." },
 } as const;
 
 export default async function RitualPage({ params }: { params: Promise<{ year: string }> }) {
@@ -92,7 +95,7 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
   const closed = view.review.status === "CLOSED";
   const missingPersons = persons.filter((p) => !view.persons.some((x) => x.person.id === p.id));
   return (
-    <Page>
+    <Page wide>
       <PageHeader title={`Rituel ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${h.canton}, région ${h.region}`} />
 
       <Hero view={view} />
@@ -113,7 +116,7 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
       )}
 
       <Section title="Par personne">
-        <ul className="space-y-3">
+        <ul className="grid gap-3 lg:grid-cols-2">
           {view.persons.map((pr, i) => (
             <li key={pr.line.id} id={`ligne-${pr.line.id}`} className="animate-rise" style={{ animationDelay: `${i * 40}ms` }}>
               <PersonCard pr={pr} year={year} closed={closed} />
@@ -128,7 +131,7 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
         <Section title="Clôture">
           <Card className="space-y-3">
             <p className="text-sm text-muted">
-              Une fois les nouvelles polices reçues (décembre/janvier), clôturez : les contrats {year} sont créés à partir de vos choix et l&apos;historique est mis à jour. Vous pourrez ajuster les primes réellement facturées dans Foyer.
+              Quand vous avez reçu vos nouvelles polices (décembre ou janvier), clôturez le rituel : vos contrats {year} sont enregistrés tels que vous les avez choisis. Vous pourrez toujours revenir en arrière.
             </p>
             <ActionForm action={closeReviewAction} hidden={{ year, reviewId: view.review.id }}>
               <SubmitButton variant="secondary" block pendingLabel="Clôture…">
@@ -138,7 +141,51 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
           </Card>
         </Section>
       )}
+
+      <Undo year={year} reviewId={view.review.id} closed={closed} />
     </Page>
+  );
+}
+
+/** Revenir en arrière, même après la clôture : rouvrir (on garde les choix) ou tout effacer. */
+function Undo({ year, reviewId, closed }: { year: number; reviewId: number; closed: boolean }) {
+  return (
+    <Section title="Revenir en arrière">
+      <Card className="space-y-3">
+        {closed && (
+          <ActionForm action={reopenReviewAction} hidden={{ year, reviewId }}>
+            <p className="mb-3 text-sm text-muted">Vous vous êtes trompé ou votre caisse a refusé le changement ? Rouvrez le rituel : vos choix sont conservés et vous pouvez les modifier.</p>
+            <ConfirmButton
+              variant="secondary"
+              block
+              message={`Rouvrir le rituel ${year} ?`}
+              confirmLabel="Rouvrir"
+              confirmVariant="primary"
+              details={<p>Les contrats {year} enregistrés à la clôture seront retirés, puis recréés quand vous clôturerez à nouveau. Vos choix et vos lettres sont conservés.</p>}
+            >
+              <RotateCcw aria-hidden className="size-4" /> Rouvrir le rituel
+            </ConfirmButton>
+          </ActionForm>
+        )}
+        <ActionForm action={deleteReviewAction} hidden={{ year, reviewId }}>
+          <ConfirmButton
+            variant="ghost"
+            block
+            className="text-increase hover:bg-increase-soft"
+            message={`Supprimer le rituel ${year} ?`}
+            confirmLabel="Supprimer le rituel"
+            details={
+              <>
+                <p>Tout ce qui a été fait pour {year} est effacé : les choix de chaque personne et les lettres préparées{closed ? `, ainsi que les contrats ${year} créés à la clôture` : ""}.</p>
+                <p>Vos contrats {year - 1} ne changent pas. Vous pourrez relancer l&apos;analyse à tout moment.</p>
+              </>
+            }
+          >
+            <Trash2 aria-hidden className="size-4" /> Supprimer ce rituel
+          </ConfirmButton>
+        </ActionForm>
+      </Card>
+    </Section>
   );
 }
 
@@ -171,10 +218,12 @@ function Hero({ view }: { view: ReviewView }) {
             {diff !== null && <span className="ml-1 text-sm font-normal text-white/80">({((changePermille(t.currentMonthlyRp, t.renewalMonthlyRp!) ?? 0) / 10).toFixed(1)} %)</span>}
           </p>
         </div>
-        <div>
-          <p className="text-white/70">Économie possible</p>
-          <p className="text-lg font-semibold tabular">{t.potentialAnnualSavingsRp > 0 ? `CHF ${Math.round(t.potentialAnnualSavingsRp / 100)}/an` : "—"}</p>
-        </div>
+        {view.review.status !== "CLOSED" && (
+          <div>
+            <p className="text-white/70">Économie possible</p>
+            <p className="text-lg font-semibold tabular">{t.potentialAnnualSavingsRp > 0 ? `CHF ${Math.round(t.potentialAnnualSavingsRp / 100)}/an` : "déjà au meilleur prix"}</p>
+          </div>
+        )}
         {chosenDiff !== null && (
           <div>
             <p className="text-white/70">Avec vos choix</p>
@@ -226,7 +275,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
         <div>
           <p className="text-lg font-semibold">{pr.person.firstName}</p>
           <p className="text-sm text-muted">
-            {pr.currentInsurer} · {pr.policy.tariffLabel || MODEL_LABEL[pr.policy.modelType as ModelType]} · F {pr.policy.franchiseChf}
+            {pr.currentInsurer} · {displayTariffLabel(pr.policy.tariffLabel, pr.policy.modelType as ModelType)} · franchise {pr.policy.franchiseChf}
           </p>
         </div>
         <Badge tone={decided ? (pr.line.decision === "KEEP" ? "primary" : "saving") : "neutral"}>{DECISION_LABEL[pr.line.decision]}</Badge>
@@ -247,7 +296,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
         </div>
         <div>
           <p className="text-muted">
-            {year}, même contrat{pr.line.renewalFranchiseChf !== pr.policy.franchiseChf ? ` (F ${pr.line.renewalFranchiseChf})` : ""}
+            {year}, même contrat{pr.line.renewalFranchiseChf !== pr.policy.franchiseChf ? ` (franchise ${pr.line.renewalFranchiseChf})` : ""}
           </p>
           <p className="text-base font-semibold">
             <Chf rp={pr.line.renewalMonthlyRp} />
@@ -261,7 +310,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
             <CircleAlert aria-hidden className="size-3.5" />
             {badge.label}
           </Badge>
-          <span className="text-muted">Le code tarif a changé : confirmez-le dans le comparateur.</span>
+          <span className="text-muted">{badge.hint.replace("{year}", String(year))}</span>
         </p>
       )}
 
@@ -269,7 +318,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
         <div className="flex items-center justify-between gap-3 rounded-xl border border-saving/30 bg-saving-soft/50 p-3 text-sm">
           <div>
             <p className="font-medium">
-              {pr.chosenInsurer} · {pr.line.chosenLabel}
+              {pr.chosenInsurer} · {displayTariffLabel(pr.line.chosenLabel, (pr.line.chosenModelType ?? "OTHER") as ModelType)}
             </p>
             <p className="text-muted">Franchise {pr.line.chosenFranchiseChf}</p>
           </div>
@@ -281,7 +330,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
         pr.best && (
           <div className="flex items-center justify-between gap-3 text-sm">
             <p className="text-muted">
-              Meilleure offre : <span className="font-medium text-foreground">{pr.best.insurerName}</span>, F {pr.best.franchiseChf}
+              Meilleure offre : <span className="font-medium text-foreground">{pr.best.insurerName}</span>, franchise {pr.best.franchiseChf}
             </p>
             <Saving rp={pr.best.savingsRp} />
           </div>
@@ -303,7 +352,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
           </Button>
           {decided && (
             <ActionForm action={undoAction} hidden={{ lineId: pr.line.id }}>
-              <SubmitButton variant="ghost" pendingLabel="…">Annuler</SubmitButton>
+              <SubmitButton variant="ghost" pendingLabel="…">Annuler le choix</SubmitButton>
             </ActionForm>
           )}
         </div>
@@ -339,7 +388,7 @@ function NextAction({ view, year }: { view: ReviewView; year: number }) {
     );
   }
   return (
-    <div className="sticky bottom-20 z-30">
+    <div className="sticky bottom-20 z-30 lg:bottom-6">
       <Button asChild block size="lg" variant={lcaPending && !undecided ? "lca" : "primary"} className="shadow-lg">
         <Link href={href}>
           <Icon aria-hidden className="size-5" />

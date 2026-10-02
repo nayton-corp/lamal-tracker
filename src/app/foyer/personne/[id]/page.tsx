@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { deleteLcaAction, deletePersonAction, deletePolicyAction } from "@/app/actions/household";
 import { getPerson, listInsurers, listLca, listPolicies } from "@/application/household";
 import { ageClassForYear } from "@/domain/age";
-import { AGE_CLASS_LABEL, MODEL_LABEL, type ModelType } from "@/domain/lamal";
+import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { db, today } from "@/server/context";
 import { Badge } from "@/ui/badge";
@@ -12,7 +12,7 @@ import { Card, Section } from "@/ui/card";
 import { Chf } from "@/ui/money";
 import { Page, PageHeader } from "@/ui/page";
 import { LcaSheet, PolicySheet } from "../../editors";
-import { PersonForm } from "../../person-form";
+import { ProfileCard } from "../../profile-card";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +29,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const hasCurrent = policies.some((x) => x.policy.coverageYear === year);
 
   return (
-    <Page>
-      <PageHeader title={`${p.firstName} ${p.lastName}`} subtitle={`${AGE_CLASS_LABEL[ageClassForYear(p.birthDate, year)]} en ${year}`} back="/foyer" />
+    <Page wide>
+      <PageHeader title={`${p.firstName} ${p.lastName}`} back="/foyer" />
 
+      <ProfileCard person={p} insurers={insurers} year={year} ageLabel={`${AGE_CLASS_LABEL[ageClassForYear(p.birthDate, year)]} en ${year}`} />
+
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
       <Section
         title="Contrats LAMal"
         action={
@@ -47,7 +50,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         {policies.length === 0 ? (
           <Card>
             <p className="text-muted">
-              Ajoutez le contrat {year} (et les années précédentes si vous les avez : l&apos;historique se construit à partir d&apos;eux).
+              Indiquez le contrat {year} : choisissez la caisse et la franchise, la prime est retrouvée toute seule. Les années précédentes sont facultatives (elles alimentent l&apos;historique).
             </p>
           </Card>
         ) : (
@@ -61,14 +64,14 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                 </div>
                 <div className="mt-1 flex items-center gap-2">
                   <p className="min-w-0 flex-1 text-sm text-muted">
-                    {policy.tariffLabel || MODEL_LABEL[policy.modelType as ModelType]} · franchise {policy.franchiseChf}
+                    {displayTariffLabel(policy.tariffLabel, policy.modelType as ModelType)} · franchise {policy.franchiseChf}
                     {policy.accident ? " · avec accident" : ""}
-                    {policy.policyNumber ? ` · n° ${policy.policyNumber}` : ""}
+                    
                   </p>
                   <PolicySheet personId={p.id} insurers={insurers} years={years} label="edit" policy={{ ...policy, insurerId: policy.insurerId }} />
                   <form action={deletePolicyAction}>
                     <input type="hidden" name="id" value={policy.id} />
-                    <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer le contrat ${policy.coverageYear}`} className="text-increase" message={`Supprimer le contrat ${policy.coverageYear} ?`}>
+                    <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer le contrat ${policy.coverageYear}`} className="text-increase" message={`Supprimer le contrat ${policy.coverageYear} ?`} confirmLabel="Supprimer" details={<p>Le contrat disparaît de l&apos;historique. Votre vraie assurance n&apos;est pas touchée : rien n&apos;est envoyé à la caisse.</p>}>
                       <Trash2 aria-hidden className="size-4" />
                     </ConfirmButton>
                   </form>
@@ -80,10 +83,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       </Section>
 
       <Section title="Complémentaires LCA" action={<LcaSheet personId={p.id} insurers={insurers} lca={null} />}>
-        <div className="flex gap-3 rounded-xl border border-lca-strong/40 bg-lca-soft p-3 text-sm text-lca">
-          <ShieldAlert aria-hidden className="size-5 shrink-0" />
-          <p>Les assurances complémentaires sont des contrats privés séparés. Les enregistrer ici permet à l&apos;app de vous alerter avant toute résiliation LAMal.</p>
-        </div>
+        {lca.length === 0 && (
+          <p className="flex gap-2 px-1 text-sm text-muted">
+            <ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-lca-strong" />
+            Assurances complémentaires (hospitalisation, dentaire…) : les enregistrer permet d&apos;être alerté avant toute résiliation LAMal.
+          </p>
+        )}
         {lca.length > 0 && (
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
             {lca.map((c) => (
@@ -97,7 +102,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                 <LcaSheet personId={p.id} insurers={insurers} lca={c} />
                 <form action={deleteLcaAction}>
                   <input type="hidden" name="id" value={c.id} />
-                  <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer ${c.productName}`} className="text-increase" message={`Supprimer ${c.productName} ?`}>
+                  <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer ${c.productName}`} className="text-increase" message={`Supprimer ${c.productName} ?`} confirmLabel="Supprimer" details={<p>Elle ne sera plus surveillée lors d&apos;un changement de caisse. Rien n&apos;est envoyé à l&apos;assureur.</p>}>
                     <Trash2 aria-hidden className="size-4" />
                   </ConfirmButton>
                 </form>
@@ -106,16 +111,11 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </ul>
         )}
       </Section>
+      </div>
 
-      <Section title="Profil">
-        <Card>
-          <PersonForm person={p} insurers={insurers} />
-        </Card>
-      </Section>
-
-      <form action={deletePersonAction} className="pt-2">
+      <form action={deletePersonAction} className="pt-2 lg:max-w-sm">
         <input type="hidden" name="id" value={p.id} />
-        <ConfirmButton variant="secondary" block className="text-increase" message={`Supprimer ${p.firstName} et tout son historique ?`}>
+        <ConfirmButton variant="secondary" block className="text-increase" message={`Supprimer ${p.firstName} ?`} confirmLabel={`Supprimer ${p.firstName}`} details={<p>{p.firstName}, ses contrats, ses complémentaires et son historique seront effacés de l&apos;app. Rien n&apos;est envoyé à la caisse.</p>}>
           <Trash2 aria-hidden className="size-4" /> Supprimer {p.firstName} et ses contrats
         </ConfirmButton>
       </form>

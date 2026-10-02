@@ -10,7 +10,7 @@ import { lamalParameters } from "@/infrastructure/db/schema";
 import { saveSubscription, removeSubscription, notifyAll } from "@/infrastructure/push/push";
 import { chfField, toActionError, type ActionState } from "@/server/action";
 import { db, nowIso } from "@/server/context";
-import { dataDir, startArchivesImport, startImport } from "@/server/jobs";
+import { dataDir, startArchivesImport, startImport, startYearImport } from "@/server/jobs";
 import { checkForNewPremiums } from "@/server/watch";
 
 export async function checkPremiumsAction(): Promise<ActionState> {
@@ -19,6 +19,11 @@ export async function checkPremiumsAction(): Promise<ActionState> {
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Importe les primes d'une année précise (fichier courant ou archive). */
+export async function importYearAction(year: number): Promise<ActionState> {
+  return startYearImport(year) ? { ok: `Import des primes ${year} lancé.` } : { error: "Un import est déjà en cours." };
 }
 
 export async function importArchivesAction(): Promise<ActionState> {

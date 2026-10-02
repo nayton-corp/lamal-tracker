@@ -8,16 +8,16 @@ import { SubmitButton } from "@/ui/submit";
 export function Co2Form({ year, amountRp }: { year: number; amountRp: number | null }) {
   const [state, action] = useActionState(saveCo2Action, null);
   return (
-    <form action={action} className="flex items-end gap-2">
+    <form action={action} className="grid grid-cols-[3.5rem_1fr_auto] items-center gap-2">
       <input type="hidden" name="year" value={year} />
-      <label className="flex-1 space-y-1">
-        <span className="block text-sm font-medium">{year}</span>
+      <span className="font-semibold tabular">{year}</span>
+      <label>
         <Input name="co2Annual" inputMode="decimal" aria-label={`Redistribution CO2 ${year} en CHF par personne et par an`} defaultValue={amountRp === null ? "" : (amountRp / 100).toFixed(2)} placeholder="à saisir" />
       </label>
       <SubmitButton size="sm" variant="secondary" pendingLabel="…">
-        OK
+        Enregistrer
       </SubmitButton>
-      {state?.error && <span className="text-sm text-increase">{state.error}</span>}
+      {state?.error && <span className="col-span-3 text-sm text-increase">{state.error}</span>}
     </form>
   );
 }

@@ -148,9 +148,13 @@ export function parsePremium(v: unknown): Rappen | null {
   return Math.round(s * 100);
 }
 
-const TELMED = /tele|télé|telmed|medgate|callmed|smart|digital|app|online|med ?call|tel\b/i;
+// Classement des anciens tarifs « divers » (TAR-DIV, jusqu'en 2026) d'après leur nom,
+// vérifié sur les vrais libellés : Sanmed24, Premed-24, FlexHelp 24, EGK-TelCare,
+// Digimed, AGRIcontact (télémédecine) ; FlexCare, PrimaFlex, Combi Care (flexibles).
 const PHARMACY = /pharm|apothe|farmac/i;
-const PRAXIS = /hmo|hausarzt|médecin|medecin|praxis|famil|centre|gesundheitszentrum|casa/i;
+const FLEX = /flex|combi|multi|choice/i;
+const TELMED = /tele|télé|telmed|medgate|callmed|smart|digi|app\b|online|med ?call|tel|contact|24\b|-24/i;
+const PRAXIS = /hmo|hausarzt|médecin|medecin|praxis|famil|centre|gesundheits?netz|zentrum|casa|réseau|netz/i;
 
 export function classifyModel(tariffType: string, label: string): ModelType {
   const t = tariffType.toUpperCase().replace(/^TAR[-_]/, "");
@@ -170,6 +174,7 @@ export function classifyModel(tariffType: string, label: string): ModelType {
       return "FLEX";
     default:
       if (PHARMACY.test(label)) return "PHARMACY";
+      if (FLEX.test(label)) return "FLEX";
       if (TELMED.test(label)) return "TELMED";
       if (PRAXIS.test(label)) return "PRAXIS";
       return "OTHER";

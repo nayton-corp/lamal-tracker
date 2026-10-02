@@ -13,6 +13,7 @@ import {
   getHousehold,
 } from "@/application/household";
 import { tariffOptions, type TariffOptions } from "@/application/tariffs";
+import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/postal";
 import { UserError } from "@/application/review";
 import { chfField, toActionError, type ActionState } from "@/server/action";
 import { db } from "@/server/context";
@@ -33,6 +34,8 @@ export async function saveHouseholdAction(_: ActionState, form: FormData): Promi
       street: str(form, "street"),
       postalCode: str(form, "postalCode"),
       city: str(form, "city"),
+      commune: str(form, "commune"),
+      bfsNumber: opt(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
       canton: (str(form, "canton") ?? "") as never,
       region: Number(str(form, "region")),
     });
@@ -129,6 +132,10 @@ export async function saveLcaAction(_: ActionState, form: FormData): Promise<Act
 export async function deleteLcaAction(form: FormData) {
   deleteLca(db(), Number(form.get("id")));
   revalidatePath("/", "layout");
+}
+
+export async function postalCodeAction(npa: string): Promise<CommuneOption[]> {
+  return lookupPostalCode(npa);
 }
 
 export async function tariffOptionsAction(personId: number, year: number, insurerId: number): Promise<TariffOptions> {
