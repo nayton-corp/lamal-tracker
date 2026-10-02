@@ -172,14 +172,14 @@ export default function Home() {
 
       </div>
       <div className="space-y-6">
-      {missing.length === 0 && params.co2AnnualRp !== null && (
+      {missing.length === 0 && (
         <Section title="À compléter">
           <p className="flex items-center gap-2 rounded-xl bg-surface p-3 text-sm text-muted shadow-card">
             <CheckCircle2 aria-hidden className="size-4 text-saving" /> Rien à faire pour le moment.
           </p>
         </Section>
       )}
-      {(missing.length > 0 || params.co2AnnualRp === null) && (
+      {missing.length > 0 && (
         <Section title="À compléter">
           <ul className="space-y-2">
             {missing.map((r) => (
@@ -189,13 +189,6 @@ export default function Home() {
                 </Link>
               </li>
             ))}
-            {params.co2AnnualRp === null && (
-              <li>
-                <Link href="/donnees" className="flex min-h-12 items-center gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
-                  <CircleAlert aria-hidden className="size-4 text-info" /> Montant de la redistribution CO2 {year}
-                </Link>
-              </li>
-            )}
           </ul>
         </Section>
       )}

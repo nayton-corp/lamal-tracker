@@ -17,8 +17,14 @@ import { fetchBuffer, fetchText } from "@/infrastructure/reference/http";
 
 const OUT = path.join(process.cwd(), "src", "infrastructure", "reference", "data");
 
-function write(name: string, data: unknown) {
-  fs.writeFileSync(path.join(OUT, name), `${JSON.stringify(data, null, 1)}\n`);
+/** JSON lisible en revue : une entrée ou une ligne de tableau par ligne. */
+function write(name: string, data: Record<string, unknown>) {
+  const body = Object.entries(data)
+    .map(([k, v]) =>
+      Array.isArray(v) ? `  ${JSON.stringify(k)}: [\n${v.map((x) => `    ${JSON.stringify(x)}`).join(",\n")}\n  ]` : `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`,
+    )
+    .join(",\n");
+  fs.writeFileSync(path.join(OUT, name), `{\n${body}\n}\n`);
   console.log(`écrit ${name}`);
 }
 

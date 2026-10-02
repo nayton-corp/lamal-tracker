@@ -102,8 +102,8 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
       {!closed && <Steps view={view} />}
 
       {!view.co2KnownForTarget && (
-        <Alert tone="info" title={`Redistribution CO2 ${year} inconnue`}>
-          Les primes nettes sont affichées sans déduction. <Link href="/donnees">Saisir le montant</Link>.
+        <Alert tone="info" title={`Redistribution CO2 ${year} pas encore publiée`}>
+          Les primes sont affichées sans cette déduction ; elle s&apos;ajoutera seule dès sa publication par l&apos;OFEV.
         </Alert>
       )}
       {missingPersons.length > 0 && !closed && (

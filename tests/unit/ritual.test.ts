@@ -121,10 +121,12 @@ describe("rituel annuel", () => {
     expect(decide(db, lines.teen, { tariffId: sameInsurerOther.tariffId, franchiseChf: sameInsurerOther.franchiseChf }, NOW)).toBe("ADJUST");
   });
 
-  it("refuse les lettres sans contrôle LCA ni adresse", () => {
+  it("refuse la résiliation sans contrôle LCA ; l'adresse officielle suffit", () => {
     const res = generateLetters(db, 1, TODAY);
-    expect(res.created).toEqual([]);
-    expect(res.blocked.map((b) => b.person)).toEqual(["Alex Test", "Noa Test"]);
+    // Noa change seulement de modèle chez CSS : l'adresse de l'annuaire officiel suffit.
+    expect(res.created).toHaveLength(1);
+    expect(getLetter(db, res.created[0]!)!.content.insurerLines).toEqual(["CSS Assurance-maladie SA", "Tribschenstrasse 21", "Postfach 2568", "6002 Luzern"]);
+    expect(res.blocked.map((b) => b.person)).toEqual(["Alex Test"]);
     expect(res.blocked[0]!.reasons.join(" ")).toMatch(/LCA/);
   });
 
@@ -138,7 +140,7 @@ describe("rituel annuel", () => {
     const termination = getLetter(db, res.created[0]!)!;
     expect(termination.kind).toBe("TERMINATION");
     expect(termination.content.lcaClause).toMatch(/LCA/);
-    expect(termination.content.insurerLines).toEqual(["Helsana Versicherungen AG", "Case postale", "8081 Zurich"]);
+    expect(termination.content.insurerLines).toEqual(["Helsana Assurances SA", "Case postale", "8081 Zurich"]);
     expect(termination.content.personRows[0]).toMatch(/HEL-123/);
     // Régénérer remplace les lettres non envoyées.
     const again = generateLetters(db, 1, TODAY);

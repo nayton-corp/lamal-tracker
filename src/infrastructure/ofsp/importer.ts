@@ -5,6 +5,7 @@ import { defaultParameters } from "@/domain/parameters";
 import type { Db } from "../db/client";
 import { insurer, lamalParameters, premium, tariff, tariffDataset } from "../db/schema";
 import { insurerName } from "./insurers";
+import { officialCo2 } from "../reference/apply";
 import { readRows } from "./reader";
 import { sha256File } from "./source";
 
@@ -159,7 +160,7 @@ export async function importPremiumFile(
       .where(and(eq(tariffDataset.year, report.year!), eq(tariffDataset.status, "ACTIVE"), ne(tariffDataset.id, dataset.id)))
       .run();
     tx.update(tariffDataset).set({ status: "ACTIVE", year: report.year, report }).where(eq(tariffDataset.id, dataset.id)).run();
-    const p = defaultParameters(report.year!);
+    const p = defaultParameters(report.year!, officialCo2(report.year!));
     tx.insert(lamalParameters)
       .values({
         year: p.year,
@@ -169,7 +170,7 @@ export async function importPremiumFile(
         coinsuranceMaxAdultRp: p.coinsuranceMaxAdultRp,
         coinsuranceMaxKidRp: p.coinsuranceMaxKidRp,
         co2AnnualRp: p.co2AnnualRp,
-        sourceNote: p.co2AnnualRp === null ? "Redistribution CO2 à saisir" : "Valeurs par défaut connues",
+        sourceNote: p.co2AnnualRp === null ? "Pas encore publiée" : "Office fédéral de l'environnement (OFEV)",
       })
       .onConflictDoNothing()
       .run();

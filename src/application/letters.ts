@@ -4,6 +4,7 @@ import { reviewDeadlines } from "@/domain/deadlines";
 import { buildLetter, type LetterContent } from "@/domain/letter";
 import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
+import { insurerRecipient } from "@/infrastructure/db/queries";
 import { insurer, letter } from "@/infrastructure/db/schema";
 import { getHousehold } from "./household";
 import { getReviewView, UserError } from "./review";
@@ -51,7 +52,7 @@ export function generateLetters(db: Db, reviewId: number, today: IsoDate): Gener
       const content: LetterContent = buildLetter({
         kind,
         senderLines: [`${sender.firstName} ${sender.lastName}`, h.street, `${h.postalCode} ${h.city}`].filter((l) => l.trim()),
-        insurerLines: [ins.name, ...(ins.terminationAddress ?? "").split("\n").map((l) => l.trim()).filter(Boolean)],
+        insurerLines: insurerRecipient(ins),
         place: h.city || "",
         date: today,
         effectiveEnd: deadlines.effectiveEnd,

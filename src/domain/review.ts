@@ -50,7 +50,7 @@ export function checkLetter(line: LineForLetter): LetterCheck {
     blockers.push("Aucune lettre nécessaire pour cette décision.");
   }
 
-  if (!line.insurerHasAddress) blockers.push("Adresse de la caisse actuelle manquante (page Données › Caisses).");
+  if (!line.insurerHasAddress) blockers.push("Adresse de la caisse actuelle manquante (Réglages › Caisses).");
   if (!line.policyNumber) warnings.push("Numéro d'assuré manquant : la caisse le demandera probablement.");
 
   return { allowed: blockers.length === 0, blockers, warnings };

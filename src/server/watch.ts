@@ -7,6 +7,7 @@ import { notifyAll } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
 import { activeDataset } from "@/infrastructure/db/queries";
 import { db, ritualYear, today } from "./context";
+import { referenceTick } from "./reference";
 import { importJob, startBootstrapImport, startImport, startYearImport } from "./jobs";
 import { latestActiveYear } from "@/infrastructure/db/queries";
 
@@ -98,6 +99,11 @@ export async function schedulerTick(): Promise<void> {
       console.error("[watch] contrôle OFSP impossible :", error instanceof Error ? error.message : error);
       setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), ok: false });
     }
+  }
+  try {
+    await referenceTick();
+  } catch (error) {
+    console.error("[watch] référentiels", error);
   }
   try {
     await sendDeadlineReminders();
