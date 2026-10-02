@@ -62,7 +62,14 @@ export function FranchiseSimulator({
         <ResponsiveContainer>
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-            <XAxis dataKey="x" type="number" domain={[0, max / 100]} tickFormatter={(v) => `${Math.round(v / 1000)}k`} stroke="var(--muted)" fontSize={11} />
+            <XAxis
+              dataKey="x"
+              type="number"
+              domain={[0, max / 100]}
+              tickFormatter={(v) => `${Math.round(v / 1000)}k`}
+              stroke="var(--muted)"
+              fontSize={11}
+            />
             <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} stroke="var(--muted)" fontSize={11} width={40} />
             <Tooltip
               formatter={(v, name) => [formatChf(Math.round(Number(v) * 100), { compact: true }), `Franchise ${String(name).slice(1)}`]}
@@ -71,7 +78,15 @@ export function FranchiseSimulator({
             />
             <ReferenceLine x={health / 100} stroke="var(--text)" strokeDasharray="4 4" />
             {options.map((o, i) => (
-              <Line key={o.franchiseChf} type="linear" dataKey={`f${o.franchiseChf}`} stroke={COLORS[i % COLORS.length]} strokeWidth={rec?.franchiseChf === o.franchiseChf ? 3 : 1.5} dot={false} isAnimationActive={false} />
+              <Line
+                key={o.franchiseChf}
+                type="linear"
+                dataKey={`f${o.franchiseChf}`}
+                stroke={COLORS[i % COLORS.length]}
+                strokeWidth={rec?.franchiseChf === o.franchiseChf ? 3 : 1.5}
+                dot={false}
+                isAnimationActive={false}
+              />
             ))}
           </LineChart>
         </ResponsiveContainer>
@@ -103,7 +118,10 @@ export function FranchiseSimulator({
         <p className="rounded-xl bg-surface-2 p-3 text-sm">
           Avec {formatChf(health, { compact: true })} de frais par an, la franchise <strong>{rec.franchiseChf}</strong> est la moins chère.
           {rec.switchBelowAtRp !== null && (
-            <> Au-delà d&apos;environ {formatChf(rec.switchBelowAtRp, { compact: true })} de frais, une franchise plus basse devient plus avantageuse.</>
+            <>
+              {" "}
+              Au-delà d&apos;environ {formatChf(rec.switchBelowAtRp, { compact: true })} de frais, une franchise plus basse devient plus avantageuse.
+            </>
           )}
         </p>
       )}

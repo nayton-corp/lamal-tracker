@@ -56,9 +56,7 @@ export function buildTerminationLetter(input: LetterInput): LetterContent {
   const subject = several
     ? `Résiliation de l'assurance obligatoire des soins (LAMal) – polices n° ${policies}`
     : `Résiliation de l'assurance obligatoire des soins (LAMal) – police n° ${policies}`;
-  const concerned = several
-    ? "des personnes mentionnées ci-dessous"
-    : `de ${input.persons[0]!.firstName} ${input.persons[0]!.lastName}`;
+  const concerned = several ? "des personnes mentionnées ci-dessous" : `de ${input.persons[0]!.firstName} ${input.persons[0]!.lastName}`;
   const plural = signaturesFor(input).length > 1;
   const paragraphs = [
     `Par la présente, ${plural ? "nous résilions" : "je résilie"} l'assurance obligatoire des soins (LAMal) ${concerned} pour le ${endDate}, ` +

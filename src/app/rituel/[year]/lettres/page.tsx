@@ -35,7 +35,9 @@ export default async function LettersPage({ params }: PageProps<"/rituel/[year]/
         <ol className="list-decimal pl-5">
           <li>Demande l&apos;affiliation à la nouvelle caisse (en ligne ou par formulaire).</li>
           <li>Envoie la lettre de résiliation en recommandé à l&apos;ancienne caisse.</li>
-          <li>L&apos;ancienne caisse ne te libère que quand la nouvelle lui confirme ton affiliation (art. 7 al. 5 LAMal) : pas de trou de couverture.</li>
+          <li>
+            L&apos;ancienne caisse ne te libère que quand la nouvelle lui confirme ton affiliation (art. 7 al. 5 LAMal) : pas de trou de couverture.
+          </li>
         </ol>
       </Notice>
 
@@ -78,7 +80,13 @@ export default async function LettersPage({ params }: PageProps<"/rituel/[year]/
                   <input id="recipientName" name="recipientName" defaultValue={g.insurerName} className={inputClass} />
                 </FormField>
                 <FormField name="addressLines" label="Adresse (une ligne par ligne)">
-                  <textarea id="addressLines" name="addressLines" rows={3} placeholder={"Case postale 1234\n1000 Lausanne"} className={`${inputClass} py-2`} />
+                  <textarea
+                    id="addressLines"
+                    name="addressLines"
+                    rows={3}
+                    placeholder={"Case postale 1234\n1000 Lausanne"}
+                    className={`${inputClass} py-2`}
+                  />
                 </FormField>
                 <SubmitButton variant="secondary">Enregistrer l&apos;adresse</SubmitButton>
               </ActionForm>
@@ -97,7 +105,11 @@ export default async function LettersPage({ params }: PageProps<"/rituel/[year]/
               {g.lines
                 .filter((l) => !l.line.lcaAckAt)
                 .map((l) => (
-                  <Link key={l.line.id} href={`/rituel/${review.targetYear}/${l.line.id}/lca`} className="inline-flex min-h-11 items-center rounded-xl bg-lca-strong px-3 text-sm font-semibold text-black">
+                  <Link
+                    key={l.line.id}
+                    href={`/rituel/${review.targetYear}/${l.line.id}/lca`}
+                    className="inline-flex min-h-11 items-center rounded-xl bg-lca-strong px-3 text-sm font-semibold text-black"
+                  >
                     Garde-fou LCA de {l.person.firstName}
                   </Link>
                 ))}
@@ -108,7 +120,11 @@ export default async function LettersPage({ params }: PageProps<"/rituel/[year]/
               {g.lines
                 .filter((l) => !l.policy?.policyNumber)
                 .map((l) => (
-                  <Link key={l.line.id} href={`/foyer/${l.person.id}/contrat?annee=${l.policy?.coverageYear ?? review.targetYear - 1}`} className="text-sm font-semibold text-primary underline">
+                  <Link
+                    key={l.line.id}
+                    href={`/foyer/${l.person.id}/contrat?annee=${l.policy?.coverageYear ?? review.targetYear - 1}`}
+                    className="text-sm font-semibold text-primary underline"
+                  >
                     Ajouter le n° de police de {l.person.firstName}
                   </Link>
                 ))}
@@ -136,18 +152,23 @@ export default async function LettersPage({ params }: PageProps<"/rituel/[year]/
           {g.letter && (
             <div className="mt-4 flex flex-col gap-4 border-t border-border pt-4">
               <div className="flex flex-wrap gap-2">
-                <a href={`/api/letters/${g.letter.id}/pdf`} target="_blank" rel="noopener" className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-fg">
+                <a
+                  href={`/api/letters/${g.letter.id}/pdf`}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-fg"
+                >
                   Ouvrir le PDF
                 </a>
                 <ShareLetterButton url={`/api/letters/${g.letter.id}/pdf`} fileName={`resiliation-lamal-${g.insurerId}.pdf`} />
               </div>
               <p className="text-xs text-muted">
-                Générée le {formatDateShort(g.letter.generatedAt.slice(0, 10))}. Imprime-la, signe-la{g.lines.length > 1 ? " (chaque adulte concerné)" : ""}, puis
-                envoie-la en recommandé.
+                Générée le {formatDateShort(g.letter.generatedAt.slice(0, 10))}. Imprime-la, signe-la
+                {g.lines.length > 1 ? " (chaque adulte concerné)" : ""}, puis envoie-la en recommandé.
               </p>
               <ActionForm action={markLetterSentAction}>
                 <input type="hidden" name="letterId" value={g.letter.id} />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
                   <FormField name="sentOn" label="Envoyée le">
                     <input id="sentOn" name="sentOn" type="date" defaultValue={g.letter.sentAt ?? today} className={inputClass} />
                   </FormField>

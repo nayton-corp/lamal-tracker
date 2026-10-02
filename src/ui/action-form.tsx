@@ -39,10 +39,7 @@ export function ActionForm({
         {state.message && (state.ok ? showSuccess : true) && (
           <p
             role={state.ok ? "status" : "alert"}
-            className={cn(
-              "rounded-xl px-3 py-2 text-sm font-medium",
-              state.ok ? "bg-down-soft text-down" : "bg-up-soft text-up",
-            )}
+            className={cn("rounded-xl px-3 py-2 text-sm font-medium", state.ok ? "bg-down-soft text-down" : "bg-up-soft text-up")}
           >
             {state.message}
           </p>

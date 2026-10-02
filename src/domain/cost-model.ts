@@ -101,9 +101,7 @@ export function franchiseCurve(
     const costs: Record<number, Rappen> = {};
     let best: { f: number; cost: number } | null = null;
     for (const option of options) {
-      const cost = expectedAnnualCost(
-        costInputFor(params, ageClass, option.monthlyPremiumRp, option.franchiseChf, healthCostsRp, null),
-      ).totalRp;
+      const cost = expectedAnnualCost(costInputFor(params, ageClass, option.monthlyPremiumRp, option.franchiseChf, healthCostsRp, null)).totalRp;
       costs[option.franchiseChf] = cost;
       if (!best || cost < best.cost || (cost === best.cost && option.franchiseChf < best.f)) {
         best = { f: option.franchiseChf, cost };
@@ -138,9 +136,7 @@ export function recommendFranchise(
   if (usable.length === 0) return null;
   const costOf = (o: FranchiseOption, d: Rappen) =>
     expectedAnnualCost(costInputFor(params, ageClass, o.monthlyPremiumRp, o.franchiseChf, d, null)).totalRp;
-  const scored = usable
-    .map((o) => ({ o, total: costOf(o, healthCostsRp) }))
-    .sort((a, b) => a.total - b.total || a.o.franchiseChf - b.o.franchiseChf);
+  const scored = usable.map((o) => ({ o, total: costOf(o, healthCostsRp) })).sort((a, b) => a.total - b.total || a.o.franchiseChf - b.o.franchiseChf);
   const best = scored[0]!;
   const worst = scored[scored.length - 1]!;
   // Recherche du seuil où une franchise plus basse devient moins chère que la recommandée.

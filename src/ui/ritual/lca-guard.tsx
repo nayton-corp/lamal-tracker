@@ -16,9 +16,12 @@ export function LcaGuardConfirm({ lineId, year }: { lineId: number; year: number
   const [pending, startTransition] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 
   function start() {
     if (!checked || pending) return;
@@ -65,7 +68,10 @@ export function LcaGuardConfirm({ lineId, year }: { lineId: number; year: number
         <span
           aria-hidden
           className="absolute inset-0 origin-left bg-lca-strong/60"
-          style={{ transform: holding ? "scaleX(1)" : "scaleX(0)", transition: holding ? `transform ${HOLD_MS}ms linear` : "transform 150ms ease-out" }}
+          style={{
+            transform: holding ? "scaleX(1)" : "scaleX(0)",
+            transition: holding ? `transform ${HOLD_MS}ms linear` : "transform 150ms ease-out",
+          }}
         />
         <span className="relative">{pending ? "Enregistrement…" : holding ? "Maintiens…" : "Maintenir pour confirmer"}</span>
       </button>

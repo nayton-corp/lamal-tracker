@@ -2,15 +2,7 @@ import { zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { detectDelimiter, parseCsv } from "@/infrastructure/ofsp/csv";
 import { decodeText } from "@/infrastructure/ofsp/decode";
-import {
-  mapColumns,
-  normalizeHeader,
-  parseAccident,
-  parseAgeClass,
-  parseCanton,
-  parseFranchise,
-  parseRegion,
-} from "@/infrastructure/ofsp/normalize";
+import { mapColumns, normalizeHeader, parseAccident, parseAgeClass, parseCanton, parseFranchise, parseRegion } from "@/infrastructure/ofsp/normalize";
 import { parseTariffRows, prepareTariffFile, TariffFileError, yearFromFileName } from "@/infrastructure/ofsp/parser";
 import { buildOfspCsv, fixtureBytes } from "../../fixtures/ofsp";
 

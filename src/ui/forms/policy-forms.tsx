@@ -94,7 +94,7 @@ export function PolicyForm({ personId, year, franchises, insurers, hasDataset, v
             ))}
           </select>
         </Labelled>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
           <Labelled label="Franchise" htmlFor="franchiseChf">
             <select id="franchiseChf" name="franchiseChf" value={franchise} onChange={(e) => setFranchise(e.target.value)} className={inputClass}>
               {franchises.map((f) => (
@@ -121,7 +121,11 @@ export function PolicyForm({ personId, year, franchises, insurers, hasDataset, v
           Couverture accident incluse
         </label>
         {hasDataset && insurerId && (
-          <Labelled label={`Produit dans les tarifs OFSP ${year}`} htmlFor="premiumTariffId" hint="Le choisir rend la comparaison exacte. Sinon, le rattachement se fait par la prime.">
+          <Labelled
+            label={`Produit dans les tarifs OFSP ${year}`}
+            htmlFor="premiumTariffId"
+            hint="Le choisir rend la comparaison exacte. Sinon, le rattachement se fait par la prime."
+          >
             <select id="premiumTariffId" name="premiumTariffId" value={tariffId} onChange={(e) => pickTariff(e.target.value)} className={inputClass}>
               <option value="">Je ne sais pas</option>
               {tariffs.map((t) => (
@@ -148,7 +152,10 @@ export function PolicyForm({ personId, year, franchises, insurers, hasDataset, v
           {pending ? "Enregistrement…" : "Enregistrer le contrat"}
         </button>
         {state.message && (
-          <p role={state.ok ? "status" : "alert"} className={state.ok ? "rounded-xl bg-down-soft px-3 py-2 text-sm text-down" : "rounded-xl bg-up-soft px-3 py-2 text-sm text-up"}>
+          <p
+            role={state.ok ? "status" : "alert"}
+            className={state.ok ? "rounded-xl bg-down-soft px-3 py-2 text-sm text-down" : "rounded-xl bg-up-soft px-3 py-2 text-sm text-up"}
+          >
             {state.message}
             {result?.confidence === "EXACT" && " Rattaché au tarif OFSP."}
           </p>
@@ -166,7 +173,10 @@ export function PolicyForm({ personId, year, franchises, insurers, hasDataset, v
                 <form action={linkPolicyAction}>
                   <input type="hidden" name="policyId" value={result.policyId} />
                   <input type="hidden" name="tariffId" value={c.id} />
-                  <button type="submit" className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-surface-2">
+                  <button
+                    type="submit"
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-surface-2"
+                  >
                     <span>{c.label}</span>
                     <span className="num font-semibold">{formatChf(c.monthlyPremiumRp)}</span>
                   </button>
@@ -180,7 +190,19 @@ export function PolicyForm({ personId, year, franchises, insurers, hasDataset, v
   );
 }
 
-function Labelled({ label, htmlFor, hint, error, children }: { label: string; htmlFor: string; hint?: string; error?: string; children: React.ReactNode }) {
+function Labelled({
+  label,
+  htmlFor,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  hint?: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={htmlFor} className="text-sm font-medium">
@@ -231,7 +253,13 @@ export function LcaForm({
         </select>
       </FormField>
       <FormField name="productName" label="Produit">
-        <input id="productName" name="productName" defaultValue={values?.productName} placeholder="ex. Hospital Flex, Dentaire…" className={inputClass} />
+        <input
+          id="productName"
+          name="productName"
+          defaultValue={values?.productName}
+          placeholder="ex. Hospital Flex, Dentaire…"
+          className={inputClass}
+        />
       </FormField>
       <FormField name="category" label="Catégorie">
         <select id="category" name="category" defaultValue={values?.category ?? "HOSPITAL"} className={inputClass}>
@@ -242,15 +270,21 @@ export function LcaForm({
           ))}
         </select>
       </FormField>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
         <FormField name="monthlyRp" label="Prime mensuelle (CHF)">
-          <input id="monthlyRp" name="monthly" inputMode="decimal" defaultValue={values?.monthlyPremiumRp ? (values.monthlyPremiumRp / 100).toFixed(2) : ""} className={inputClass} />
+          <input
+            id="monthlyRp"
+            name="monthly"
+            inputMode="decimal"
+            defaultValue={values?.monthlyPremiumRp ? (values.monthlyPremiumRp / 100).toFixed(2) : ""}
+            className={inputClass}
+          />
         </FormField>
         <FormField name="policyNumber" label="N° de police">
           <input id="policyNumber" name="policyNumber" defaultValue={values?.policyNumber} className={inputClass} />
         </FormField>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
         <FormField name="startDate" label="Début">
           <input id="startDate" name="startDate" type="date" defaultValue={values?.startDate ?? ""} className={inputClass} />
         </FormField>

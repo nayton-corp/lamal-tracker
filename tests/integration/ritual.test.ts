@@ -187,11 +187,15 @@ describe("rituel annuel complet", () => {
       bundledDiscount: true,
       monthlyRp: 4500,
     });
-    savePrefs(ctx, nathan, { allowedModels: [], allowedFranchises: [2500], expectedHealthCostsRp: 30000, accidentIncluded: false, excludedInsurers: [8] });
+    savePrefs(ctx, nathan, {
+      allowedModels: [],
+      allowedFranchises: [2500],
+      expectedHealthCostsRp: 30000,
+      accidentIncluded: false,
+      excludedInsurers: [8],
+    });
     const reviewId = openReview(ctx, 2027);
-    const [nLine, lLine] = ["n", "l"].map((k) =>
-      reviewOverview(ctx, reviewId).lines.find((x) => x.person.id === (k === "n" ? nathan : lea))!.line,
-    );
+    const [nLine, lLine] = ["n", "l"].map((k) => reviewOverview(ctx, reviewId).lines.find((x) => x.person.id === (k === "n" ? nathan : lea))!.line);
 
     // Comparateur : filtres de préférences (caisse actuelle exclue, franchise 2500)
     const offers = offersForLine(ctx, nLine!.id, { sortBy: "premium" });
@@ -216,9 +220,7 @@ describe("rituel annuel complet", () => {
     await expect(generateLetter(ctx, reviewId, 8, fakePdf)).rejects.toThrow(/LCA/);
 
     // Le trigger SQL bloque même un contournement du domaine
-    expect(() => ctx.reviews.createLetter({ reviewId, insurerId: 8, pdfSha256: "x", pdfPath: "x" }, [nLine!.id])).toThrow(
-      /INVARIANT_LETTER/,
-    );
+    expect(() => ctx.reviews.createLetter({ reviewId, insurerId: 8, pdfSha256: "x", pdfPath: "x" }, [nLine!.id])).toThrow(/INVARIANT_LETTER/);
 
     acknowledgeLca(ctx, nLine!.id);
     group = letterGroups(ctx, reviewId)[0]!;

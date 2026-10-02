@@ -75,10 +75,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/comparer
   const reset = { personne: null, classe: null, franchise: null, modeles: null, accident: null, n: null };
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Comparer"
-        subtitle={`Primes ${r.year} · ${r.household.canton}, région ${r.household.region}`}
-      />
+      <PageHeader title="Comparer" subtitle={`Primes ${r.year} · ${r.household.canton}, région ${r.household.region}`} />
 
       <Card className="flex flex-col gap-3">
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -136,10 +133,8 @@ export default async function ComparePage({ searchParams }: PageProps<"/comparer
           ))}
         </div>
         <form action={base} className="flex items-end gap-2">
-          {Object.entries(sp).map(([k, v]) =>
-            k === "frais" || typeof v !== "string" ? null : <input key={k} type="hidden" name={k} value={v} />,
-          )}
-          <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
+          {Object.entries(sp).map(([k, v]) => (k === "frais" || typeof v !== "string" ? null : <input key={k} type="hidden" name={k} value={v} />))}
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">
             Frais de santé attendus (CHF/an)
             <input
               name="frais"
@@ -148,10 +143,10 @@ export default async function ComparePage({ searchParams }: PageProps<"/comparer
               min={0}
               step={100}
               defaultValue={Math.round(r.criteria.healthCostsRp / 100)}
-              className="min-h-11 rounded-xl border border-border bg-surface px-3 text-base"
+              className="min-h-11 w-full min-w-0 rounded-xl border border-border bg-surface px-3 text-base"
             />
           </label>
-          <button type="submit" className="min-h-11 rounded-xl bg-surface-2 px-4 text-sm font-semibold">
+          <button type="submit" className="min-h-11 shrink-0 rounded-xl bg-surface-2 px-4 text-sm font-semibold">
             Appliquer
           </button>
         </form>
@@ -159,12 +154,14 @@ export default async function ComparePage({ searchParams }: PageProps<"/comparer
 
       {r.market && (
         <p className="text-sm text-muted">
-          Marché franchise {r.franchise} : de <Chf rp={r.market.minRp} /> à <Chf rp={r.market.maxRp} />, médiane <Chf rp={r.market.medianRp} /> par mois.
+          Marché franchise {r.franchise} : de <Chf rp={r.market.minRp} /> à <Chf rp={r.market.maxRp} />, médiane <Chf rp={r.market.medianRp} /> par
+          mois.
         </p>
       )}
 
       <p className="text-sm text-muted">
-        {r.total} produit{r.total > 1 ? "s" : ""} · meilleure franchise par produit pour {formatChf(r.criteria.healthCostsRp, { compact: true })} de frais par an
+        {r.total} produit{r.total > 1 ? "s" : ""} · meilleure franchise par produit pour {formatChf(r.criteria.healthCostsRp, { compact: true })} de
+        frais par an
         {r.criteria.co2AnnualRp ? `, redistribution CO2 de ${formatChf(r.criteria.co2AnnualRp, { compact: true })} déduite` : ""}.
       </p>
 
@@ -174,7 +171,10 @@ export default async function ComparePage({ searchParams }: PageProps<"/comparer
         <ol className="flex flex-col gap-3">
           {r.offers.map((o) => (
             <li key={o.tariff.id}>
-              <article className="rounded-2xl border border-border bg-surface p-4 shadow-card" aria-label={`${o.tariff.insurerName}, ${o.tariff.tariffLabel}`}>
+              <article
+                className="rounded-2xl border border-border bg-surface p-4 shadow-card"
+                aria-label={`${o.tariff.insurerName}, ${o.tariff.tariffLabel}`}
+              >
                 <div className="flex items-start gap-3">
                   <span
                     className={cn(
@@ -197,7 +197,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/comparer
                     <p className="text-xs text-muted">par mois</p>
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-surface-2 p-2.5 text-sm">
+                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 rounded-xl bg-surface-2 p-2.5 text-sm">
                   <div>
                     <p className="text-xs text-muted">Coût total estimé</p>
                     <p className="num font-semibold">{formatChf(o.cost.totalRp, { compact: true })}/an</p>

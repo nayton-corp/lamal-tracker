@@ -105,7 +105,19 @@ export function Notice({ tone = "info", title, children }: { tone?: "info" | "up
   );
 }
 
-export function Field({ label, hint, error, children, htmlFor }: { label: string; hint?: ReactNode; error?: string; children: ReactNode; htmlFor?: string }) {
+export function Field({
+  label,
+  hint,
+  error,
+  children,
+  htmlFor,
+}: {
+  label: string;
+  hint?: ReactNode;
+  error?: string;
+  children: ReactNode;
+  htmlFor?: string;
+}) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={htmlFor} className="text-sm font-medium">

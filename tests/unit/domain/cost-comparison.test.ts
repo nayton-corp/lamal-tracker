@@ -113,7 +113,15 @@ describe("classement des offres", () => {
     tariff({ insurerId: 8, insurerName: "CSS", franchiseChf: 2500, monthlyPremiumRp: 38000 }),
     tariff({ insurerId: 8, insurerName: "CSS", franchiseChf: 300, monthlyPremiumRp: 52000 }),
     tariff({ insurerId: 1542, insurerName: "Assura", modelType: "TELMED", tariffCode: "TEL", franchiseChf: 2500, monthlyPremiumRp: 33000 }),
-    tariff({ insurerId: 1542, insurerName: "Assura", modelType: "TELMED", tariffCode: "TEL", franchiseChf: 2500, monthlyPremiumRp: 30000, accidentIncluded: true }),
+    tariff({
+      insurerId: 1542,
+      insurerName: "Assura",
+      modelType: "TELMED",
+      tariffCode: "TEL",
+      franchiseChf: 2500,
+      monthlyPremiumRp: 30000,
+      accidentIncluded: true,
+    }),
     tariff({ insurerId: 1384, insurerName: "Swica", modelType: "HMO", tariffCode: "HMO", franchiseChf: 2500, monthlyPremiumRp: 34000 }),
     tariff({ insurerId: 1384, insurerName: "Swica", ageClass: "KID", franchiseChf: 0, monthlyPremiumRp: 10000 }),
   ];
@@ -179,12 +187,27 @@ describe("renouvellement", () => {
     tariff({ insurerId: 8, tariffCode: "BASE", franchiseChf: 2500, monthlyPremiumRp: 41000 }),
     tariff({ insurerId: 8, tariffCode: "BASE", franchiseChf: 500, monthlyPremiumRp: 49000, ageClass: "YOUNG" }),
     tariff({ insurerId: 8, tariffCode: "HAM-NEW", modelType: "FAMILY_DOCTOR", tariffLabel: "Hausarzt", franchiseChf: 2500, monthlyPremiumRp: 37000 }),
-    tariff({ insurerId: 8, tariffCode: "HAM-2", modelType: "FAMILY_DOCTOR", tariffLabel: "Hausarzt Plus", franchiseChf: 2500, monthlyPremiumRp: 36000 }),
+    tariff({
+      insurerId: 8,
+      tariffCode: "HAM-2",
+      modelType: "FAMILY_DOCTOR",
+      tariffLabel: "Hausarzt Plus",
+      franchiseChf: 2500,
+      monthlyPremiumRp: 36000,
+    }),
   ];
 
   it("retrouve le même code tarifaire", () => {
     const r = findRenewal(
-      { insurerId: 8, tariffCode: "BASE", tariffLabel: null, modelType: "STANDARD", franchiseChf: 2500, accidentIncluded: false, monthlyPremiumRp: 39000 },
+      {
+        insurerId: 8,
+        tariffCode: "BASE",
+        tariffLabel: null,
+        modelType: "STANDARD",
+        franchiseChf: 2500,
+        accidentIncluded: false,
+        monthlyPremiumRp: 39000,
+      },
       next,
       params,
       "ADULT",
@@ -196,7 +219,15 @@ describe("renouvellement", () => {
 
   it("suit la lignée confirmée d'un produit renommé", () => {
     const r = findRenewal(
-      { insurerId: 8, tariffCode: "HAM-OLD", tariffLabel: null, modelType: "FAMILY_DOCTOR", franchiseChf: 2500, accidentIncluded: false, monthlyPremiumRp: null },
+      {
+        insurerId: 8,
+        tariffCode: "HAM-OLD",
+        tariffLabel: null,
+        modelType: "FAMILY_DOCTOR",
+        franchiseChf: 2500,
+        accidentIncluded: false,
+        monthlyPremiumRp: null,
+      },
       next,
       params,
       "ADULT",
@@ -208,7 +239,15 @@ describe("renouvellement", () => {
 
   it("ne devine pas entre deux produits du même modèle", () => {
     const r = findRenewal(
-      { insurerId: 8, tariffCode: "HAM-OLD", tariffLabel: "autre", modelType: "FAMILY_DOCTOR", franchiseChf: 2500, accidentIncluded: false, monthlyPremiumRp: null },
+      {
+        insurerId: 8,
+        tariffCode: "HAM-OLD",
+        tariffLabel: "autre",
+        modelType: "FAMILY_DOCTOR",
+        franchiseChf: 2500,
+        accidentIncluded: false,
+        monthlyPremiumRp: null,
+      },
       next,
       params,
       "ADULT",
@@ -220,7 +259,15 @@ describe("renouvellement", () => {
 
   it("utilise le libellé pour départager", () => {
     const r = findRenewal(
-      { insurerId: 8, tariffCode: "X", tariffLabel: "Hausarzt plus", modelType: "FAMILY_DOCTOR", franchiseChf: 2500, accidentIncluded: false, monthlyPremiumRp: null },
+      {
+        insurerId: 8,
+        tariffCode: "X",
+        tariffLabel: "Hausarzt plus",
+        modelType: "FAMILY_DOCTOR",
+        franchiseChf: 2500,
+        accidentIncluded: false,
+        monthlyPremiumRp: null,
+      },
       next,
       params,
       "ADULT",
@@ -232,7 +279,15 @@ describe("renouvellement", () => {
 
   it("ajuste la franchise au passage enfant → jeune adulte", () => {
     const r = findRenewal(
-      { insurerId: 8, tariffCode: "BASE", tariffLabel: null, modelType: "STANDARD", franchiseChf: 600, accidentIncluded: false, monthlyPremiumRp: 9000 },
+      {
+        insurerId: 8,
+        tariffCode: "BASE",
+        tariffLabel: null,
+        modelType: "STANDARD",
+        franchiseChf: 600,
+        accidentIncluded: false,
+        monthlyPremiumRp: 9000,
+      },
       next,
       params,
       "YOUNG",
@@ -245,14 +300,30 @@ describe("renouvellement", () => {
 
   it("rattache un contrat saisi à la main via la prime facturée", () => {
     const r = matchPolicyToTariff(
-      { insurerId: 8, tariffCode: null, tariffLabel: null, modelType: "FAMILY_DOCTOR", franchiseChf: 2500, accidentIncluded: false, monthlyPremiumRp: 36100 },
+      {
+        insurerId: 8,
+        tariffCode: null,
+        tariffLabel: null,
+        modelType: "FAMILY_DOCTOR",
+        franchiseChf: 2500,
+        accidentIncluded: false,
+        monthlyPremiumRp: 36100,
+      },
       next,
       "ADULT",
     );
     expect(r.confidence).toBe("PROBABLE");
     expect(r.tariff?.tariffCode).toBe("HAM-2");
     const far = matchPolicyToTariff(
-      { insurerId: 8, tariffCode: null, tariffLabel: null, modelType: "FAMILY_DOCTOR", franchiseChf: 2500, accidentIncluded: false, monthlyPremiumRp: 20000 },
+      {
+        insurerId: 8,
+        tariffCode: null,
+        tariffLabel: null,
+        modelType: "FAMILY_DOCTOR",
+        franchiseChf: 2500,
+        accidentIncluded: false,
+        monthlyPremiumRp: 20000,
+      },
       next,
       "ADULT",
     );

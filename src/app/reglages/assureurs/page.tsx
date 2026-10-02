@@ -29,7 +29,15 @@ export default async function InsurersPage({ searchParams }: PageProps<"/reglage
         <Card>
           <ActionForm action={saveInsurerAction}>
             <FormField name="id" label="Numéro OFSP" hint="Visible sur priminfo.admin.ch et dans le fichier des primes.">
-              <Input id="id" name="id" type="number" inputMode="numeric" defaultValue={editing?.id ?? editId ?? ""} readOnly={Boolean(editing)} required />
+              <Input
+                id="id"
+                name="id"
+                type="number"
+                inputMode="numeric"
+                defaultValue={editing?.id ?? editId ?? ""}
+                readOnly={Boolean(editing)}
+                required
+              />
             </FormField>
             <FormField name="name" label="Nom">
               <Input id="name" name="name" defaultValue={editing?.name ?? ""} required />
@@ -65,7 +73,11 @@ export default async function InsurersPage({ searchParams }: PageProps<"/reglage
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Assureurs" back="/reglages" subtitle="Le fichier OFSP ne contient que les numéros : les noms et adresses sont à confirmer ici." />
+      <PageHeader
+        title="Assureurs"
+        back="/reglages"
+        subtitle="Le fichier OFSP ne contient que les numéros : les noms et adresses sont à confirmer ici."
+      />
       <Card className="py-1">
         <ul>
           <li>
@@ -77,10 +89,7 @@ export default async function InsurersPage({ searchParams }: PageProps<"/reglage
             const addr = ctx.reference.terminationAddress(i.id, year);
             return (
               <li key={i.id}>
-                <ListRow
-                  href={`/reglages/assureurs?id=${i.id}`}
-                  trailing={addr ? <Badge tone="down">Adresse</Badge> : <Badge>Sans adresse</Badge>}
-                >
+                <ListRow href={`/reglages/assureurs?id=${i.id}`} trailing={addr ? <Badge tone="down">Adresse</Badge> : <Badge>Sans adresse</Badge>}>
                   <p className="truncate font-semibold">{i.name}</p>
                   <p className="text-xs text-muted">
                     n° {i.id} · nom {SOURCE_LABEL[i.nameSource]}

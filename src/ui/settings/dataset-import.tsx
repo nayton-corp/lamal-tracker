@@ -57,7 +57,11 @@ export function FetchNowButton({ year }: { year: number }) {
   async function run() {
     setBusy(true);
     setMessage(null);
-    const res = await fetch("/api/datasets/fetch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ year }) })
+    const res = await fetch("/api/datasets/fetch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ year }),
+    })
       .then((r) => r.json() as Promise<{ status: string; message: string; datasetId?: number }>)
       .catch(() => ({ status: "error", message: "Le serveur ne répond pas.", datasetId: undefined }));
     setBusy(false);

@@ -112,7 +112,9 @@ export default async function LinePage({ params, searchParams }: PageProps<"/rit
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted">{review.targetYear}</p>
                 <p className="num text-lg font-bold">{lo.renewal ? formatChf(lo.renewal.monthlyPremiumRp) : "?"}</p>
-                <p className="text-xs text-muted">{lo.renewal ? `${lo.renewal.tariffLabel} · ${lo.renewal.franchiseChf}` : "Renouvellement inconnu"}</p>
+                <p className="text-xs text-muted">
+                  {lo.renewal ? `${lo.renewal.tariffLabel} · ${lo.renewal.franchiseChf}` : "Renouvellement inconnu"}
+                </p>
               </div>
             </div>
             {lo.change && (
@@ -127,7 +129,14 @@ export default async function LinePage({ params, searchParams }: PageProps<"/rit
                 chère {formatChf(lo.market.minRp)}).
               </p>
             )}
-            <Badge tone={lo.line.renewalConfidence === "EXACT" || lo.line.renewalConfidence === "LINEAGE" || lo.line.renewalConfidence === "MANUAL" ? "down" : "up"} className="self-start">
+            <Badge
+              tone={
+                lo.line.renewalConfidence === "EXACT" || lo.line.renewalConfidence === "LINEAGE" || lo.line.renewalConfidence === "MANUAL"
+                  ? "down"
+                  : "up"
+              }
+              className="self-start"
+            >
               {lo.line.renewalConfidence === "MANUAL" ? "Renouvellement confirmé" : MATCH_CONFIDENCE_LABEL[lo.line.renewalConfidence]}
             </Badge>
           </div>
@@ -182,7 +191,9 @@ export default async function LinePage({ params, searchParams }: PageProps<"/rit
           <h2 id="offers-title" className="text-lg font-bold">
             Offres {review.targetYear}
           </h2>
-          <p className="text-xs text-muted">{result.total} {all ? "tarifs" : "produits"}</p>
+          <p className="text-xs text-muted">
+            {result.total} {all ? "tarifs" : "produits"}
+          </p>
         </div>
         <nav aria-label="Tri" className="flex gap-1 rounded-xl bg-surface-2 p-1">
           {SORTS.map((s) => (
@@ -191,7 +202,10 @@ export default async function LinePage({ params, searchParams }: PageProps<"/rit
               href={href(base, sp, { tri: s.key === "expectedCost" ? null : s.key, n: null })}
               scroll={false}
               aria-current={sortBy === s.key ? "true" : undefined}
-              className={cn("flex min-h-10 flex-1 items-center justify-center rounded-lg text-sm font-semibold", sortBy === s.key ? "bg-surface shadow-card" : "text-muted")}
+              className={cn(
+                "flex min-h-10 flex-1 items-center justify-center rounded-lg text-sm font-semibold",
+                sortBy === s.key ? "bg-surface shadow-card" : "text-muted",
+              )}
             >
               {s.label}
             </Link>
@@ -262,7 +276,14 @@ export default async function LinePage({ params, searchParams }: PageProps<"/rit
 
         {comparedOffers.length >= 2 && (
           <Card className="overflow-x-auto p-3">
-            <CardTitle className="mb-2" action={<Link href={href(base, sp, { cmp: null })} scroll={false} className="text-sm text-primary">Effacer</Link>}>
+            <CardTitle
+              className="mb-2"
+              action={
+                <Link href={href(base, sp, { cmp: null })} scroll={false} className="text-sm text-primary">
+                  Effacer
+                </Link>
+              }
+            >
               Côte à côte
             </CardTitle>
             <table className="num w-full min-w-[20rem] text-sm">
@@ -350,8 +371,8 @@ export default async function LinePage({ params, searchParams }: PageProps<"/rit
         <Card>
           <CardTitle>Médecin traitant</CardTitle>
           <p className="mb-3 text-sm text-muted">
-            Le modèle {MODEL_LABEL[lo.line.chosenModelType as ModelType].toLowerCase()} impose de passer par un médecin ou un centre de la liste
-            de l&apos;assureur. Vérifie sur le site de la caisse que {ctx.household.prefs(lo.person.id).doctorName || "ton médecin"} y figure.
+            Le modèle {MODEL_LABEL[lo.line.chosenModelType as ModelType].toLowerCase()} impose de passer par un médecin ou un centre de la liste de
+            l&apos;assureur. Vérifie sur le site de la caisse que {ctx.household.prefs(lo.person.id).doctorName || "ton médecin"} y figure.
           </p>
           <div className="flex gap-2">
             {(["YES", "NO", "UNKNOWN"] as const).map((v) => (

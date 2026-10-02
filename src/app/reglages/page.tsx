@@ -83,7 +83,9 @@ export default function SettingsPage() {
               <li key={j.id} className="border-b border-border py-1.5 last:border-b-0">
                 <p className="flex justify-between gap-2">
                   <span className="font-medium">{j.job === "backup" ? "Sauvegarde" : "Tâche du jour"}</span>
-                  <span className={j.ok ? "text-down" : j.ok === false ? "text-up" : "text-muted"}>{j.ok ? "OK" : j.ok === false ? "Échec" : "En cours"}</span>
+                  <span className={j.ok ? "text-down" : j.ok === false ? "text-up" : "text-muted"}>
+                    {j.ok ? "OK" : j.ok === false ? "Échec" : "En cours"}
+                  </span>
                 </p>
                 <p className="num text-xs text-muted">
                   {j.startedAt.slice(0, 16).replace("T", " ")} · {j.message}

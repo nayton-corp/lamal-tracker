@@ -28,8 +28,32 @@ export function productKey(t: Pick<Tariff, "insurerId" | "tariffCode">): string 
 }
 
 export const CANTONS = [
-  "AG", "AI", "AR", "BE", "BL", "BS", "FR", "GE", "GL", "GR", "JU", "LU", "NE",
-  "NW", "OW", "SG", "SH", "SO", "SZ", "TG", "TI", "UR", "VD", "VS", "ZG", "ZH",
+  "AG",
+  "AI",
+  "AR",
+  "BE",
+  "BL",
+  "BS",
+  "FR",
+  "GE",
+  "GL",
+  "GR",
+  "JU",
+  "LU",
+  "NE",
+  "NW",
+  "OW",
+  "SG",
+  "SH",
+  "SO",
+  "SZ",
+  "TG",
+  "TI",
+  "UR",
+  "VD",
+  "VS",
+  "ZG",
+  "ZH",
 ] as const;
 export type Canton = (typeof CANTONS)[number];
 

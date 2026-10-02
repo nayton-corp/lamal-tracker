@@ -154,9 +154,14 @@ export async function savePolicyAction(_: ActionState, form: FormData): Promise<
         label: `${t.tariffLabel} (${t.tariffCode})`,
         monthlyPremiumRp: t.monthlyPremiumRp,
       })),
-      proposed: result.match?.tariff && result.match.confidence !== "EXACT"
-        ? { id: result.match.tariff.id, label: `${result.match.tariff.tariffLabel} (${result.match.tariff.tariffCode})`, monthlyPremiumRp: result.match.tariff.monthlyPremiumRp }
-        : null,
+      proposed:
+        result.match?.tariff && result.match.confidence !== "EXACT"
+          ? {
+              id: result.match.tariff.id,
+              label: `${result.match.tariff.tariffLabel} (${result.match.tariff.tariffCode})`,
+              monthlyPremiumRp: result.match.tariff.monthlyPremiumRp,
+            }
+          : null,
     };
   }, "Contrat enregistré.");
 }
@@ -257,10 +262,7 @@ export async function setAffiliationAction(_: ActionState, form: FormData): Prom
 }
 
 export async function generateLetterAction(_: ActionState, form: FormData): Promise<ActionState> {
-  return run(
-    () => generateLetter(app(), Number(form.get("reviewId")), Number(form.get("insurerId")), renderLetterPdf),
-    "Lettre générée.",
-  );
+  return run(() => generateLetter(app(), Number(form.get("reviewId")), Number(form.get("insurerId")), renderLetterPdf), "Lettre générée.");
 }
 
 export async function deleteLetterAction(_: ActionState, form: FormData): Promise<ActionState> {
@@ -315,7 +317,9 @@ export async function saveInsurerAction(_: ActionState, form: FormData): Promise
       .filter(Boolean);
     if (recipient || lines.length > 0) {
       if (!recipient || lines.length < 2) {
-        throw new ValidationError("Adresse incomplète.", { addressLines: "Indique le destinataire et au moins deux lignes (case postale / rue, NPA localité)." });
+        throw new ValidationError("Adresse incomplète.", {
+          addressLines: "Indique le destinataire et au moins deux lignes (case postale / rue, NPA localité).",
+        });
       }
       app().reference.saveAddress({
         insurerId: id,
@@ -352,7 +356,9 @@ export async function saveParametersAction(_: ActionState, form: FormData): Prom
     });
     const co2 = chf(form, "co2Annual", "co2Annual");
     app().reference.saveCo2(year, co2, str(form, "co2Source") || null);
-    for (const review of app().reviews.openReviews().filter((r) => r.targetYear === year)) {
+    for (const review of app()
+      .reviews.openReviews()
+      .filter((r) => r.targetYear === year)) {
       app().reviews.updateReview(review.id, { co2AnnualRp: co2 });
     }
   }, "Paramètres enregistrés.");

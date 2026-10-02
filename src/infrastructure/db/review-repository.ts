@@ -36,7 +36,10 @@ export class ReviewRepository {
   createReview(input: Omit<ReviewRow, "id" | "openedAt" | "closedAt">, lines: Omit<ReviewLineRow, "id" | "reviewId">[]): number {
     return this.db.transaction((tx) => {
       const id = tx.insert(annualReview).values(input).returning({ id: annualReview.id }).get().id;
-      for (const line of lines) tx.insert(reviewLine).values({ ...line, reviewId: id }).run();
+      for (const line of lines)
+        tx.insert(reviewLine)
+          .values({ ...line, reviewId: id })
+          .run();
       return id;
     });
   }
@@ -58,7 +61,11 @@ export class ReviewRepository {
   }
 
   addLine(reviewId: number, line: Omit<ReviewLineRow, "id" | "reviewId">): number {
-    return this.db.insert(reviewLine).values({ ...line, reviewId }).returning({ id: reviewLine.id }).get().id;
+    return this.db
+      .insert(reviewLine)
+      .values({ ...line, reviewId })
+      .returning({ id: reviewLine.id })
+      .get().id;
   }
 
   updateLine(id: number, input: Partial<Omit<ReviewLineRow, "id" | "reviewId">>): void {
@@ -66,12 +73,7 @@ export class ReviewRepository {
   }
 
   letters(reviewId: number): (LetterRow & { lineIds: number[] })[] {
-    const letters = this.db
-      .select()
-      .from(terminationLetter)
-      .where(eq(terminationLetter.reviewId, reviewId))
-      .orderBy(asc(terminationLetter.id))
-      .all();
+    const letters = this.db.select().from(terminationLetter).where(eq(terminationLetter.reviewId, reviewId)).orderBy(asc(terminationLetter.id)).all();
     return letters.map((l) => ({ ...l, lineIds: this.letterLineIds(l.id) }));
   }
 

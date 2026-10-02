@@ -30,11 +30,17 @@ export default async function LcaGuardPage({ params }: PageProps<"/rituel/[year]
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#fbbf24] text-black" role="dialog" aria-modal="true" aria-labelledby="lca-title">
       <div className="pt-safe mx-auto flex min-h-full max-w-xl flex-col gap-5 px-5 pb-10 pt-6">
-        <Link href={`/rituel/${review.targetYear}/${line.id}`} className="inline-flex min-h-11 items-center self-start text-sm font-semibold underline">
+        <Link
+          href={`/rituel/${review.targetYear}/${line.id}`}
+          className="inline-flex min-h-11 items-center self-start text-sm font-semibold underline"
+        >
           ← Revenir sans confirmer
         </Link>
         <div className="flex items-center gap-3">
-          <span aria-hidden className="inline-flex size-14 shrink-0 items-center justify-center rounded-2xl bg-black text-3xl font-black text-[#fbbf24]">
+          <span
+            aria-hidden
+            className="inline-flex size-14 shrink-0 items-center justify-center rounded-2xl bg-black text-3xl font-black text-[#fbbf24]"
+          >
             !
           </span>
           <h1 id="lca-title" className="text-2xl font-extrabold leading-tight">

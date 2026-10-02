@@ -181,9 +181,7 @@ export function importTariffFile(
       previousYear: previous.year,
       comparedProducts: changes.length,
       medianChangeBp: marketStats(changes.map((c) => c.changeBp))?.medianRp ?? null,
-      medianChangeBpByCanton: Object.fromEntries(
-        Object.entries(byCantonChanges).map(([canton, list]) => [canton, marketStats(list)!.medianRp]),
-      ),
+      medianChangeBpByCanton: Object.fromEntries(Object.entries(byCantonChanges).map(([canton, list]) => [canton, marketStats(list)!.medianRp])),
       bigChangeCount: big.length,
       bigChanges: big.slice(0, 50),
     };

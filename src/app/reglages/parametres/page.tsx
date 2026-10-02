@@ -44,9 +44,16 @@ export default async function ParametersPage({ searchParams }: PageProps<"/regla
             <Input id="franchisesKid" name="franchisesKid" defaultValue={p.franchisesKid.join(", ")} />
           </FormField>
           <FormField name="coinsuranceRate" label="Quote-part (%)">
-            <Input id="coinsuranceRate" name="coinsuranceRate" type="number" step="0.1" inputMode="decimal" defaultValue={p.coinsuranceRateBp / 100} />
+            <Input
+              id="coinsuranceRate"
+              name="coinsuranceRate"
+              type="number"
+              step="0.1"
+              inputMode="decimal"
+              defaultValue={p.coinsuranceRateBp / 100}
+            />
           </FormField>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <FormField name="coinsuranceMaxAdult" label="Plafond adulte (CHF)">
               <Input id="coinsuranceMaxAdult" name="coinsuranceMaxAdult" inputMode="decimal" defaultValue={rpToChf(p.coinsuranceMaxAdultRp)} />
             </FormField>

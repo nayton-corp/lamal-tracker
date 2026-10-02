@@ -27,7 +27,19 @@ export type Field =
   | "premium";
 
 const ALIASES: Record<Field, string[]> = {
-  insurer: ["versicherer", "versicherernr", "versicherernummer", "assureur", "noassureur", "numeroassureur", "insurer", "insurerid", "bagnr", "idversicherer", "krankenversicherer"],
+  insurer: [
+    "versicherer",
+    "versicherernr",
+    "versicherernummer",
+    "assureur",
+    "noassureur",
+    "numeroassureur",
+    "insurer",
+    "insurerid",
+    "bagnr",
+    "idversicherer",
+    "krankenversicherer",
+  ],
   insurerName: ["versicherername", "nameversicherer", "nomassureur", "assureurnom", "insurername", "name"],
   canton: ["kanton", "canton", "kt", "cantone"],
   region: ["region", "praemienregion", "pramienregion", "regiondeprimes", "regionprimes", "regione"],

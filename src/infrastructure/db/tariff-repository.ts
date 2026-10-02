@@ -183,15 +183,18 @@ export class TariffRepository {
   tariffsByIds(ids: number[]): Tariff[] {
     if (ids.length === 0) return [];
     return this.db
-      .all<RawTariff>(sql`SELECT ${tariffColumns} ${tariffFrom} WHERE t.id IN ${sql`(${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`}`)
+      .all<RawTariff>(
+        sql`SELECT ${tariffColumns} ${tariffFrom} WHERE t.id IN ${sql`(${sql.join(
+          ids.map((i) => sql`${i}`),
+          sql`, `,
+        )})`}`,
+      )
       .map(toTariff);
   }
 
   regions(datasetId: number, canton: string): number[] {
     return this.db
-      .all<{ region: number }>(
-        sql`SELECT DISTINCT region FROM premium_tariff WHERE dataset_id = ${datasetId} AND canton = ${canton} ORDER BY region`,
-      )
+      .all<{ region: number }>(sql`SELECT DISTINCT region FROM premium_tariff WHERE dataset_id = ${datasetId} AND canton = ${canton} ORDER BY region`)
       .map((r) => r.region);
   }
 
@@ -204,9 +207,7 @@ export class TariffRepository {
   }
 
   insurerIds(datasetId: number): number[] {
-    return this.db
-      .all<{ id: number }>(sql`SELECT DISTINCT insurer_id AS id FROM premium_tariff WHERE dataset_id = ${datasetId}`)
-      .map((r) => r.id);
+    return this.db.all<{ id: number }>(sql`SELECT DISTINCT insurer_id AS id FROM premium_tariff WHERE dataset_id = ${datasetId}`).map((r) => r.id);
   }
 
   /** Statistiques de contrôle d'un import. */
@@ -217,9 +218,7 @@ export class TariffRepository {
     const byModel = this.db.all<{ model: string; n: number }>(
       sql`SELECT model_type AS model, COUNT(*) AS n FROM premium_tariff WHERE dataset_id = ${datasetId} GROUP BY model_type`,
     );
-    const insurers = this.db.get<{ n: number }>(
-      sql`SELECT COUNT(DISTINCT insurer_id) AS n FROM premium_tariff WHERE dataset_id = ${datasetId}`,
-    );
+    const insurers = this.db.get<{ n: number }>(sql`SELECT COUNT(DISTINCT insurer_id) AS n FROM premium_tariff WHERE dataset_id = ${datasetId}`);
     const withoutStandard = this.db.all<{ id: number }>(sql`
       SELECT DISTINCT insurer_id AS id FROM premium_tariff WHERE dataset_id = ${datasetId}
       EXCEPT SELECT DISTINCT insurer_id FROM premium_tariff WHERE dataset_id = ${datasetId} AND model_type = 'STANDARD'`);
@@ -316,7 +315,15 @@ export class TariffRepository {
 
   /** Produits distincts d'un jeu pour une région (pour corriger la classification des modèles). */
   products(datasetId: number, canton: string, region: number) {
-    return this.db.all<{ insurerId: number; insurerName: string; tariffCode: string; tariffLabel: string; modelType: ModelType; rawType: string; overridden: number }>(sql`
+    return this.db.all<{
+      insurerId: number;
+      insurerName: string;
+      tariffCode: string;
+      tariffLabel: string;
+      modelType: ModelType;
+      rawType: string;
+      overridden: number;
+    }>(sql`
       SELECT t.insurer_id AS insurerId, COALESCE(i.name, 'Assureur n° ' || t.insurer_id) AS insurerName,
              t.tariff_code AS tariffCode, MIN(t.tariff_label) AS tariffLabel,
              COALESCE(o.model_type, MIN(t.model_type)) AS modelType, MIN(t.tariff_type_raw) AS rawType,
@@ -344,9 +351,7 @@ export class TariffRepository {
   }
 
   countTariffs(datasetId: number): number {
-    return (
-      this.db.get<{ n: number }>(sql`SELECT COUNT(*) AS n FROM premium_tariff WHERE dataset_id = ${datasetId}`)?.n ?? 0
-    );
+    return this.db.get<{ n: number }>(sql`SELECT COUNT(*) AS n FROM premium_tariff WHERE dataset_id = ${datasetId}`)?.n ?? 0;
   }
 
   insurerName(id: number): string {

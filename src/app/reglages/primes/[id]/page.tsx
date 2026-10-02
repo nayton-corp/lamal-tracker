@@ -56,7 +56,8 @@ export default async function DatasetReportPage({ params }: PageProps<"/reglages
       {ds.status === "STAGING" && (
         <Card className="flex flex-col gap-3">
           <p className="text-sm">
-            Vérifie le rapport ci-dessous. Une fois activées, ces primes remplacent l&apos;éventuel import précédent de {ds.year} et servent au rituel.
+            Vérifie le rapport ci-dessous. Une fois activées, ces primes remplacent l&apos;éventuel import précédent de {ds.year} et servent au
+            rituel.
           </p>
           <ActionForm action={activateDatasetAction} className="gap-2">
             <input type="hidden" name="datasetId" value={ds.id} />
@@ -79,7 +80,7 @@ export default async function DatasetReportPage({ params }: PageProps<"/reglages
 
       <Card>
         <CardTitle>Lecture du fichier</CardTitle>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
           <Stat label="Tarifs importés" value={r.rowsImported.toLocaleString("fr-CH")} />
           <Stat label="Lignes rejetées" value={r.rowsRejected.toLocaleString("fr-CH")} tone={r.rowsRejected > 0 ? "up" : undefined} />
           <Stat label="Assureurs" value={r.insurerCount} />
@@ -87,7 +88,15 @@ export default async function DatasetReportPage({ params }: PageProps<"/reglages
         </div>
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
           <dt className="text-muted">Source</dt>
-          <dd className="truncate">{ds.sourceUrl ? <a className="text-primary underline" href={ds.sourceUrl}>{ds.sourceLabel}</a> : ds.sourceLabel}</dd>
+          <dd className="truncate">
+            {ds.sourceUrl ? (
+              <a className="text-primary underline" href={ds.sourceUrl}>
+                {ds.sourceLabel}
+              </a>
+            ) : (
+              ds.sourceLabel
+            )}
+          </dd>
           <dt className="text-muted">Importé le</dt>
           <dd>{formatDateShort(ds.importedAt.slice(0, 10))}</dd>
           <dt className="text-muted">Fichier lu</dt>
@@ -118,7 +127,7 @@ export default async function DatasetReportPage({ params }: PageProps<"/reglages
       {yoy && (
         <Card>
           <CardTitle>Évolution par rapport à {yoy.previousYear}</CardTitle>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
             <Stat
               label="Hausse médiane"
               value={yoy.medianChangeBp !== null ? formatPercentBp(yoy.medianChangeBp) : "–"}
@@ -181,9 +190,7 @@ export default async function DatasetReportPage({ params }: PageProps<"/reglages
         {r.insurersWithoutStandard.length > 0 && (
           <p className="mt-2 text-sm text-muted">Sans modèle standard détecté : {r.insurersWithoutStandard.map(name).join(", ")}.</p>
         )}
-        {r.outOfBoundsCount > 0 && (
-          <p className="mt-2 text-sm text-up">{r.outOfBoundsCount} primes hors des bornes plausibles.</p>
-        )}
+        {r.outOfBoundsCount > 0 && <p className="mt-2 text-sm text-up">{r.outOfBoundsCount} primes hors des bornes plausibles.</p>}
       </Card>
     </div>
   );

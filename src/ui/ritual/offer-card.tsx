@@ -64,7 +64,7 @@ export function OfferCard({
           <p className="text-xs text-muted">par mois</p>
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-surface-2 p-2.5 text-sm">
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 rounded-xl bg-surface-2 p-2.5 text-sm">
         <div>
           <p className="text-xs text-muted">Coût total estimé</p>
           <p className="num font-semibold">{formatChf(offer.cost.totalRp, { compact: true })}/an</p>
@@ -89,7 +89,11 @@ export function OfferCard({
             <SubmitButton className="min-h-11 w-full">{isRenewal ? "Je reste" : "Choisir"}</SubmitButton>
           </ActionForm>
         )}
-        <Link href={simulateHref} scroll={false} className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-primary hover:bg-primary-soft">
+        <Link
+          href={simulateHref}
+          scroll={false}
+          className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-primary hover:bg-primary-soft"
+        >
           Franchises
         </Link>
         <Link

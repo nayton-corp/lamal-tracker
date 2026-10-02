@@ -27,7 +27,13 @@ export class SystemRepository {
   }
 
   unreadCount(): number {
-    return this.db.select({ n: sql<number>`count(*)` }).from(notificationLog).where(isNull(notificationLog.readAt)).get()?.n ?? 0;
+    return (
+      this.db
+        .select({ n: sql<number>`count(*)` })
+        .from(notificationLog)
+        .where(isNull(notificationLog.readAt))
+        .get()?.n ?? 0
+    );
   }
 
   markAllRead(nowIso: string): void {

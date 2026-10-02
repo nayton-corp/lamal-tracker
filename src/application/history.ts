@@ -97,7 +97,7 @@ export function householdHistory(ctx: AppContext) {
         year: review.targetYear,
         monthlyRp: monthly,
         netAnnualRp: monthly * 12 - (review.co2AnnualRp ?? 0),
-        insurerName: line.chosenLabel ?? (line.renewalTariffId ? ctx.tariffs.tariffById(line.renewalTariffId)?.insurerName ?? null : null),
+        insurerName: line.chosenLabel ?? (line.renewalTariffId ? (ctx.tariffs.tariffById(line.renewalTariffId)?.insurerName ?? null) : null),
         label: line.chosenLabel ?? line.renewalLabel,
         franchiseChf: line.chosenFranchiseChf ?? line.renewalFranchiseChf,
         marketMedianRp: null,

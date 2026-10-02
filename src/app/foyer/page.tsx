@@ -30,7 +30,13 @@ export default function HouseholdPage() {
     <div className="flex flex-col gap-4">
       <PageHeader title="Foyer" subtitle={`${h.name} · ${h.canton}, région ${h.region}`} />
       <Card>
-        <CardTitle action={<ButtonLink href="/foyer/edition" variant="ghost" className="min-h-10 px-3 text-sm">Modifier</ButtonLink>}>
+        <CardTitle
+          action={
+            <ButtonLink href="/foyer/edition" variant="ghost" className="min-h-10 px-3 text-sm">
+              Modifier
+            </ButtonLink>
+          }
+        >
           Adresse
         </CardTitle>
         <p className="text-sm">
@@ -40,7 +46,13 @@ export default function HouseholdPage() {
         </p>
       </Card>
       <Card>
-        <CardTitle action={<ButtonLink href="/foyer/personne/nouvelle" variant="ghost" className="min-h-10 px-3 text-sm">+ Ajouter</ButtonLink>}>
+        <CardTitle
+          action={
+            <ButtonLink href="/foyer/personne/nouvelle" variant="ghost" className="min-h-10 px-3 text-sm">
+              + Ajouter
+            </ButtonLink>
+          }
+        >
           Personnes
         </CardTitle>
         {persons.length === 0 ? (
@@ -53,7 +65,11 @@ export default function HouseholdPage() {
               const next = ageClassFor(p.birthDate, nextYear);
               const lcaCount = lca.filter((l) => l.personId === p.id && l.status === "ACTIVE").length;
               return (
-                <ListRow key={p.id} href={`/foyer/${p.id}`} trailing={policy ? <Chf rp={policy.billedMonthlyRp} className="text-sm font-semibold" /> : <Badge>Contrat ?</Badge>}>
+                <ListRow
+                  key={p.id}
+                  href={`/foyer/${p.id}`}
+                  trailing={policy ? <Chf rp={policy.billedMonthlyRp} className="text-sm font-semibold" /> : <Badge>Contrat ?</Badge>}
+                >
                   <p className="font-semibold">
                     {p.firstName} {p.lastName}
                   </p>
@@ -66,7 +82,11 @@ export default function HouseholdPage() {
                       : "Aucun contrat"}
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {next !== cls && <Badge tone="up">{AGE_CLASS_LABEL[next]} en {nextYear}</Badge>}
+                    {next !== cls && (
+                      <Badge tone="up">
+                        {AGE_CLASS_LABEL[next]} en {nextYear}
+                      </Badge>
+                    )}
                     {lcaCount > 0 && <Badge tone="lca">{lcaCount} LCA</Badge>}
                   </div>
                 </ListRow>

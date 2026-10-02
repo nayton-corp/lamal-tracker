@@ -66,7 +66,7 @@ export default function HistoryPage() {
             <p className="text-sm text-muted">Aucun contrat enregistré.</p>
           ) : (
             <div className="-mx-4 overflow-x-auto px-4">
-              <table className="num w-full min-w-[22rem] text-sm">
+              <table className="num w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-muted">
                     <th className="py-1 font-medium">Année</th>
@@ -89,7 +89,7 @@ export default function HistoryPage() {
                           )}
                         </td>
                         <td className="py-2">
-                          <span className="block max-w-[9rem] truncate">{pt.insurerName ?? "–"}</span>
+                          <span className="block max-w-[7rem] truncate">{pt.insurerName ?? "–"}</span>
                           <span className="text-xs text-muted">{pt.franchiseChf !== null ? `franchise ${pt.franchiseChf}` : ""}</span>
                         </td>
                         <td className="py-2 text-right">

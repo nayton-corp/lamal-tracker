@@ -44,7 +44,13 @@ export function freeComparison(ctx: AppContext, q: FreeCompareQuery) {
     sortBy: q.sortBy ?? "expectedCost",
     ageSubgroup: ctx.tariffs.defaultSubgroup(dataset.id, ageClass),
   };
-  const tariffs = ctx.tariffs.tariffs({ datasetId: dataset.id, canton: household.canton, region: household.region, ageClass, accidentIncluded: accident });
+  const tariffs = ctx.tariffs.tariffs({
+    datasetId: dataset.id,
+    canton: household.canton,
+    region: household.region,
+    ageClass,
+    accidentIncluded: accident,
+  });
   const all = bestPerProduct(rankOffers(tariffs, params, criteria, null));
   const market = franchise !== null ? marketStats(all.map((o) => o.tariff.monthlyPremiumRp)) : null;
   return {

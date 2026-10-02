@@ -39,13 +39,22 @@ export function HouseholdForm({
       </FormField>
       <div className="grid grid-cols-[7rem_1fr] gap-3">
         <FormField name="npa" label="NPA">
-          <input id="npa" name="npa" inputMode="numeric" pattern="\d{4}" maxLength={4} defaultValue={values?.npa} className={inputClass} autoComplete="postal-code" />
+          <input
+            id="npa"
+            name="npa"
+            inputMode="numeric"
+            pattern="\d{4}"
+            maxLength={4}
+            defaultValue={values?.npa}
+            className={inputClass}
+            autoComplete="postal-code"
+          />
         </FormField>
         <FormField name="locality" label="Localité">
           <input id="locality" name="locality" defaultValue={values?.locality} className={inputClass} autoComplete="address-level2" />
         </FormField>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
         <FormField name="canton" label="Canton">
           <select id="canton" name="canton" value={canton} onChange={(e) => setCanton(e.target.value)} className={inputClass} required>
             <option value="" disabled>
@@ -74,7 +83,12 @@ export function HouseholdForm({
       </p>
       {persons.length > 0 && (
         <FormField name="representativePersonId" label="Signataire pour les mineurs" hint="Représentant légal qui signe les lettres des enfants.">
-          <select id="representativePersonId" name="representativePersonId" defaultValue={values?.representativePersonId ?? ""} className={inputClass}>
+          <select
+            id="representativePersonId"
+            name="representativePersonId"
+            defaultValue={values?.representativePersonId ?? ""}
+            className={inputClass}
+          >
             <option value="">Automatique (premier adulte)</option>
             {persons.map((p) => (
               <option key={p.id} value={p.id}>
@@ -128,7 +142,11 @@ export function PrefsForm({
   return (
     <ActionForm action={savePrefsAction}>
       <input type="hidden" name="personId" value={personId} />
-      <FormField name="expectedHealthCostsRp" label="Frais de santé attendus par an (CHF)" hint="Factures médicales estimées avant franchise ; sert à calculer le coût total et la franchise idéale.">
+      <FormField
+        name="expectedHealthCostsRp"
+        label="Frais de santé attendus par an (CHF)"
+        hint="Factures médicales estimées avant franchise ; sert à calculer le coût total et la franchise idéale."
+      >
         <input
           id="expectedHealthCostsRp"
           name="expectedHealthCosts"
@@ -163,7 +181,13 @@ export function PrefsForm({
         <div className="flex flex-wrap gap-2">
           {franchises.map((f) => (
             <label key={f} className="cursor-pointer">
-              <input type="checkbox" name="allowedFranchises" value={f} defaultChecked={values.allowedFranchises.includes(f)} className="peer sr-only" />
+              <input
+                type="checkbox"
+                name="allowedFranchises"
+                value={f}
+                defaultChecked={values.allowedFranchises.includes(f)}
+                className="peer sr-only"
+              />
               <span className="num inline-flex min-h-10 items-center rounded-full border border-border px-3 text-sm peer-checked:border-primary peer-checked:bg-primary-soft peer-checked:text-primary">
                 {f}
               </span>
@@ -172,7 +196,11 @@ export function PrefsForm({
         </div>
         <p className="mt-1 text-xs text-muted">Aucune cochée = toutes les franchises légales.</p>
       </fieldset>
-      <FormField name="doctorName" label="Médecin traitant" hint="Rappel pour vérifier qu'il figure sur la liste des modèles médecin de famille / HMO.">
+      <FormField
+        name="doctorName"
+        label="Médecin traitant"
+        hint="Rappel pour vérifier qu'il figure sur la liste des modèles médecin de famille / HMO."
+      >
         <input id="doctorName" name="doctorName" defaultValue={values.doctorName} className={inputClass} />
       </FormField>
       {insurers.length > 0 && (
@@ -181,7 +209,13 @@ export function PrefsForm({
           <div className="mt-3 flex max-h-64 flex-col gap-1 overflow-y-auto">
             {insurers.map((i) => (
               <label key={i.id} className="flex min-h-10 items-center gap-3 text-sm">
-                <input type="checkbox" name="excludedInsurers" value={i.id} defaultChecked={values.excludedInsurers.includes(i.id)} className="size-5" />
+                <input
+                  type="checkbox"
+                  name="excludedInsurers"
+                  value={i.id}
+                  defaultChecked={values.excludedInsurers.includes(i.id)}
+                  className="size-5"
+                />
                 {i.name}
               </label>
             ))}

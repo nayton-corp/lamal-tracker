@@ -1,23 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { ageClassChange, ageClassFor } from "@/domain/age-class";
-import {
-  addDays,
-  daysBetween,
-  formatDateFr,
-  isWeekend,
-  lastWorkingDayOnOrBefore,
-  parseIsoDate,
-  subtractWorkingDays,
-} from "@/domain/calendar";
-import {
-  countdown,
-  isReviewSeason,
-  midYearTermination,
-  ordinaryTerminationDeadline,
-  remindersDue,
-  reviewTargetYear,
-} from "@/domain/deadlines";
+import { addDays, daysBetween, formatDateFr, isWeekend, lastWorkingDayOnOrBefore, parseIsoDate, subtractWorkingDays } from "@/domain/calendar";
+import { countdown, isReviewSeason, midYearTermination, ordinaryTerminationDeadline, remindersDue, reviewTargetYear } from "@/domain/deadlines";
 
 describe("calendrier", () => {
   it("refuse les dates inexistantes", () => {
@@ -86,7 +71,11 @@ describe("échéance de résiliation", () => {
     expect(remindersDue("2026-10-25", d)).toEqual([30]);
     expect(remindersDue("2026-11-17", d)).toEqual([7]);
     expect(remindersDue("2026-11-24", d)).toEqual([0]);
-    expect(remindersDue("2026-10-26", d)).toEqual([]);
+    // Serveur éteint le jour J : le palier atteint reste dû (dédoublonné par la clé de notification)
+    expect(remindersDue("2026-10-26", d)).toEqual([30]);
+    expect(remindersDue("2026-10-24", d)).toEqual([]);
+    expect(remindersDue("2026-11-27", d)).toEqual([0]);
+    expect(remindersDue("2026-12-01", d)).toEqual([]);
   });
 
   it("résiliation au 30 juin seulement en assurance ordinaire", () => {

@@ -15,7 +15,9 @@ const page = await browser.newPage();
 for (const t of targets) {
   const svg = fs.readFileSync(t.src, "utf8");
   await page.setViewportSize({ width: t.size, height: t.size });
-  await page.setContent(`<html><body style="margin:0;background:transparent">${svg.replace("<svg ", `<svg width="${t.size}" height="${t.size}" `)}</body></html>`);
+  await page.setContent(
+    `<html><body style="margin:0;background:transparent">${svg.replace("<svg ", `<svg width="${t.size}" height="${t.size}" `)}</body></html>`,
+  );
   await page.screenshot({ path: t.out, omitBackground: true, clip: { x: 0, y: 0, width: t.size, height: t.size } });
   console.log("écrit", t.out);
 }

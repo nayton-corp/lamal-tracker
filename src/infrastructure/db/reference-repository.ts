@@ -48,12 +48,7 @@ export class ReferenceRepository {
   }
 
   addresses(insurerId: number): InsurerAddressRow[] {
-    return this.db
-      .select()
-      .from(insurerAddress)
-      .where(eq(insurerAddress.insurerId, insurerId))
-      .orderBy(desc(insurerAddress.validFromYear))
-      .all();
+    return this.db.select().from(insurerAddress).where(eq(insurerAddress.insurerId, insurerId)).orderBy(desc(insurerAddress.validFromYear)).all();
   }
 
   saveAddress(row: InsurerAddressRow): void {

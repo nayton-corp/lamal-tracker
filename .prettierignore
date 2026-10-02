@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+drizzle/meta
+.next
+next-env.d.ts
+test-results
+playwright-report
+data
+public/offline.html

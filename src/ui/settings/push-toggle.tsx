@@ -43,7 +43,11 @@ export function PushToggle() {
       await navigator.serviceWorker.ready;
       const { publicKey } = (await (await fetch("/api/push/subscribe")).json()) as { publicKey: string };
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
-      const res = await fetch("/api/push/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sub.toJSON()),
+      });
       if (!res.ok) throw new Error();
       setState("on");
       setMessage("Notifications activées sur cet appareil.");
@@ -60,7 +64,11 @@ export function PushToggle() {
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = await reg?.pushManager.getSubscription();
       if (sub) {
-        await fetch("/api/push/subscribe", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+        await fetch("/api/push/subscribe", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        });
         await sub.unsubscribe();
       }
       setState("off");
@@ -72,14 +80,17 @@ export function PushToggle() {
 
   async function test() {
     setBusy(true);
-    const res = await fetch("/api/push/test", { method: "POST" }).then((r) => r.json() as Promise<{ sent: number }>).catch(() => ({ sent: 0 }));
+    const res = await fetch("/api/push/test", { method: "POST" })
+      .then((r) => r.json() as Promise<{ sent: number }>)
+      .catch(() => ({ sent: 0 }));
     setMessage(res.sent > 0 ? `Notification envoyée à ${res.sent} appareil(s).` : "Aucun appareil n'a reçu la notification.");
     setBusy(false);
   }
 
   const explanations: Partial<Record<State, string>> = {
     insecure: "Les notifications exigent une connexion HTTPS (par exemple via Tailscale). Voir le README pour la mise en place.",
-    unsupported: "Ce navigateur ne gère pas les notifications. Sur iPhone, ajoute d'abord l'app à l'écran d'accueil (Partager → Sur l'écran d'accueil).",
+    unsupported:
+      "Ce navigateur ne gère pas les notifications. Sur iPhone, ajoute d'abord l'app à l'écran d'accueil (Partager → Sur l'écran d'accueil).",
     denied: "Les notifications sont bloquées pour ce site dans les réglages du navigateur.",
   };
 

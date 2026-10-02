@@ -12,7 +12,13 @@ export function Countdown({ overview }: { overview: ReviewOverview }) {
   const { daysLeft, level } = overview.countdown;
   const sendBy = formatDateFr(overview.review.recommendedSendBy, true);
   const tone =
-    level === "overdue" ? "bg-up text-white" : level === "urgent" ? "bg-up-soft text-up" : level === "soon" ? "bg-lca-soft text-text" : "bg-surface-2 text-text";
+    level === "overdue"
+      ? "bg-up text-white"
+      : level === "urgent"
+        ? "bg-up-soft text-up"
+        : level === "soon"
+          ? "bg-lca-soft text-text"
+          : "bg-surface-2 text-text";
   if (overview.review.status === "CLOSED") return null;
   return (
     <div className={cn("flex items-center gap-3 rounded-xl px-3 py-2", tone)}>
@@ -38,12 +44,7 @@ export function Steps({ overview }: { overview: ReviewOverview }) {
     <ol className="flex gap-1" aria-label="Étapes du rituel">
       {steps.map((s) => (
         <li key={s.key} className="flex-1">
-          <div
-            className={cn(
-              "h-1.5 rounded-full",
-              s.state === "done" ? "bg-primary" : s.state === "current" ? "bg-primary/50" : "bg-surface-2",
-            )}
-          />
+          <div className={cn("h-1.5 rounded-full", s.state === "done" ? "bg-primary" : s.state === "current" ? "bg-primary/50" : "bg-surface-2")} />
           <p className={cn("mt-1 text-[11px] font-medium", s.state === "todo" ? "text-muted" : "text-text")}>
             {s.label}
             <span className="sr-only">{s.state === "done" ? " (terminé)" : s.state === "current" ? " (en cours)" : " (à faire)"}</span>
@@ -114,12 +115,14 @@ export function PersonCards({ overview }: { overview: ReviewOverview }) {
                 </p>
               </div>
               {l.line.decision ? (
-                <Badge tone={l.line.decision === "SWITCH" ? "info" : "neutral"}>{DECISION_LABEL[l.line.decision]}</Badge>
+                <Badge tone={l.line.decision === "SWITCH" ? "info" : "neutral"} className="shrink-0 whitespace-nowrap">
+                  {DECISION_LABEL[l.line.decision]}
+                </Badge>
               ) : (
                 <Badge>À décider</Badge>
               )}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted">Hausse {year}</p>
                 {l.change ? (
@@ -141,8 +144,7 @@ export function PersonCards({ overview }: { overview: ReviewOverview }) {
             </div>
             {l.chosen && (
               <p className="num mt-2 text-sm">
-                Choix : <strong>{l.line.chosenLabel}</strong>, franchise {l.line.chosenFranchiseChf} ·{" "}
-                <Chf rp={l.line.chosenMonthlyRp ?? 0} />
+                Choix : <strong>{l.line.chosenLabel}</strong>, franchise {l.line.chosenFranchiseChf} · <Chf rp={l.line.chosenMonthlyRp ?? 0} />
                 /mois
               </p>
             )}

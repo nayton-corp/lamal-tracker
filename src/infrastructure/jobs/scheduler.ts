@@ -20,7 +20,8 @@ export async function dailyBackup(ctx: AppContext): Promise<string> {
     .readdirSync(dir)
     .filter((f) => /^lamal-\d{4}-\d{2}-\d{2}\.sqlite$/.test(f))
     .sort();
-  for (const old of backups.slice(0, Math.max(0, backups.length - KEEP_BACKUPS))) fs.rmSync(path.join(/*turbopackIgnore: true*/ dir, old), { force: true });
+  for (const old of backups.slice(0, Math.max(0, backups.length - KEEP_BACKUPS)))
+    fs.rmSync(path.join(/*turbopackIgnore: true*/ dir, old), { force: true });
   return file;
 }
 

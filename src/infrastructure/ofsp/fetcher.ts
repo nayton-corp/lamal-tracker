@@ -4,7 +4,8 @@
  * les ressources CSV/ZIP dont le titre ou l'URL mentionne l'année.
  */
 export const DEFAULT_SEARCH_URL =
-  "https://ckan.opendata.swiss/api/3/action/package_search?rows=50&q=" + encodeURIComponent("prämien krankenversicherung OR primes assurance-maladie");
+  "https://ckan.opendata.swiss/api/3/action/package_search?rows=50&q=" +
+  encodeURIComponent("prämien krankenversicherung OR primes assurance-maladie");
 
 export interface ResourceCandidate {
   url: string;
@@ -51,7 +52,11 @@ export function rankResources(payload: unknown, year: number): ResourceCandidate
   return candidates.sort((a, b) => b.score - a.score);
 }
 
-export async function discoverTariffResources(year: number, searchUrl = DEFAULT_SEARCH_URL, fetchImpl: FetchLike = fetch): Promise<ResourceCandidate[]> {
+export async function discoverTariffResources(
+  year: number,
+  searchUrl = DEFAULT_SEARCH_URL,
+  fetchImpl: FetchLike = fetch,
+): Promise<ResourceCandidate[]> {
   const res = await fetchImpl(searchUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`Recherche opendata.swiss impossible (HTTP ${res.status}).`);
   return rankResources(await res.json(), year);

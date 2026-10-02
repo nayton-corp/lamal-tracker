@@ -84,20 +84,7 @@ export function compareIsoDate(a: IsoDate, b: IsoDate): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-const MONTHS_FR = [
-  "janvier",
-  "février",
-  "mars",
-  "avril",
-  "mai",
-  "juin",
-  "juillet",
-  "août",
-  "septembre",
-  "octobre",
-  "novembre",
-  "décembre",
-];
+const MONTHS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const WEEKDAYS_FR = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 
 /** « 30 novembre 2026 », ou « lundi 30 novembre 2026 » avec le jour. */

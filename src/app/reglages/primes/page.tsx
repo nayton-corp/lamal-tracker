@@ -25,8 +25,8 @@ export default function DatasetsPage() {
       <Card>
         <CardTitle>Importer un fichier</CardTitle>
         <p className="mb-3 text-sm text-muted">
-          Télécharge le fichier des primes sur opendata.swiss ou priminfo.admin.ch (ZIP ou CSV « Prämien »), puis envoie-le ici. Chaque import est vérifié avant
-          d&apos;être utilisé.
+          Télécharge le fichier des primes sur opendata.swiss ou priminfo.admin.ch (ZIP ou CSV « Prämien »), puis envoie-le ici. Chaque import est
+          vérifié avant d&apos;être utilisé.
         </p>
         <DatasetImportForm defaultYear={target} />
       </Card>

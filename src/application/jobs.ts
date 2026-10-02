@@ -30,11 +30,7 @@ export interface FetchOutcome {
 }
 
 /** Cherche et importe (en attente de validation) les primes d'une année depuis opendata.swiss. */
-export async function fetchTariffsFromOpenData(
-  ctx: AppContext,
-  year: number,
-  fetchImpl: typeof fetch = fetch,
-): Promise<FetchOutcome> {
+export async function fetchTariffsFromOpenData(ctx: AppContext, year: number, fetchImpl: typeof fetch = fetch): Promise<FetchOutcome> {
   const override = ctx.system.setting<string>("datasetUrlOverride");
   const searchUrl = ctx.system.setting<string>("datasetSearchUrl") || DEFAULT_SEARCH_URL;
   try {
@@ -42,14 +38,19 @@ export async function fetchTariffsFromOpenData(
     let title = "URL configurée";
     if (!url) {
       const candidates = await discoverTariffResources(year, searchUrl, fetchImpl);
-      if (candidates.length === 0) return { status: "not-found", message: `Aucun fichier de primes ${year} trouvé sur opendata.swiss pour l'instant.` };
+      if (candidates.length === 0)
+        return { status: "not-found", message: `Aucun fichier de primes ${year} trouvé sur opendata.swiss pour l'instant.` };
       url = candidates[0]!.url;
       title = `${candidates[0]!.packageTitle} – ${candidates[0]!.title}`;
     }
     const { bytes, fileName } = await downloadFile(url, fetchImpl);
     const result = importTariffFile(ctx, { fileName, bytes, sourceLabel: `opendata.swiss : ${title}`.slice(0, 200), sourceUrl: url, yearHint: year });
     if (result.duplicateOf !== null) return { status: "duplicate", message: "Ce fichier est déjà importé.", datasetId: result.datasetId };
-    return { status: "imported", message: `Primes ${result.report.year} importées : ${result.report.rowsImported} tarifs.`, datasetId: result.datasetId };
+    return {
+      status: "imported",
+      message: `Primes ${result.report.year} importées : ${result.report.rowsImported} tarifs.`,
+      datasetId: result.datasetId,
+    };
   } catch (e) {
     return { status: "error", message: (e as Error).message };
   }

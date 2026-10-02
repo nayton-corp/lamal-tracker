@@ -105,6 +105,9 @@ export function markInsurerAck(ctx: AppContext, letterId: number, ackOn: string 
 export function letterPdf(ctx: AppContext, letterId: number): { bytes: Uint8Array; fileName: string } {
   const letter = ctx.reviews.letter(letterId);
   if (!letter) throw new ReviewError("Lettre introuvable.");
-  const name = ctx.tariffs.insurerName(letter.insurerId).replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+  const name = ctx.tariffs
+    .insurerName(letter.insurerId)
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-|-$/g, "");
   return { bytes: ctx.files.read(letter.pdfPath), fileName: `resiliation-lamal-${name}.pdf` };
 }

@@ -15,7 +15,7 @@ export function Delta({ rp, bp, suffix, className }: { rp: Rappen; bp?: number |
   return (
     <span
       className={cn(
-        "num inline-flex items-baseline gap-1 whitespace-nowrap font-semibold",
+        "num inline-flex flex-wrap items-baseline gap-x-1 font-semibold",
         rp < 0 && "text-down",
         rp > 0 && "text-up",
         rp === 0 && "text-muted",
@@ -25,11 +25,11 @@ export function Delta({ rp, bp, suffix, className }: { rp: Rappen; bp?: number |
       <span aria-hidden className="text-[0.75em]">
         {arrow}
       </span>
-      <span>
+      <span className="whitespace-nowrap">
         {formatChf(rp, { signed: true })}
         {suffix}
       </span>
-      {bp !== undefined && bp !== null && <span className="text-[0.85em] font-medium">({formatPercentBp(bp)})</span>}
+      {bp !== undefined && bp !== null && <span className="whitespace-nowrap text-[0.85em] font-medium">({formatPercentBp(bp)})</span>}
       <span className="sr-only">{rp > 0 ? "hausse" : rp < 0 ? "baisse" : "stable"}</span>
     </span>
   );
@@ -40,10 +40,15 @@ export function Saving({ rp, className, suffix = "/an" }: { rp: Rappen; classNam
   if (rp === 0) return <span className={cn("num text-muted", className)}>Même coût</span>;
   const saving = rp > 0;
   return (
-    <span className={cn("num inline-flex items-baseline gap-1 whitespace-nowrap font-semibold", saving ? "text-down" : "text-up", className)}>
-      <span aria-hidden className="text-[0.75em]">{saving ? "▼" : "▲"}</span>
-      {saving ? "Économie" : "Surcoût"} {formatChf(Math.abs(rp), { compact: true })}
-      {suffix}
+    <span className={cn("num inline-flex flex-wrap items-baseline gap-x-1 font-semibold", saving ? "text-down" : "text-up", className)}>
+      <span aria-hidden className="text-[0.75em]">
+        {saving ? "▼" : "▲"}
+      </span>
+      <span>{saving ? "Économie" : "Surcoût"}</span>
+      <span className="whitespace-nowrap">
+        {formatChf(Math.abs(rp), { compact: true })}
+        {suffix}
+      </span>
     </span>
   );
 }

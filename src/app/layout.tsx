@@ -14,7 +14,13 @@ export const metadata: Metadata = {
   applicationName: "LAMal Tracker",
   appleWebApp: { capable: true, title: "LAMal", statusBarStyle: "default" },
   formatDetection: { telephone: false },
-  icons: { icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192" }], apple: "/icons/apple-touch-icon.png" },
+  icons: {
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -55,7 +61,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   </span>
                 )}
               </Link>
-              <Link href="/reglages" aria-label="Réglages" className="inline-flex size-11 items-center justify-center rounded-full text-muted hover:bg-surface-2">
+              <Link
+                href="/reglages"
+                aria-label="Réglages"
+                className="inline-flex size-11 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+              >
                 <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <circle cx="12" cy="12" r="3" />
                   <path

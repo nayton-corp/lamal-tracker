@@ -34,7 +34,10 @@ export interface MatchResult {
 }
 
 function normalizeLabel(label: string | null): string {
-  return (label ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return (label ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 /**
@@ -90,12 +93,7 @@ export function findRenewal(
  * Rattache un contrat saisi à la main (caisse, modèle, franchise, prime facturée) à un tarif OFSP
  * de la même année. Le code tarifaire prime ; sinon on retient la prime la plus proche à ±5 %.
  */
-export function matchPolicyToTariff(
-  policy: PolicyDescriptor,
-  sameYearTariffs: readonly Tariff[],
-  ageClass: AgeClass,
-  ageSubgroup = "",
-): MatchResult {
+export function matchPolicyToTariff(policy: PolicyDescriptor, sameYearTariffs: readonly Tariff[], ageClass: AgeClass, ageSubgroup = ""): MatchResult {
   const pool = sameYearTariffs.filter(
     (t) =>
       t.insurerId === policy.insurerId &&
@@ -115,9 +113,7 @@ export function matchPolicyToTariff(
   }
   if (policy.monthlyPremiumRp !== null && sameModel.length > 0) {
     const premium = policy.monthlyPremiumRp;
-    const sorted = [...sameModel].sort(
-      (a, b) => Math.abs(a.monthlyPremiumRp - premium) - Math.abs(b.monthlyPremiumRp - premium),
-    );
+    const sorted = [...sameModel].sort((a, b) => Math.abs(a.monthlyPremiumRp - premium) - Math.abs(b.monthlyPremiumRp - premium));
     const closest = sorted[0]!;
     const within = Math.abs(closest.monthlyPremiumRp - premium) <= Math.round(premium * 0.05);
     if (within) {

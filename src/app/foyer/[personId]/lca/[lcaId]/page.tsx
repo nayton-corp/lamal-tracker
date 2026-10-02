@@ -15,7 +15,11 @@ export default async function LcaPage({ params }: PageProps<"/foyer/[personId]/l
   const premiums = lca ? ctx.household.lcaPremiums(lca.id) : [];
   return (
     <>
-      <PageHeader title={isNew ? "Nouvelle complémentaire" : lca!.productName} subtitle={`${person.firstName} · assurance complémentaire (LCA)`} back={`/foyer/${person.id}`} />
+      <PageHeader
+        title={isNew ? "Nouvelle complémentaire" : lca!.productName}
+        subtitle={`${person.firstName} · assurance complémentaire (LCA)`}
+        back={`/foyer/${person.id}`}
+      />
       <div className="mb-4">
         <Notice tone="lca" title="LCA ≠ LAMal">
           Une complémentaire est un contrat privé séparé. Changer de caisse LAMal ne la résilie pas, et il ne faut jamais la résilier avant

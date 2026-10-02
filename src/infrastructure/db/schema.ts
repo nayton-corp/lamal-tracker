@@ -152,14 +152,20 @@ export const personPrefs = sqliteTable("person_prefs", {
     .primaryKey()
     .references(() => person.id, { onDelete: "cascade" }),
   /** Vide = tous les modèles acceptés. */
-  allowedModels: json<string[]>("allowed_models").notNull().default(sql`'[]'`),
+  allowedModels: json<string[]>("allowed_models")
+    .notNull()
+    .default(sql`'[]'`),
   /** Vide = toutes les franchises légales. */
-  allowedFranchises: json<number[]>("allowed_franchises").notNull().default(sql`'[]'`),
+  allowedFranchises: json<number[]>("allowed_franchises")
+    .notNull()
+    .default(sql`'[]'`),
   expectedHealthCostsRp: integer("expected_health_costs_rp").notNull().default(50_000),
   /** Couverture accident incluse (non salarié ou moins de 8 h/semaine chez un employeur). */
   accidentIncluded: bool("accident_included").notNull().default(false),
   doctorName: text("doctor_name").notNull().default(""),
-  excludedInsurers: json<number[]>("excluded_insurers").notNull().default(sql`'[]'`),
+  excludedInsurers: json<number[]>("excluded_insurers")
+    .notNull()
+    .default(sql`'[]'`),
 });
 
 export const lamalPolicy = sqliteTable(
@@ -203,7 +209,9 @@ export const lcaPolicy = sqliteTable("lca_policy", {
   minTermEnd: text("min_term_end"),
   noticeMonths: integer("notice_months").notNull().default(3),
   bundledDiscount: bool("bundled_discount").notNull().default(false),
-  status: text("status", { enum: ["ACTIVE", "TERMINATED"] }).notNull().default("ACTIVE"),
+  status: text("status", { enum: ["ACTIVE", "TERMINATED"] })
+    .notNull()
+    .default("ACTIVE"),
   createdAt: createdAt(),
 });
 
@@ -273,7 +281,9 @@ export const reviewLine = sqliteTable(
     chosenMonthlyRp: integer("chosen_monthly_rp"),
     chosenAnnualCostRp: integer("chosen_annual_cost_rp"),
     decidedAt: text("decided_at"),
-    doctorCheck: text("doctor_check", { enum: ["YES", "NO", "UNKNOWN"] }).notNull().default("UNKNOWN"),
+    doctorCheck: text("doctor_check", { enum: ["YES", "NO", "UNKNOWN"] })
+      .notNull()
+      .default("UNKNOWN"),
     lcaAckAt: text("lca_ack_at"),
     affiliationRequestedAt: text("affiliation_requested_at"),
     affiliationConfirmedAt: text("affiliation_confirmed_at"),

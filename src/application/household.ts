@@ -35,11 +35,19 @@ const optionalIsoDate = z
 export const householdSchema = z.object({
   name: z.string().trim().min(1, "Nom du foyer requis."),
   street: z.string().trim().default(""),
-  npa: z.string().trim().regex(/^(\d{4})?$/, "NPA à 4 chiffres."),
+  npa: z
+    .string()
+    .trim()
+    .regex(/^(\d{4})?$/, "NPA à 4 chiffres."),
   locality: z.string().trim().default(""),
   canton: z.enum(CANTONS, { message: "Canton requis." }),
   region: z.coerce.number().int().min(0).max(3),
-  representativePersonId: z.coerce.number().int().positive().nullish().transform((v) => v ?? null),
+  representativePersonId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .nullish()
+    .transform((v) => v ?? null),
 });
 
 export function saveHousehold(ctx: AppContext, input: unknown): number {
@@ -97,9 +105,22 @@ export const policySchema = z.object({
   franchiseChf: z.coerce.number().int().min(0),
   accidentIncluded: z.coerce.boolean(),
   billedMonthlyRp: z.coerce.number().int().positive("Prime mensuelle requise."),
-  tariffCode: z.string().trim().nullish().transform((v) => v || null),
-  tariffLabel: z.string().trim().nullish().transform((v) => v || null),
-  premiumTariffId: z.coerce.number().int().positive().nullish().transform((v) => v ?? null),
+  tariffCode: z
+    .string()
+    .trim()
+    .nullish()
+    .transform((v) => v || null),
+  tariffLabel: z
+    .string()
+    .trim()
+    .nullish()
+    .transform((v) => v || null),
+  premiumTariffId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .nullish()
+    .transform((v) => v ?? null),
 });
 
 export interface PolicySaveResult {
@@ -201,7 +222,12 @@ export const lcaSchema = z.object({
   noticeMonths: z.coerce.number().int().min(0).max(24),
   bundledDiscount: z.coerce.boolean(),
   status: z.enum(["ACTIVE", "TERMINATED"]).default("ACTIVE"),
-  monthlyRp: z.coerce.number().int().min(0).nullish().transform((v) => v ?? null),
+  monthlyRp: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .nullish()
+    .transform((v) => v ?? null),
 });
 
 export function saveLcaPolicy(ctx: AppContext, id: number | null, input: unknown): number {

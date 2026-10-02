@@ -258,7 +258,14 @@ function toLcaPolicy(r: ReturnType<AppContext["household"]["lcaPolicies"]>[numbe
   };
 }
 
-export function criteriaFor(ctx: AppContext, personId: number, ageClass: AgeClass, accidentIncluded: boolean, co2AnnualRp: number | null, datasetId: number): ComparisonCriteria {
+export function criteriaFor(
+  ctx: AppContext,
+  personId: number,
+  ageClass: AgeClass,
+  accidentIncluded: boolean,
+  co2AnnualRp: number | null,
+  datasetId: number,
+): ComparisonCriteria {
   const prefs = ctx.household.prefs(personId);
   return {
     ageClass,
@@ -280,9 +287,9 @@ export function reviewOverview(ctx: AppContext, reviewId: number): ReviewOvervie
   const lca = ctx.household.lcaPolicies(h.id).map(toLcaPolicy);
   const lines = ctx.reviews.lines(reviewId).map((line): LineOverview => {
     const person = ctx.household.person(line.personId)!;
-    const policy = line.currentPolicyId ? ctx.household.policy(line.currentPolicyId) ?? null : null;
+    const policy = line.currentPolicyId ? (ctx.household.policy(line.currentPolicyId) ?? null) : null;
     const current = policy ? { ...policy, insurerName: ctx.tariffs.insurerName(policy.insurerId) } : null;
-    const renewal = line.renewalTariffId ? ctx.tariffs.tariffById(line.renewalTariffId) ?? null : null;
+    const renewal = line.renewalTariffId ? (ctx.tariffs.tariffById(line.renewalTariffId) ?? null) : null;
     const accident = policy?.accidentIncluded ?? ctx.household.prefs(person.id).accidentIncluded;
     const criteria = criteriaFor(ctx, person.id, line.targetAgeClass, accident, review.co2AnnualRp, review.datasetId);
     const tariffs = ctx.tariffs.tariffs({
@@ -293,9 +300,10 @@ export function reviewOverview(ctx: AppContext, reviewId: number): ReviewOvervie
       accidentIncluded: accident,
     });
     const renewalMonthly = line.renewalMonthlyRp;
-    const reference = renewalMonthly !== null && line.renewalFranchiseChf !== null
-      ? { monthlyPremiumRp: renewalMonthly, franchiseChf: line.renewalFranchiseChf }
-      : null;
+    const reference =
+      renewalMonthly !== null && line.renewalFranchiseChf !== null
+        ? { monthlyPremiumRp: renewalMonthly, franchiseChf: line.renewalFranchiseChf }
+        : null;
     const ranked = rankOffers(tariffs, params, criteria, reference);
     const best = ranked[0] ?? null;
     const sameFranchise = tariffs
@@ -303,9 +311,7 @@ export function reviewOverview(ctx: AppContext, reviewId: number): ReviewOvervie
       .map((t) => t.monthlyPremiumRp);
     const stats = marketStats(sameFranchise);
     const market =
-      stats && renewalMonthly !== null
-        ? { medianRp: stats.medianRp, minRp: stats.minRp, ...marketRank(sameFranchise, renewalMonthly) }
-        : null;
+      stats && renewalMonthly !== null ? { medianRp: stats.medianRp, minRp: stats.minRp, ...marketRank(sameFranchise, renewalMonthly) } : null;
     const activeLca = policy ? lcaWarningsForSwitch(lca, person.id, policy.insurerId).map((w) => w.policy) : [];
     const alerts: string[] = [];
     const ageChange = ageClassChange(person.birthDate, review.targetYear - 1, review.targetYear);
@@ -315,7 +321,7 @@ export function reviewOverview(ctx: AppContext, reviewId: number): ReviewOvervie
     }
     if (policy && line.renewalConfidence === "NONE") alerts.push("Tarif de renouvellement introuvable : choisis-le dans la liste.");
     if (line.renewalConfidence === "PROBABLE") alerts.push("Tarif de renouvellement probable : confirme-le.");
-    const chosen = line.chosenTariffId ? ctx.tariffs.tariffById(line.chosenTariffId) ?? null : null;
+    const chosen = line.chosenTariffId ? (ctx.tariffs.tariffById(line.chosenTariffId) ?? null) : null;
     if (line.chosenModelType && requiresDoctorCheck(line.chosenModelType as ModelType) && line.doctorCheck !== "YES") {
       alerts.push("Vérifie que ton médecin figure sur la liste du nouveau modèle.");
     }
@@ -424,7 +430,14 @@ export function franchiseSimulation(ctx: AppContext, lineId: number, tariffId: n
   const params = ctx.reference.parameters(review.targetYear);
   const h = requireHousehold(ctx);
   const variants = ctx.tariffs
-    .tariffs({ datasetId: t.datasetId, canton: h.canton, region: h.region, ageClass: line.targetAgeClass, accidentIncluded: t.accidentIncluded, insurerId: t.insurerId })
+    .tariffs({
+      datasetId: t.datasetId,
+      canton: h.canton,
+      region: h.region,
+      ageClass: line.targetAgeClass,
+      accidentIncluded: t.accidentIncluded,
+      insurerId: t.insurerId,
+    })
     .filter((v) => v.tariffCode === t.tariffCode && v.ageSubgroup === t.ageSubgroup)
     .sort((a, b) => a.franchiseChf - b.franchiseChf);
   const options = variants.map((v) => ({ franchiseChf: v.franchiseChf, monthlyPremiumRp: v.monthlyPremiumRp, tariffId: v.id }));
@@ -479,9 +492,7 @@ export function chooseOffer(ctx: AppContext, lineId: number, tariffId: number, e
   const policy = line.currentPolicyId ? ctx.household.policy(line.currentPolicyId) : undefined;
   const current = policy ? { franchiseChf: policy.franchiseChf, modelType: policy.modelType, tariffCode: policy.tariffCode } : null;
   const renewal = line.renewalTariffId ? ctx.tariffs.tariffById(line.renewalTariffId) : undefined;
-  const decision =
-    explicit ??
-    (renewal && renewal.id === t.id ? "KEEP" : inferDecision(policy?.insurerId ?? null, current, t));
+  const decision = explicit ?? (renewal && renewal.id === t.id ? "KEEP" : inferDecision(policy?.insurerId ?? null, current, t));
   const check =
     decision === "KEEP" && renewal && renewal.id !== t.id
       ? { ok: false, reasons: ["« Je reste » s'applique au tarif de renouvellement uniquement."] }
@@ -552,8 +563,10 @@ export function setAffiliation(
   if (line.decision !== "SWITCH") throw new ReviewError("L'affiliation ne concerne qu'un changement de caisse.");
   const now = ctx.clock.nowIso();
   ctx.reviews.updateLine(lineId, {
-    affiliationRequestedAt: input.requested === undefined ? line.affiliationRequestedAt : input.requested ? (line.affiliationRequestedAt ?? now) : null,
-    affiliationConfirmedAt: input.confirmed === undefined ? line.affiliationConfirmedAt : input.confirmed ? (line.affiliationConfirmedAt ?? now) : null,
+    affiliationRequestedAt:
+      input.requested === undefined ? line.affiliationRequestedAt : input.requested ? (line.affiliationRequestedAt ?? now) : null,
+    affiliationConfirmedAt:
+      input.confirmed === undefined ? line.affiliationConfirmedAt : input.confirmed ? (line.affiliationConfirmedAt ?? now) : null,
     newPolicyNumber: input.newPolicyNumber === undefined ? line.newPolicyNumber : input.newPolicyNumber || null,
   });
   syncStatus(ctx, review.id);

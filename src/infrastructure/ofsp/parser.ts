@@ -37,9 +37,7 @@ export function prepareTariffFile(fileName: string, bytes: Uint8Array): Prepared
   for (const c of [...candidates].sort((a, b) => b.bytes.length - a.bytes.length)) {
     const prepared = prepareCsv(c.name, c.bytes);
     if ("text" in prepared) return prepared;
-    failures.push(
-      `${prepared.name} : colonnes manquantes ${prepared.missing.join(", ")} (trouvées : ${prepared.headers.slice(0, 20).join(" | ")})`,
-    );
+    failures.push(`${prepared.name} : colonnes manquantes ${prepared.missing.join(", ")} (trouvées : ${prepared.headers.slice(0, 20).join(" | ")})`);
   }
   throw new TariffFileError(`Format de fichier non reconnu.\n${failures.join("\n")}`);
 }

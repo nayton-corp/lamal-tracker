@@ -81,8 +81,40 @@ export function buildOfspCsv(options: FixtureOptions): string {
     french = false,
   } = options;
   const header = french
-    ? ["Assureur", "Canton", "Région", "Classe d'âge", "Accident", "Année", "Tarif", "Type de tarif", "Sous-groupe d'âge", "Franchise", "Prime", "Désignation du tarif"]
-    : ["Versicherer", "Kanton", "Region", "Altersklasse", "Unfalleinschluss", "Geschäftsjahr", "Erhebungsjahr", "Tarif", "Tariftyp", "Altersuntergruppe", "Franchisestufe", "Franchise", "Prämie", "isBaseP", "isBaseF", "isBaseAG", "Tarifbezeichnung", "Sort"];
+    ? [
+        "Assureur",
+        "Canton",
+        "Région",
+        "Classe d'âge",
+        "Accident",
+        "Année",
+        "Tarif",
+        "Type de tarif",
+        "Sous-groupe d'âge",
+        "Franchise",
+        "Prime",
+        "Désignation du tarif",
+      ]
+    : [
+        "Versicherer",
+        "Kanton",
+        "Region",
+        "Altersklasse",
+        "Unfalleinschluss",
+        "Geschäftsjahr",
+        "Erhebungsjahr",
+        "Tarif",
+        "Tariftyp",
+        "Altersuntergruppe",
+        "Franchisestufe",
+        "Franchise",
+        "Prämie",
+        "isBaseP",
+        "isBaseF",
+        "isBaseAG",
+        "Tarifbezeichnung",
+        "Sort",
+      ];
   const lines = [header.join(delimiter)];
   const classes = [
     { code: "AKL-KIN", base: 120, kid: true, subgroups: ["K1", "K2"] },

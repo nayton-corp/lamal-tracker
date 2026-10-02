@@ -31,9 +31,7 @@ export class HouseholdRepository {
   }
 
   persons(householdId: number, includeInactive = false): PersonRow[] {
-    const cond = includeInactive
-      ? eq(person.householdId, householdId)
-      : and(eq(person.householdId, householdId), eq(person.active, true));
+    const cond = includeInactive ? eq(person.householdId, householdId) : and(eq(person.householdId, householdId), eq(person.active, true));
     return this.db.select().from(person).where(cond).orderBy(asc(person.birthDate)).all();
   }
 
@@ -162,13 +160,6 @@ export class HouseholdRepository {
   }
 
   private latestLcaPremium(lcaPolicyId: number): number | null {
-    return (
-      this.db
-        .select()
-        .from(lcaPremium)
-        .where(eq(lcaPremium.lcaPolicyId, lcaPolicyId))
-        .orderBy(desc(lcaPremium.year))
-        .get()?.monthlyRp ?? null
-    );
+    return this.db.select().from(lcaPremium).where(eq(lcaPremium.lcaPolicyId, lcaPolicyId)).orderBy(desc(lcaPremium.year)).get()?.monthlyRp ?? null;
   }
 }

@@ -47,7 +47,11 @@ export default async function PersonPage({ params }: PageProps<"/foyer/[personId
       <Card>
         <CardTitle
           action={
-            <ButtonLink href={`/foyer/${person.id}/contrat?annee=${hasCurrent ? policyYear - 1 : policyYear}`} variant="ghost" className="min-h-10 px-3 text-sm">
+            <ButtonLink
+              href={`/foyer/${person.id}/contrat?annee=${hasCurrent ? policyYear - 1 : policyYear}`}
+              variant="ghost"
+              className="min-h-10 px-3 text-sm"
+            >
               + Contrat {hasCurrent ? policyYear - 1 : policyYear}
             </ButtonLink>
           }
@@ -59,7 +63,11 @@ export default async function PersonPage({ params }: PageProps<"/foyer/[personId
         ) : (
           <ul>
             {policies.map((p) => (
-              <ListRow key={p.id} href={`/foyer/${person.id}/contrat?annee=${p.coverageYear}`} trailing={<Chf rp={p.billedMonthlyRp} className="text-sm font-semibold" />}>
+              <ListRow
+                key={p.id}
+                href={`/foyer/${person.id}/contrat?annee=${p.coverageYear}`}
+                trailing={<Chf rp={p.billedMonthlyRp} className="text-sm font-semibold" />}
+              >
                 <p className="font-semibold">
                   {p.coverageYear} · {ctx.tariffs.insurerName(p.insurerId)}
                 </p>
@@ -91,7 +99,9 @@ export default async function PersonPage({ params }: PageProps<"/foyer/[personId
           </span>
         </CardTitle>
         {lca.length === 0 ? (
-          <p className="text-sm text-muted">Aucune complémentaire. Elles sont indépendantes de la LAMal et ne sont jamais résiliées par l&apos;application.</p>
+          <p className="text-sm text-muted">
+            Aucune complémentaire. Elles sont indépendantes de la LAMal et ne sont jamais résiliées par l&apos;application.
+          </p>
         ) : (
           <ul>
             {lca.map((l) => (

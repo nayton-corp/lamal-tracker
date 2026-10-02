@@ -6,7 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "arch": "depcruise src --config .dependency-cruiser.cjs",
+    "format": "prettier --write .",
+    "db:generate": "drizzle-kit generate",
+    "ingest": "tsx scripts/ingest.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.11",

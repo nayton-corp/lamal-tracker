@@ -74,7 +74,10 @@ export default function HomePage() {
 
       {review?.status === "CLOSED" && (
         <Notice tone="down" title={`Rituel ${targetYear} terminé`}>
-          Les contrats {targetYear} sont enregistrés. <Link href={`/rituel/${targetYear}`} className="font-semibold underline">Revoir le rituel</Link>
+          Les contrats {targetYear} sont enregistrés.{" "}
+          <Link href={`/rituel/${targetYear}`} className="font-semibold underline">
+            Revoir le rituel
+          </Link>
         </Notice>
       )}
 
@@ -113,12 +116,23 @@ export default function HomePage() {
 
       {persons.length > 0 && (
         <Card>
-          <CardTitle action={<span className="num text-sm font-semibold"><Chf rp={totalMonthly} />/mois</span>}>
+          <CardTitle
+            action={
+              <span className="num text-sm font-semibold">
+                <Chf rp={totalMonthly} />
+                /mois
+              </span>
+            }
+          >
             Contrats {coverageYear}
           </CardTitle>
           <ul>
             {policies.map(({ person, policy }) => (
-              <ListRow key={person.id} href={`/foyer/${person.id}`} trailing={policy ? <Chf rp={policy.billedMonthlyRp} className="text-sm font-semibold" /> : <Badge>À saisir</Badge>}>
+              <ListRow
+                key={person.id}
+                href={`/foyer/${person.id}`}
+                trailing={policy ? <Chf rp={policy.billedMonthlyRp} className="text-sm font-semibold" /> : <Badge>À saisir</Badge>}
+              >
                 <p className="font-medium">{person.firstName}</p>
                 <p className="truncate text-sm text-muted">
                   {policy

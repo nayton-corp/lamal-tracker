@@ -1,12 +1,4 @@
-import {
-  addDays,
-  compareIsoDate,
-  daysBetween,
-  isoDate,
-  lastWorkingDayOnOrBefore,
-  subtractWorkingDays,
-  type IsoDate,
-} from "./calendar";
+import { addDays, compareIsoDate, daysBetween, isoDate, lastWorkingDayOnOrBefore, subtractWorkingDays, type IsoDate } from "./calendar";
 import type { ModelType } from "./insurance-model";
 
 /**
@@ -31,10 +23,7 @@ export interface TerminationDeadline {
 /** Marge par défaut entre l'envoi en recommandé et la réception (jours ouvrables). */
 export const DEFAULT_POSTAL_MARGIN_WORKING_DAYS = 4;
 
-export function ordinaryTerminationDeadline(
-  targetYear: number,
-  postalMarginWorkingDays = DEFAULT_POSTAL_MARGIN_WORKING_DAYS,
-): TerminationDeadline {
+export function ordinaryTerminationDeadline(targetYear: number, postalMarginWorkingDays = DEFAULT_POSTAL_MARGIN_WORKING_DAYS): TerminationDeadline {
   const legal = isoDate(targetYear - 1, 11, 30);
   const receiptByWorkingDay = lastWorkingDayOnOrBefore(legal);
   return {
@@ -53,12 +42,7 @@ export interface MidYearEligibility {
 }
 
 /** Résiliation au 30 juin : seulement en assurance ordinaire avec la franchise minimale. */
-export function midYearTermination(
-  year: number,
-  model: ModelType,
-  franchiseChf: number,
-  minimumFranchiseChf: number,
-): MidYearEligibility {
+export function midYearTermination(year: number, model: ModelType, franchiseChf: number, minimumFranchiseChf: number): MidYearEligibility {
   if (model !== "STANDARD") {
     return {
       eligible: false,
@@ -99,9 +83,15 @@ export function countdown(today: IsoDate, deadline: IsoDate): Countdown {
 /** Jours avant l'envoi recommandé auxquels un rappel est envoyé. */
 export const REMINDER_OFFSETS_DAYS = [30, 14, 7, 3, 1, 0] as const;
 
-/** Rappels dus aujourd'hui, à partir de la date d'envoi recommandée. */
+/**
+ * Palier de rappel atteint à cette date (J-30, J-14… J-0 compté depuis l'envoi recommandé).
+ * On retourne le palier le plus récent plutôt que le jour exact : un rappel n'est pas perdu si le
+ * serveur était éteint ce jour-là. La notification étant idempotente par palier, rien n'est envoyé deux fois.
+ */
 export function remindersDue(today: IsoDate, deadline: TerminationDeadline): number[] {
-  return REMINDER_OFFSETS_DAYS.filter((offset) => addDays(deadline.recommendedSendBy, -offset) === today);
+  if (compareIsoDate(today, deadline.receiptByWorkingDay) > 0) return [];
+  const reached = REMINDER_OFFSETS_DAYS.filter((offset) => compareIsoDate(today, addDays(deadline.recommendedSendBy, -offset)) >= 0);
+  return reached.length ? [Math.min(...reached)] : [];
 }
 
 export function isAfter(a: IsoDate, b: IsoDate): boolean {
