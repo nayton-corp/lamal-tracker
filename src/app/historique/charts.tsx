@@ -79,3 +79,32 @@ export function PersonChart({ persons, years }: { persons: HouseholdHistory["per
     </div>
   );
 }
+
+/** Prime du foyer comparée à ce qu'il aurait payé au prix médian et au prix le plus bas du marché. */
+export function MarketChart({ totals }: { totals: HouseholdHistory["totals"] }) {
+  const data = totals
+    .filter((t) => t.marketMedianMonthlyRp !== null)
+    .map((t) => ({
+      year: String(t.year),
+      "Votre foyer": t.billedMonthlyRp / 100,
+      "Médiane du marché": t.marketMedianMonthlyRp! / 100,
+      "Moins cher du marché": t.marketMinMonthlyRp! / 100,
+    }));
+  if (data.length === 0) return <p className="text-sm text-muted">Importez les primes des années passées (Réglages) pour situer votre foyer dans le marché.</p>;
+  return (
+    <div className="h-64" role="img" aria-label={`Prime mensuelle du foyer comparée au marché : ${data.map((d) => `${d.year} ${chf(d["Votre foyer"])} contre médiane ${chf(d["Médiane du marché"])}`).join(", ")}`}>
+      <ResponsiveContainer>
+        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+          <XAxis dataKey="year" stroke="var(--muted)" fontSize={12} />
+          <YAxis stroke="var(--muted)" fontSize={12} width={44} />
+          <Tooltip formatter={chf} contentStyle={tooltipStyle} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Line dataKey="Votre foyer" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 4 }} isAnimationActive={false} />
+          <Line dataKey="Médiane du marché" stroke="var(--muted)" strokeDasharray="6 4" dot={false} isAnimationActive={false} />
+          <Line dataKey="Moins cher du marché" stroke="var(--saving)" strokeDasharray="2 4" dot={false} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

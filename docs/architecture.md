@@ -13,6 +13,7 @@ src/
     review.ts        garde-fous des lettres et du contrôle LCA
     letter.ts        contenu des lettres et des demandes d'offre (indépendant du rendu)
     lca.ts           familles de garanties complémentaires
+    policy-import.ts lecture d'une police (texte du PDF) : personnes, franchise, modèle, montants, complémentaires
     insurer-profile.ts portrait d'une caisse : réserves en mois de primes, frais, évolution des primes
     ofsp/            lecture d'une ligne OFSP (formats ≤2026 et ≥2027), rapport d'import
   application/     Cas d'usage : foyer, revue annuelle, comparateur, lettres, historique

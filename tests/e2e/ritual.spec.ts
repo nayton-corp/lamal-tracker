@@ -92,8 +92,25 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await shot(page, "07-simulateur");
   await page.getByRole("button", { name: "Fermer" }).click();
 
-  const first = page.locator("ol > li details").first();
-  await first.locator("summary").click();
+  // Deux offres côte à côte
+  const offerCards = page.locator("ol > li > details");
+  await offerCards.nth(0).locator(":scope > summary").click();
+  await expect(offerCards.nth(0).getByText("Année chargée (maximum)")).toBeVisible();
+  await expect(offerCards.nth(0).getByText("Premier recours")).toBeVisible();
+  await offerCards.nth(0).getByRole("checkbox", { name: /^Comparer/ }).click();
+  await expect(offerCards.nth(0).getByRole("checkbox", { name: /^Comparer/ })).toBeChecked();
+  await expect(page).toHaveURL(/c=/);
+  await offerCards.nth(1).locator(":scope > summary").click();
+  await offerCards.nth(1).getByRole("checkbox", { name: /^Comparer/ }).click();
+  await expect(offerCards.nth(1).getByRole("checkbox", { name: /^Comparer/ })).toBeChecked();
+  await page.getByRole("link", { name: "Comparer 2 offres côte à côte" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Comparer des offres" })).toBeVisible();
+  await expect(page.getByRole("table")).toContainText("Premier recours");
+  await shot(page, "06b-comparaison");
+  await page.goBack();
+
+  const first = page.locator("ol > li > details").first();
+  if (!(await first.getAttribute("open"))) await first.locator(":scope > summary").click();
   await first.getByRole("button", { name: /^Choisir/ }).click();
   await expect(page).toHaveURL(/\/rituel\/2027/);
   await expect(page.getByText("Je change de caisse")).toBeVisible();
@@ -124,32 +141,34 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await helsana.getByRole("button", { name: "Revenir à l'adresse officielle" }).click();
   await expect(helsana.getByText("Adresse officielle rétablie.")).toBeVisible();
 
-  // Demande d'offre à la nouvelle caisse, avec la complémentaire en cours
+  // Démarches : demande à la nouvelle caisse, résiliation, confirmations
   await page.goto("/rituel/2027/lettres");
-  await page.getByRole("button", { name: "Préparer les demandes d'offre" }).click();
-  await expect(page.getByText("1 demande(s) prête(s).")).toBeVisible();
-  await expect(page.getByText("Avec offre de complémentaires")).toBeVisible();
+  await expect(page.getByText("Qui change quoi")).toBeVisible();
+  await page.getByRole("button", { name: "Préparer tous les courriers" }).click();
+  await expect(page.getByText("2 courrier(s) prêt(s).")).toBeVisible();
+  await expect(page.getByText(/avec offre de complémentaires/)).toBeVisible();
   const offerHref = await page.getByRole("link", { name: "Ouvrir le PDF" }).first().getAttribute("href");
   expect(offerHref).toMatch(/\/api\/offers\/\d+\/pdf/);
   const offerPdf = await page.request.get(offerHref!);
   expect((await offerPdf.body()).subarray(0, 4).toString()).toBe("%PDF");
-  await page.getByRole("button", { name: "Marquer comme envoyée" }).click();
-  await expect(page.getByRole("button", { name: "Réponse reçue" })).toBeVisible();
-
-  await page.goto("/rituel/2027/lettres");
-  await page.getByRole("button", { name: "Générer les lettres" }).click();
-  await expect(page.getByText("1 lettre(s) prête(s).")).toBeVisible();
-  await expect(page.getByText("Résiliation LAMal")).toBeVisible();
+  await page.getByRole("button", { name: "Marquer comme envoyée" }).first().click();
+  await expect(page.getByRole("button", { name: "Annuler l'envoi" })).toBeVisible();
 
   const href = await page.getByRole("link", { name: "Ouvrir le PDF" }).last().getAttribute("href");
+  expect(href).toMatch(/\/api\/letters\/\d+\/pdf/);
   const pdf = await page.request.get(href!);
   expect(pdf.headers()["content-type"]).toBe("application/pdf");
   expect((await pdf.body()).subarray(0, 4).toString()).toBe("%PDF");
 
   await page.getByLabel("N° de suivi").fill("98.00.123456.12345678");
   await page.getByRole("button", { name: "Marquer comme envoyée" }).click();
-  await expect(page.getByText(/Envoyée le 05.10.2026/)).toBeVisible();
-  await shot(page, "09-lettres");
+  await expect(page.getByText("Suivi : 98.00.123456.12345678")).toBeVisible();
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole("button", { name: "Reçue", exact: true }).first().click();
+    await expect(page.getByRole("button", { name: "Reçue", exact: true })).toHaveCount(1 - i);
+  }
+  await expect(page.getByRole("link", { name: /Clôturer le rituel/ })).toBeVisible();
+  await shot(page, "09-demarches");
 
   // Clôture et historique
   await page.goto("/rituel/2027");
@@ -158,6 +177,8 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByRole("link", { name: "Historique" }).click();
   await expect(page.getByRole("heading", { name: "Historique" })).toBeVisible();
   await expect(page.getByRole("table")).toContainText("2027");
+  await expect(page.getByText("Économisé grâce aux rituels")).toBeVisible();
+  await expect(page.getByText("Parcours de chaque personne")).toBeVisible();
   await shot(page, "10-historique");
   await page.goto("/");
   await shot(page, "11-accueil");
@@ -176,6 +197,10 @@ test.describe("sur ordinateur", () => {
       await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
       await shot(page, file);
     }
+    await page.goto("/foyer");
+    await page.getByRole("link", { name: "Importer une police" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Importer une police" })).toBeVisible();
+    await shot(page, "d04b-import-police");
     await page.goto("/foyer");
     await page.getByRole("link", { name: /Alex Test/ }).click();
     await shot(page, "d05-personne");
