@@ -93,7 +93,7 @@ describe("rituel annuel", () => {
     expect(teen!.line.renewalFranchiseChf).toBe(300);
     expect(teen!.transition).toMatch(/jeune adulte/);
     expect(view.deadlines.receiptDeadline).toBe("2026-11-30");
-    expect(adult!.best?.insurerName).toBe("Assura-Basis SA");
+    expect(adult!.best?.insurerName).toBe("Assura");
     expect(view.totals.potentialAnnualSavingsRp).toBeGreaterThan(0);
     expect(adult!.lcaWarnings[0]!.level).toBe("danger");
   });

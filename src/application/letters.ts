@@ -52,7 +52,7 @@ export function generateLetters(db: Db, reviewId: number, today: IsoDate): Gener
       const content: LetterContent = buildLetter({
         kind,
         senderLines: [`${sender.firstName} ${sender.lastName}`, h.street, `${h.postalCode} ${h.city}`].filter((l) => l.trim()),
-        insurerLines: [insurerLabel(ins), ...(ins.terminationAddress ?? "").split("\n").map((l) => l.trim()).filter(Boolean)],
+        insurerLines: [ins.name, ...(ins.terminationAddress ?? "").split("\n").map((l) => l.trim()).filter(Boolean)],
         place: h.city || "",
         date: today,
         effectiveEnd: deadlines.effectiveEnd,

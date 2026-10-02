@@ -70,9 +70,13 @@ export function ImportPanel({ initial }: { initial: ImportJob }) {
       </Button>
       {checkMsg?.error && <FormError message={`Téléchargement impossible : ${checkMsg.error}. Vous pouvez importer le fichier à la main ci-dessous.`} />}
 
-      <form action={upload} className="space-y-2 rounded-xl border border-dashed border-border p-3">
-        <label htmlFor="file" className="flex items-center gap-2 text-sm font-medium">
-          <FileUp aria-hidden className="size-4" /> Ou importer un fichier OFSP (.xlsx, .csv ou archive .zip)
+      <details className="rounded-xl border border-dashed border-border px-3">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
+          <FileUp aria-hidden className="size-4" /> Importer un fichier à la main
+        </summary>
+      <form action={upload} className="space-y-2 pb-3">
+        <label htmlFor="file" className="block text-sm text-muted">
+          Fichier OFSP « Prämien_CH » (.xlsx, .csv) ou archive annuelle (.zip).
         </label>
         <input id="file" name="file" type="file" accept=".xlsx,.csv,.zip" className="block w-full text-sm file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:font-medium file:text-primary" />
         <SubmitButton size="sm" variant="secondary" disabled={job.running} pendingLabel="Envoi…">
@@ -80,6 +84,7 @@ export function ImportPanel({ initial }: { initial: ImportJob }) {
         </SubmitButton>
         <FormError message={uploadState?.error} />
       </form>
+      </details>
 
       {job.phase !== "idle" && (
         <div aria-live="polite" className="space-y-2">

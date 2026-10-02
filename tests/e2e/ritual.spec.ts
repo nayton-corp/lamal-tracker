@@ -11,6 +11,7 @@ test.beforeAll(async () => {
 
 async function importFile(page: Page, file: string, year: number) {
   await page.goto("/donnees");
+  await page.getByText("Importer un fichier à la main").click();
   await page.setInputFiles("#file", path.join(FIXTURES_DIR, file));
   await page.getByRole("button", { name: "Importer le fichier", exact: true }).click();
   await expect(page.getByText(`Primes ${year} importées`)).toBeVisible({ timeout: 60_000 });
@@ -49,7 +50,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByRole("button", { name: "Ajouter un contrat LAMal" }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByLabel("Année").selectOption("2026");
-  await sheet.getByLabel("Caisse-maladie").selectOption({ label: "Helsana Versicherungen AG" });
+  await sheet.getByLabel("Caisse-maladie").selectOption({ label: "Helsana" });
   await expect(sheet.getByLabel("Produit")).toBeVisible();
   await sheet.getByLabel("Produit").selectOption("HEL-TEL26");
   await sheet.getByLabel("Franchise").selectOption("2500");
@@ -61,13 +62,13 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await shot(page, "03-contrat");
   await sheet.getByRole("button", { name: "Enregistrer le contrat" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
-  await expect(page.getByText("Helsana Versicherungen AG").first()).toBeVisible();
+  await expect(page.getByText("Helsana", { exact: true }).first()).toBeVisible();
 
   // Complémentaire LCA chez le même groupe
   await page.getByRole("button", { name: "Ajouter une complémentaire LCA" }).click();
   const lca = page.getByRole("dialog");
   await lca.getByLabel("Assureur LCA").fill("Helsana Assurances complémentaires SA");
-  await lca.getByLabel("Groupe de la caisse LAMal").selectOption({ label: "Helsana Versicherungen AG" });
+  await lca.getByLabel("Groupe de la caisse LAMal").selectOption({ label: "Helsana" });
   await lca.getByLabel("Produit").fill("Hospitalisation mi-privée");
   await lca.getByRole("button", { name: "Enregistrer la complémentaire" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
@@ -116,7 +117,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText(/Adresse de la caisse actuelle manquante/)).toBeVisible();
 
   await page.goto("/donnees/caisses");
-  const helsana = page.locator("details", { hasText: "Helsana Versicherungen AG" });
+  const helsana = page.locator("details").filter({ has: page.getByText("Helsana", { exact: true }) });
   await helsana.locator("summary").click();
   await helsana.getByLabel("Adresse de résiliation").fill("Case postale\n8081 Zurich");
   await helsana.getByRole("button", { name: "Enregistrer" }).click();

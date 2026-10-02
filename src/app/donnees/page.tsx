@@ -28,7 +28,16 @@ const STATUS = {
 
 export default function DataPage() {
   const datasets = db().select().from(tariffDataset).orderBy(desc(tariffDataset.id)).all();
-  const params = db().select().from(lamalParameters).orderBy(desc(lamalParameters.year)).all();
+  const currentYear = Number(today().slice(0, 4));
+  const activeYears = new Set(datasets.filter((d) => d.status === "ACTIVE").map((d) => d.year));
+  // CO2 : années utiles seulement (primes importées, année en cours et suivante).
+  const params = db()
+    .select()
+    .from(lamalParameters)
+    .orderBy(desc(lamalParameters.year))
+    .all()
+    .filter((p) => activeYears.has(p.year) || p.year >= currentYear);
+  const visibleDatasets = datasets.filter((d) => d.status !== "SUPERSEDED");
   const insurers = listInsurers(db());
   const missingAddresses = insurers.filter((i) => !i.terminationAddress).length;
   const lastCheck = getSetting<{ at: string; ok: boolean }>(db(), "ofsp.lastCheck");
@@ -45,24 +54,22 @@ export default function DataPage() {
             {lastCheck && ` Dernier contrôle : ${new Date(lastCheck.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich" })}${lastCheck.ok ? "" : " (échec)"}.`}
           </p>
         </Card>
-        {datasets.length > 0 && (
+        {visibleDatasets.length > 0 && (
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
-            {datasets.map((d) => {
+            {visibleDatasets.map((d) => {
               const report = d.report as ValidationReport | null;
               const s = STATUS[d.status];
               return (
-                <li key={d.id} className="space-y-1 p-4">
+                <li key={d.id} className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold tabular">{d.year ?? "—"}</span>
-                    <Badge tone={s.tone}>{s.label}</Badge>
-                    <span className="ml-auto text-sm text-muted">{d.importedAt.slice(0, 10)}</span>
+                    <span className="w-12 font-bold tabular">{d.year ?? "—"}</span>
+                    {d.status !== "ACTIVE" && <Badge tone={s.tone}>{s.label}</Badge>}
+                    {report && (
+                      <span className="text-sm text-muted">
+                        {report.stats.rowsKept.toLocaleString("fr-CH")} primes · {report.stats.insurers} caisses
+                      </span>
+                    )}
                   </div>
-                  {report && (
-                    <p className="text-sm text-muted">
-                      {report.stats.rowsKept.toLocaleString("fr-CH")} primes · {report.stats.insurers} caisses · {report.stats.cantons} cantons
-                      {report.stats.duplicates ? ` · ${report.stats.duplicates.toLocaleString("fr-CH")} doublons écartés` : ""}
-                    </p>
-                  )}
                   {report && [...report.errors, ...report.warnings].length > 0 && (
                     <details className="text-sm">
                       <summary className="min-h-11 cursor-pointer content-center text-primary">
@@ -75,9 +82,7 @@ export default function DataPage() {
                       </ul>
                     </details>
                   )}
-                  <p className="truncate text-xs text-muted" title={d.source}>
-                    {d.source}
-                  </p>
+
                 </li>
               );
             })}
@@ -87,9 +92,7 @@ export default function DataPage() {
 
       <Section title="Redistribution CO2 (CHF par personne et par an)">
         <Card className="space-y-3">
-          <p className="text-sm text-muted">
-            Déduite de la prime par la caisse. Le montant change chaque année (2026 : 61.80, 2027 : 57.00) : il ne modifie pas le classement, seulement la prime nette affichée.
-          </p>
+          <p className="text-sm text-muted">Déduite de la prime par la caisse ; change chaque année. Ne modifie pas le classement, seulement la prime nette.</p>
           {params.map((p) => (
             <Co2Form key={p.year} year={p.year} amountRp={p.co2AnnualRp} />
           ))}

@@ -65,7 +65,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                   <p className="min-w-0 flex-1 text-sm text-muted">
                     {displayTariffLabel(policy.tariffLabel, policy.modelType as ModelType)} · franchise {policy.franchiseChf}
                     {policy.accident ? " · avec accident" : ""}
-                    {policy.policyNumber ? ` · n° ${policy.policyNumber}` : ""}
+                    
                   </p>
                   <PolicySheet personId={p.id} insurers={insurers} years={years} label="edit" policy={{ ...policy, insurerId: policy.insurerId }} />
                   <form action={deletePolicyAction}>
@@ -82,10 +82,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       </Section>
 
       <Section title="Complémentaires LCA" action={<LcaSheet personId={p.id} insurers={insurers} lca={null} />}>
-        <div className="flex gap-3 rounded-xl border border-lca-strong/40 bg-lca-soft p-3 text-sm text-lca">
-          <ShieldAlert aria-hidden className="size-5 shrink-0" />
-          <p>Les assurances complémentaires sont des contrats privés séparés. Les enregistrer ici permet à l&apos;app de vous alerter avant toute résiliation LAMal.</p>
-        </div>
+        {lca.length === 0 && (
+          <p className="flex gap-2 px-1 text-sm text-muted">
+            <ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-lca-strong" />
+            Assurances complémentaires (hospitalisation, dentaire…) : les enregistrer permet d&apos;être alerté avant toute résiliation LAMal.
+          </p>
+        )}
         {lca.length > 0 && (
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
             {lca.map((c) => (
