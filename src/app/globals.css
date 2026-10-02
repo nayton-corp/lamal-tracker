@@ -1,26 +1,139 @@
 @import "tailwindcss";
 
+/*
+ * Design system LAMal Tracker.
+ * Couleurs à sens fixe : hausse = rouge, économie = vert, information = neutre,
+ * LCA = ambre (réservé exclusivement aux complémentaires dans toute l'application).
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --border: #dde1e8;
+  --text: #121620;
+  --muted: #5b6475;
+  --primary: #1f4fd8;
+  --primary-fg: #ffffff;
+  --primary-soft: #e6ecfd;
+  --up: #c4271b;
+  --up-soft: #fdecea;
+  --down: #067a46;
+  --down-soft: #e3f6ec;
+  --lca: #b45309;
+  --lca-strong: #f59e0b;
+  --lca-soft: #fff4dc;
+  --focus: #1f4fd8;
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.08);
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0d1117;
+    --surface: #161b23;
+    --surface-2: #1f2630;
+    --border: #2c3542;
+    --text: #e8ecf2;
+    --muted: #9aa5b5;
+    --primary: #7c9dff;
+    --primary-fg: #0d1117;
+    --primary-soft: #1c2747;
+    --up: #ff8a7f;
+    --up-soft: #3a1c1a;
+    --down: #5fd49b;
+    --down-soft: #142e22;
+    --lca: #fbbf5a;
+    --lca-strong: #f59e0b;
+    --lca-soft: #33260f;
+    --focus: #7c9dff;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-lca: var(--lca);
+  --color-lca-strong: var(--lca-strong);
+  --color-lca-soft: var(--lca-soft);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --shadow-card: var(--shadow);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  overscroll-behavior-y: none;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes skeleton {
+  0% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+
+.skeleton {
+  background: var(--surface-2);
+  border-radius: 0.5rem;
+  animation: skeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes fill-hold {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
