@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { openDb } from "@/infrastructure/db/client";
-import { extractPremiumFile, isXlsxZip } from "@/infrastructure/ofsp/archive";
+import ExcelJS from "exceljs";
+import { extractPremiumFile, isXlsxZip, premiumEntryScore } from "@/infrastructure/ofsp/archive";
 import { importPremiumFile } from "@/infrastructure/ofsp/importer";
 import { guessedArchiveUrl, pickArchiveResources } from "@/infrastructure/ofsp/source";
 import { FIXTURES_DIR } from "../fixtures/generate";
@@ -50,5 +51,46 @@ describe("archives OFSP", () => {
     const outcome = await importPremiumFile(db, zip, "archive");
     expect(outcome.status).toBe("IMPORTED");
     expect(outcome.status === "IMPORTED" && outcome.report.year).toBe(2026);
+  });
+
+  it("choisit Prämien_CH parmi le contenu réel d'une archive", () => {
+    const names = [
+      "Eingeschr.-Tät.gebiete.xlsx", "Einzugsgebiete.csv", "Erläuterungen zu den Prämiendaten.xlsx",
+      "Prämien_CH.csv", "Prämien_CH.xlsx", "Prämien_CHEU.xlsx", "Prämien_EU.csv", "Prämien_EU.xlsx",
+      "Tarife.xlsx", "Versichertenbestand_CH.xlsx",
+      "Pr\uFFFDmien_CH g\uFFFDltig_von_01.01.2024_bis_31.08.2024.xlsx", "Pr\uFFFDmien_CHEU g\uFFFDltig_von_01.01.2024_bis_31.08.2024.xlsx",
+    ];
+    const best = [...names].sort((a, b) => premiumEntryScore(b) - premiumEntryScore(a))[0];
+    expect(best).toBe("Prämien_CH.xlsx");
+    expect(premiumEntryScore("Prämien_CHEU.xlsx")).toBe(0);
+    expect(premiumEntryScore("Prämien_EU.csv")).toBe(0);
+    expect(premiumEntryScore("Versichertenbestand_CH.xlsx")).toBe(0);
+    expect(premiumEntryScore("Pr\uFFFDmien_CH.csv")).toBeGreaterThan(premiumEntryScore("Pr\uFFFDmien_CH g\uFFFDltig_von_01.09.2024_bis_31.12.2024.xlsx"));
+  });
+
+  it("saute une feuille d'information et des lignes de titre", async () => {
+    const src = new ExcelJS.Workbook();
+    await src.xlsx.readFile(path.join(FIXTURES_DIR, "primes-2026.xlsx"));
+    const data = src.worksheets[0]!;
+    const wb = new ExcelJS.Workbook();
+    const info = wb.addWorksheet("Info");
+    info.addRow(["BAG OFSP UFSP SFOPH"]);
+    info.addRow(["Prämienübersicht 2026"]);
+    const sheet = wb.addWorksheet("Daten");
+    sheet.addRow(["Prämien 2026"]);
+    sheet.addRow([]);
+    data.eachRow((row) => sheet.addRow((row.values as unknown[]).slice(1)));
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "xlsx-test-")), "p.xlsx");
+    await wb.xlsx.writeFile(file);
+    const outcome = await importPremiumFile(openDb(":memory:"), file, "titres");
+    expect(outcome.status).toBe("IMPORTED");
+  });
+
+  it("lit un CSV encodé en Latin-1", async () => {
+    const csv = fs.readFileSync(path.join(FIXTURES_DIR, "primes-2027.csv"), "utf8").replace(/^\uFEFF/, "");
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "csv-test-")), "p.csv");
+    fs.writeFileSync(file, Buffer.from(csv, "latin1"));
+    const outcome = await importPremiumFile(openDb(":memory:"), file, "latin1");
+    expect(outcome.status).toBe("IMPORTED");
   });
 });

@@ -98,16 +98,23 @@ export async function importPremiumFile(
   let index: Partial<Record<Column, number>> | null = null;
   let missing: string[] = [];
   let batch: PremiumRow[] = [];
+  let scanned = 0;
   let filtered = 0;
 
   try {
     for await (const cells of readRows(file)) {
       if (index === null) {
+        // L'en-tête est la première ligne qui contient toutes les colonnes requises
+        // (quelques lignes de titre peuvent la précéder).
         if (cells.every((c) => c === undefined || c === null || String(c).trim() === "")) continue;
         const header = mapHeader(cells);
-        index = header.index;
-        missing = header.missing;
-        if (missing.length) break;
+        if (header.missing.length === 0) {
+          index = header.index;
+          missing = [];
+        } else {
+          if (scanned === 0 || header.missing.length < missing.length) missing = header.missing;
+          if (++scanned >= 30) break;
+        }
         continue;
       }
       if (acc.rowsRead % 997 === 0) sample(cells);
@@ -137,7 +144,7 @@ export async function importPremiumFile(
     return fail(db, dataset.id, report);
   }
 
-  if (index === null) missing = ["(en-tête introuvable)"];
+  if (index === null && missing.length === 0) missing = ["(en-tête introuvable)"];
   const draft = acc.report(missing);
   const previous = draft.year === null ? undefined : previousMedians(db, draft.year - 1);
   const report = acc.report(missing, previous);
