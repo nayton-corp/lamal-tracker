@@ -44,5 +44,6 @@ export function classifyModel(tariffTypeRaw: string, label: string): ModelType {
   if (PHARMACY_RE.test(label)) return "PHARMACY";
   if (HMO_RE.test(label)) return "HMO";
   if (FAMILY_RE.test(label)) return "FAMILY_DOCTOR";
+  if (type === "" && /standard|grundversicherung|ordinaire|libre choix|\bbase\b|\bbasis\b/i.test(label)) return "STANDARD";
   return "OTHER";
 }
