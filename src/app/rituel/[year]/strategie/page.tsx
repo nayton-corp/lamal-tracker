@@ -28,7 +28,7 @@ export default async function StrategyPage({ params }: { params: Promise<{ year:
     <Page>
       <PageHeader
         title="Quelle stratégie ?"
-        subtitle={`Trois façons de chercher mieux pour ${year}. Le montant indique l'économie annuelle ${several ? "du foyer" : ""} par rapport à la reconduction, avec vos frais de santé habituels. Vous pourrez ajuster à l'étape suivante.`}
+        subtitle={`Économie annuelle estimée${several ? " du foyer" : ""} par rapport à la reconduction. Ajustable ensuite.`}
         back={`/rituel/${year}`}
       />
       <ul className="space-y-3">

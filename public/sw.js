@@ -1,5 +1,5 @@
 /* Service worker : application consultable hors ligne (dernières pages vues), notifications. */
-const VERSION = "v2";
+const VERSION = "v3";
 const PAGES = `pages-${VERSION}`;
 const STATIC = `static-${VERSION}`;
 const OFFLINE = "/offline.html";
@@ -23,7 +23,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return;
 
   // Fichiers versionnés : cache d'abord.
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/ocr/")) {
+  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")) {
     event.respondWith(
       caches.match(req).then((hit) => hit || fetch(req).then((res) => {
         const copy = res.clone();

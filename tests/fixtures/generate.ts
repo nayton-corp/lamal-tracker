@@ -40,7 +40,7 @@ function franchiseFactor(franchise: number, kid: boolean): number {
   return 1 - ((franchise - base) * 0.7 * 0.85) / 12 / (kid ? 140 : 480);
 }
 
-function rows(year: number): unknown[][] {
+export function rows(year: number): unknown[][] {
   const newFormat = year >= 2027;
   const growth = year >= 2027 ? 1 : 0.95;
   const out: unknown[][] = [];

@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getHousehold, listInsurers } from "@/application/household";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { getHousehold, getHouseholdMode } from "@/application/household";
 import { db, today } from "@/server/context";
 import { Card } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
@@ -10,13 +9,13 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Nouvelle personne" };
 
 export default function NewPersonPage() {
-  if (!getHousehold(db())) redirect("/foyer");
-  const insurers = listInsurers(db()).map((i) => ({ id: i.id, name: insurerLabel(i) }));
+  if (!getHousehold(db())) redirect("/bienvenue");
+  const solo = getHouseholdMode(db()) === "SOLO";
   return (
     <Page>
-      <PageHeader title="Nouvelle personne" back="/foyer" />
+      <PageHeader title={solo ? "Passer en foyer" : "Nouvelle personne"} subtitle={solo ? "Ajoutez une personne : l'app passe en mode foyer, avec un seul rituel pour tous." : undefined} back="/foyer" />
       <Card>
-        <PersonForm person={null} insurers={insurers} year={Number(today().slice(0, 4))} />
+        <PersonForm person={null} year={Number(today().slice(0, 4))} />
       </Card>
     </Page>
   );

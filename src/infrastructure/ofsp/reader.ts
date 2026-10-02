@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import fs from "node:fs";
+import path from "node:path";
 import readline from "node:readline";
 import { extractPremiumFile, isXlsxZip } from "./archive";
 
@@ -7,7 +8,15 @@ import { extractPremiumFile, isXlsxZip } from "./archive";
 export async function* readRows(file: string): AsyncGenerator<unknown[]> {
   if (!(await isZip(file))) yield* readCsv(file);
   else if (isXlsxZip(file)) yield* readXlsx(file);
-  else yield* readRows(extractPremiumFile(file)); // archive annuelle .zip
+  else {
+    // archive annuelle .zip : le fichier extrait vit dans un dossier temporaire à nettoyer
+    const extracted = extractPremiumFile(file);
+    try {
+      yield* readRows(extracted);
+    } finally {
+      fs.rmSync(path.dirname(extracted), { recursive: true, force: true });
+    }
+  }
 }
 
 async function isZip(file: string): Promise<boolean> {

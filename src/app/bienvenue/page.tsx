@@ -1,4 +1,4 @@
-import { ArrowRight, Check, House, UserRound, Users } from "lucide-react";
+import { ArrowRight, Check, Pencil, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { chooseModeAction } from "@/app/actions/journey";
 import { getHousehold, getHouseholdMode, listInsurers, listPersons, listPolicies } from "@/application/household";
@@ -9,22 +9,28 @@ import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
 import { Page } from "@/ui/page";
-import { AddressStep, ContractsStep, MemberAdder } from "./steps";
+import { ContractsStep, IdentityStep, MemberAdder } from "./steps";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bienvenue" };
 
-const STEPS = [
+type StepKey = "structure" | "vous" | "adresse" | "membres" | "contrats";
+
+const SOLO_STEPS: { key: StepKey; label: string }[] = [
+  { key: "structure", label: "Pour qui" },
+  { key: "vous", label: "Vous" },
+  { key: "contrats", label: "Contrat" },
+];
+const FAMILY_STEPS: { key: StepKey; label: string }[] = [
   { key: "structure", label: "Pour qui" },
   { key: "adresse", label: "Adresse" },
   { key: "membres", label: "Personnes" },
   { key: "contrats", label: "Contrats" },
-] as const;
-type StepKey = (typeof STEPS)[number]["key"];
+];
 
 /**
- * Accueil de la première connexion : pour qui (une personne ou un foyer), l'adresse (région de
- * primes), les personnes, puis leurs contrats actuels (police scannée ou saisie guidée).
+ * Accueil de la première connexion. Seul·e : pour qui → vous (identité + adresse, ou la police
+ * PDF) → votre contrat. Foyer : pour qui → adresse (ou la police PDF) → personnes → contrats.
  */
 export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ etape?: string }> }) {
   const asked = (await searchParams).etape as StepKey | undefined;
@@ -44,36 +50,34 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
     };
   });
 
+  const steps = solo ? SOLO_STEPS : FAMILY_STEPS;
   const done: Record<StepKey, boolean> = {
-    structure: mode !== null || Boolean(h),
+    structure: mode !== null,
+    vous: Boolean(h) && persons.length > 0,
     adresse: Boolean(h),
     membres: persons.length > 0,
     contrats: persons.length > 0 && withContracts.every((p) => p.contract),
   };
-  const firstOpen = STEPS.find((s) => !done[s.key])?.key ?? "contrats";
+  const firstOpen = steps.find((s) => !done[s.key])?.key ?? "contrats";
   // On ne saute pas une étape dont les prérequis manquent.
-  const order = STEPS.map((s) => s.key);
-  const step: StepKey = asked && order.indexOf(asked) <= order.indexOf(firstOpen) ? asked : firstOpen;
+  const order = steps.map((s) => s.key);
+  const step: StepKey = asked && order.includes(asked) && order.indexOf(asked) <= order.indexOf(firstOpen) ? asked : firstOpen;
   const insurers = listInsurers(db())
     .map((i) => ({ id: i.id, name: insurerLabel(i) }))
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  const years = Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i);
+  const first = persons[0];
 
   return (
     <Page>
       <header className="space-y-2 pt-6 lg:pt-0">
         <p className="text-sm font-semibold uppercase tracking-wide text-primary">Primes LAMal</p>
-        <h1 className="text-3xl font-bold leading-tight text-balance">
-          {step === "structure" ? "Payez le juste prix pour votre assurance de base." : TITLES[step](solo)}
-        </h1>
-        {step === "structure" && (
-          <p className="text-muted">
-            Quelques minutes une fois, puis chaque automne l&apos;app vous montre ce que vous paierez sans rien faire, trouve mieux et prépare les courriers.
-          </p>
-        )}
+        <h1 className="text-3xl font-bold leading-tight text-balance">{step === "structure" ? "Payez le juste prix pour votre assurance de base." : TITLES[step](solo)}</h1>
+        {step === "structure" && <p className="text-muted">Quelques minutes aujourd&apos;hui. Chaque automne, l&apos;app mesure la hausse, cherche mieux et prépare les courriers.</p>}
       </header>
 
-      <ol className="grid grid-cols-4 gap-2" aria-label="Étapes de l'accueil">
-        {STEPS.map((s, i) => (
+      <ol className={cn("grid gap-2", steps.length === 3 ? "grid-cols-3" : "grid-cols-4")} aria-label="Étapes de l'accueil">
+        {steps.map((s, i) => (
           <li key={s.key} className="space-y-1 text-center text-xs">
             <span className={cn("mx-auto flex size-7 items-center justify-center rounded-full font-semibold", done[s.key] ? "bg-saving text-white dark:text-black" : s.key === step ? "bg-primary text-on-primary" : "bg-surface-2 text-muted")} aria-hidden>
               {done[s.key] ? <Check className="size-4" /> : i + 1}
@@ -89,51 +93,43 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
       {step === "structure" && (
         <form action={chooseModeAction} className="space-y-3">
           <p className="font-medium">Pour qui gérez-vous l&apos;assurance maladie ?</p>
-          <ModeButton value="SOLO" icon={<UserRound aria-hidden className="size-6" />} title="Pour moi seul·e" text="Un profil individuel : votre contrat, vos échéances, vos économies." active={mode === "SOLO"} />
-          <ModeButton value="FAMILY" icon={<Users aria-hidden className="size-6" />} title="Pour mon foyer" text="Plusieurs personnes (conjoint·e, enfants) : une vue d'ensemble et un seul rituel pour tous." active={mode === "FAMILY"} />
+          <ModeButton value="SOLO" icon={<UserRound aria-hidden className="size-6" />} title="Pour moi seul·e" text="Votre contrat, vos échéances, vos économies." active={mode === "SOLO"} disabled={persons.length > 1} />
+          <ModeButton value="FAMILY" icon={<Users aria-hidden className="size-6" />} title="Pour mon foyer" text="Plusieurs personnes, un seul rituel pour tous." active={mode === "FAMILY"} />
+          {persons.length > 1 && <p className="text-sm text-muted">Plusieurs personnes sont déjà enregistrées : le mode foyer s&apos;applique.</p>}
         </form>
       )}
 
-      {step === "adresse" && (
-        <Card className="space-y-3">
-          <p className="flex items-start gap-2 text-sm text-muted">
-            <House aria-hidden className="mt-0.5 size-4 shrink-0" /> Le code postal donne la région de primes ; l&apos;adresse sert d&apos;expéditeur aux courriers.
-          </p>
-          <AddressStep household={h} solo={solo} />
-        </Card>
+      {(step === "vous" || step === "adresse") && (
+        <IdentityStep
+          household={h}
+          person={solo ? (first ? { firstName: first.firstName, lastName: first.lastName, birthDate: first.birthDate } : null) : undefined}
+          insurers={insurers}
+          years={years}
+          next={solo ? "/bienvenue?etape=contrats" : "/bienvenue?etape=membres"}
+        />
       )}
 
       {step === "membres" && (
         <div className="space-y-4">
-          {!solo && persons.length > 0 && (
+          {persons.length > 0 && (
             <ul className="space-y-2">
               {withContracts.map((p) => (
                 <li key={p.id} className="flex min-h-12 items-center gap-3 rounded-xl bg-surface p-3 shadow-card">
                   <UserRound aria-hidden className="size-5 text-primary" />
                   <span className="flex-1 font-medium">{p.name}</span>
                   <span className="text-sm text-muted">{formatDateShort(p.birth)}</span>
+                  <Link href={`/foyer/personne/${p.id}?retour=bienvenue`} className="flex size-10 items-center justify-center rounded-full text-primary hover:bg-primary-soft" aria-label={`Modifier ${p.name}`}>
+                    <Pencil aria-hidden className="size-4" />
+                  </Link>
                 </li>
               ))}
             </ul>
           )}
-          {solo && persons.length > 0 ? (
-            <Card className="space-y-3">
-              <p>
-                Profil créé : <strong>{withContracts[0]!.name}</strong>.
-              </p>
-              <Button asChild block>
-                <Link href="/bienvenue?etape=contrats">
-                  Continuer <ArrowRight aria-hidden className="size-4" />
-                </Link>
-              </Button>
-            </Card>
-          ) : (
-            <Card className="space-y-3">
-              <p className="font-medium">{solo ? "Vous" : persons.length ? "Une autre personne ?" : "Première personne"}</p>
-              <MemberAdder insurers={insurers} year={year} solo={solo} first={persons.length === 0} />
-            </Card>
-          )}
-          {!solo && persons.length > 0 && (
+          <Card className="space-y-3">
+            <p className="font-medium">{persons.length ? "Une autre personne ?" : "Première personne"}</p>
+            <MemberAdder year={year} first={persons.length === 0} />
+          </Card>
+          {persons.length > 0 && (
             <Button asChild block size="lg">
               <Link href="/bienvenue?etape=contrats">
                 C&apos;est tout le monde <ArrowRight aria-hidden className="size-5" />
@@ -145,15 +141,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
 
       {step === "contrats" && (
         <div className="space-y-4">
-          <p className="text-muted">
-            Le contrat {year} de {solo ? "votre assurance de base" : "chaque personne"} : c&apos;est la référence pour mesurer la hausse et les économies.
-          </p>
-          <ContractsStep
-            persons={withContracts.map(({ id, name, employed, contract }) => ({ id, name, employed, contract }))}
-            insurers={insurers}
-            year={year}
-            years={Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i)}
-          />
+          <p className="text-muted">{solo ? "Votre contrat" : "Le contrat de chaque personne"} pour {year} : la référence pour mesurer la hausse et les économies.</p>
+          <ContractsStep persons={withContracts.map(({ id, name, employed, contract }) => ({ id, name, employed, contract }))} insurers={insurers} year={year} years={years} solo={solo} />
           {done.contrats ? (
             <Button asChild block size="lg">
               <Link href="/">
@@ -174,18 +163,20 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
 }
 
 const TITLES: Record<Exclude<StepKey, "structure">, (solo: boolean) => string> = {
-  adresse: (solo) => (solo ? "Où habitez-vous ?" : "Où habite votre foyer ?"),
-  membres: (solo) => (solo ? "Qui êtes-vous ?" : "Qui est assuré dans votre foyer ?"),
+  vous: () => "Qui êtes-vous ?",
+  adresse: () => "Où habite votre foyer ?",
+  membres: () => "Qui est assuré dans votre foyer ?",
   contrats: (solo) => (solo ? "Votre contrat actuel" : "Les contrats actuels"),
 };
 
-function ModeButton({ value, icon, title, text, active }: { value: string; icon: React.ReactNode; title: string; text: string; active: boolean }) {
+function ModeButton({ value, icon, title, text, active, disabled }: { value: string; icon: React.ReactNode; title: string; text: string; active: boolean; disabled?: boolean }) {
   return (
     <button
       name="mode"
       value={value}
+      disabled={disabled}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-4 rounded-2xl border-2 bg-surface p-4 text-left shadow-card transition-colors hover:bg-surface-2",
+        "flex w-full cursor-pointer items-center gap-4 rounded-2xl border-2 bg-surface p-4 text-left shadow-card transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50",
         active ? "border-primary" : "border-border",
       )}
     >

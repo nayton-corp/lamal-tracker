@@ -285,6 +285,17 @@ export const signature = sqliteTable("signature", {
   createdAt: createdAt(),
 });
 
+/** Session ouverte par le mot de passe : un jeton aléatoire par appareil, révocable. */
+export const session = sqliteTable("session", {
+  id: text("id").primaryKey(),
+  /** Empreinte SHA-256 du jeton : le jeton lui-même ne vit que dans le cookie. */
+  tokenHash: text("token_hash").notNull().unique(),
+  device: text("device").notNull().default(""),
+  createdAt: createdAt(),
+  lastSeenAt: text("last_seen_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+  expiresAt: text("expires_at").notNull(),
+});
+
 export const pushSubscription = sqliteTable("push_subscription", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   endpoint: text("endpoint").notNull().unique(),

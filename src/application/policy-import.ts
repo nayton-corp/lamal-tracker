@@ -3,11 +3,12 @@ import { ageClassForYear } from "@/domain/age";
 import { guaranteeInfo, type LcaGuarantee } from "@/domain/lca";
 import { defaultSubgroup, type ModelType } from "@/domain/lamal";
 import { franchisesFor } from "@/domain/parameters";
-import { extractPolicy, type PolicyExtract } from "@/domain/policy-import";
+import { extractPolicy, findInsurer, readHolder, readYear, type HolderAddress, type HolderPerson, type PolicyExtract } from "@/domain/policy-import";
+import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/postal";
 import type { Db } from "@/infrastructure/db/client";
 import { activeDataset, insurerLabel, parametersFor } from "@/infrastructure/db/queries";
 import { insurer, premium, tariff } from "@/infrastructure/db/schema";
-import { getHousehold, listInsurers, listLca, listPersons, saveLca, savePolicy } from "./household";
+import { getHousehold, listInsurers, listLca, listPersons, saveHousehold, saveLca, savePerson, savePolicy, setHouseholdMode } from "./household";
 import { UserError } from "./review";
 
 export interface ImportedPerson {
@@ -87,26 +88,29 @@ export function analyzePolicyText(db: Db, text: string, currentYear: number): Po
   const persons = listPersons(db, h.id);
   if (persons.length === 0) throw new UserError("Ajoutez d'abord les membres du foyer : leur date de naissance permet de les retrouver dans la police.");
   const insurers = listInsurers(db);
+  const guessYear = readYear(text, 2010, currentYear + 1) ?? currentYear;
+  const franchises = [...new Set([...franchisesFor(parametersFor(db, guessYear), "ADULT"), ...franchisesFor(parametersFor(db, guessYear), "KID")])];
   const extract = extractPolicy(text, {
-    persons,
-    insurers: insurers.map((i) => ({ id: i.id, names: [i.name, i.displayName, i.legalNameFr, i.groupName].filter((n): n is string => Boolean(n)) })),
-    franchises: [...new Set([...franchisesFor(parametersFor(db, currentYear), "ADULT"), ...franchisesFor(parametersFor(db, currentYear), "KID")])],
+    persons: persons.filter((p) => Number(p.birthDate.slice(0, 4)) <= guessYear),
+    insurers: importInsurers(insurers),
+    franchises,
     minYear: 2010,
     maxYear: currentYear + 1,
   });
   const warnings: string[] = [];
-  if (extract.noText) throw new UserError("Ce PDF ne contient pas de texte lisible (document scanné). Choisissez plutôt « Photo » : le texte sera lu sur votre appareil.");
+  if (extract.noText) throw new UserError(NO_TEXT);
   const year = extract.year ?? currentYear;
   if (!extract.year) warnings.push(`Année de la police non trouvée : ${year} par défaut.`);
-  if (extract.persons.length === 0) warnings.push("Aucun membre du foyer reconnu : vérifiez les dates de naissance dans Foyer.");
+  if (extract.persons.length === 0) warnings.push("Aucune personne reconnue : vérifiez les dates de naissance.");
 
   let insurerId = extract.insurerId;
   const out: ImportedPerson[] = extract.persons.map((read) => {
     const p = persons.find((x) => x.id === read.personId)!;
     let list = candidates(db, year, p.birthDate, p.kidSubgroup, read.amountsRp, insurerId);
-    if (list.length === 0 && insurerId === null) list = candidates(db, year, p.birthDate, p.kidSubgroup, read.amountsRp, null);
+    // Caisse mal reconnue (ou absente) : la prime exacte suffit à retrouver le tarif.
+    if (list.length === 0) list = candidates(db, year, p.birthDate, p.kidSubgroup, read.amountsRp, null);
     const c = bestCandidate(list, read);
-    if (c && insurerId === null) insurerId = c.insurerId;
+    if (c && (insurerId === null || list.every((x) => x.insurerId === c.insurerId))) insurerId = c.insurerId;
     return {
       personId: p.id,
       name: `${p.firstName} ${p.lastName}`,
@@ -116,7 +120,8 @@ export function analyzePolicyText(db: Db, text: string, currentYear: number): Po
       modelType: c?.modelType ?? read.modelType ?? "STANDARD",
       franchiseChf: c?.franchise ?? read.franchiseChf,
       accident: c?.accident ?? read.accident ?? !p.employedAccidentCover,
-      billedMonthlyRp: c?.monthly ?? null,
+      // Tarif non retrouvé : on propose quand même la prime lue (un montant plausible, hors franchise), à vérifier.
+      billedMonthlyRp: c?.monthly ?? read.amountsRp.find((a) => a >= 3000 && a <= 200000 && !franchises.includes(a / 100)) ?? null,
       policyNumber: read.policyNumber,
       lca: read.lca.map((l) => ({ ...l, label: guaranteeInfo(l.guarantee)!.label })),
     };
@@ -125,6 +130,62 @@ export function analyzePolicyText(db: Db, text: string, currentYear: number): Po
   const ins = insurerId ? db.select().from(insurer).where(eq(insurer.id, insurerId)).get() : null;
   if (!ins) warnings.push("Caisse non reconnue : choisissez-la.");
   return { insurerId: ins?.id ?? null, insurerName: ins ? insurerLabel(ins) : null, year, persons: out, warnings };
+}
+
+const NO_TEXT = "Ce PDF ne contient pas de texte lisible (document scanné) : passez par la saisie guidée.";
+
+function importInsurers(insurers: ReturnType<typeof listInsurers>) {
+  return insurers.map((i) => ({ id: i.id, names: [i.name, i.displayName, i.legalNameFr].filter((n): n is string => Boolean(n)), group: i.groupName }));
+}
+
+export interface PolicyHolderPreview {
+  insurerName: string | null;
+  year: number;
+  persons: HolderPerson[];
+  address: HolderAddress | null;
+  /** Communes possibles pour le code postal lu (la région de primes en dépend). */
+  communes: CommuneOption[];
+}
+
+/**
+ * Accueil depuis la police, avant tout foyer : qui est assuré et où, lus dans le PDF. Rien n'est
+ * enregistré ; l'utilisateur vérifie, puis `createHouseholdFromPolicy` crée le foyer.
+ */
+export function previewPolicyHolder(db: Db, text: string, currentYear: number): PolicyHolderPreview {
+  if (text.replace(/\s/g, "").length < 40) throw new UserError(NO_TEXT);
+  const insurers = listInsurers(db);
+  const holder = readHolder(text, { maxYear: currentYear, insurerNames: insurers.flatMap((i) => [i.name, i.displayName, i.legalNameFr, i.groupName]).filter((n): n is string => Boolean(n)) });
+  const insurerId = findInsurer(text.slice(0, 1500), importInsurers(insurers)) ?? findInsurer(text, importInsurers(insurers));
+  const ins = insurers.find((i) => i.id === insurerId) ?? null;
+  return {
+    insurerName: ins ? insurerLabel(ins) : null,
+    year: readYear(text, 2010, currentYear + 1) ?? currentYear,
+    persons: holder.persons,
+    address: holder.address,
+    communes: holder.address ? lookupPostalCode(holder.address.postalCode) : [],
+  };
+}
+
+export interface HouseholdFromPolicy {
+  address: { street: string; postalCode: string; city: string; bfsNumber: number | null; canton: string; region: number; commune: string };
+  persons: { firstName: string; lastName: string; birthDate: string }[];
+}
+
+/** Crée le foyer et ses personnes d'un coup (accueil depuis la police) ; solo si une seule personne. */
+export function createHouseholdFromPolicy(db: Db, input: HouseholdFromPolicy): number {
+  if (getHousehold(db)) throw new UserError("Un foyer existe déjà.");
+  if (input.persons.length === 0) throw new UserError("Indiquez au moins une personne.");
+  const first = input.persons[0]!;
+  return db.transaction(() => {
+    const id = saveHousehold(db, {
+      name: input.persons.length === 1 ? `${first.firstName} ${first.lastName}` : `Famille ${first.lastName}`,
+      ...input.address,
+      canton: input.address.canton as never,
+    });
+    for (const p of input.persons) savePerson(db, id, { ...p, healthCostsRp: 50000 });
+    setHouseholdMode(db, input.persons.length === 1 ? "SOLO" : "FAMILY");
+    return id;
+  });
 }
 
 export interface ConfirmedImport {

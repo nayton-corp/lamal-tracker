@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { ageClassForYear, ageTransition } from "@/domain/age";
 import { costOf, filterOffers, rankOffers, type Offer, type RankedOffer } from "@/domain/comparison";
 import { daysBetween, type IsoDate } from "@/domain/dates";
@@ -98,13 +98,14 @@ export function openReview(db: Db, targetYear: number): { reviewId: number; skip
   }
   if (row.status === "CLOSED") return { reviewId: row.id, skipped: [] };
 
+  const persons = listPersons(db, h.id);
+  if (!persons.some((p) => currentPolicy(db, p.id, targetYear - 1))) {
+    db.delete(review).where(and(eq(review.id, row.id), eq(review.status, "OPEN"))).run();
+    throw new UserError(`Indiquez d'abord ${persons.length > 1 ? "les contrats" : "votre contrat"} ${targetYear - 1}.`);
+  }
   const skipped: string[] = [];
-  for (const p of listPersons(db, h.id)) {
-    const policy = db
-      .select()
-      .from(lamalPolicy)
-      .where(and(eq(lamalPolicy.personId, p.id), eq(lamalPolicy.coverageYear, targetYear - 1)))
-      .get();
+  for (const p of persons) {
+    const policy = currentPolicy(db, p.id, targetYear - 1);
     if (!policy) {
       skipped.push(`${p.firstName} ${p.lastName} (pas de contrat ${targetYear - 1})`);
       continue;
@@ -133,11 +134,22 @@ export function ensureReview(db: Db, targetYear: number): number | null {
   if (existing) return existing.id;
   const h = getHousehold(db);
   if (!h || !activeDataset(db, targetYear)) return null;
-  const persons = listPersons(db, h.id);
-  const anyContract = persons.some((p) =>
-    db.select({ id: lamalPolicy.id }).from(lamalPolicy).where(and(eq(lamalPolicy.personId, p.id), eq(lamalPolicy.coverageYear, targetYear - 1))).get(),
-  );
+  const anyContract = listPersons(db, h.id).some((p) => currentPolicy(db, p.id, targetYear - 1));
   return anyContract ? openReview(db, targetYear).reviewId : null;
+}
+
+function currentPolicy(db: Db, personId: number, year: number) {
+  return db.select().from(lamalPolicy).where(and(eq(lamalPolicy.personId, personId), eq(lamalPolicy.coverageYear, year))).get() ?? null;
+}
+
+/**
+ * Rituel en cours : le dernier non clôturé, quelle que soit l'année (en décembre et janvier,
+ * l'année civile a changé mais les confirmations et la clôture restent à faire).
+ */
+export function activeReview(db: Db) {
+  const h = getHousehold(db);
+  if (!h) return null;
+  return db.select().from(review).where(and(eq(review.householdId, h.id), eq(review.status, "OPEN"))).orderBy(desc(review.targetYear)).get() ?? null;
 }
 
 export function getReviewByYear(db: Db, targetYear: number) {
@@ -402,12 +414,12 @@ export function getReviewView(db: Db, reviewId: number, today: IsoDate): ReviewV
     letters,
     // Une étape n'est faite que si les précédentes le sont (pas de coche « vide » avant les décisions).
     steps: sequential([
-      { key: "renewal", label: "Recon­duction", done: persons.length > 0 && persons.every((x) => x.line.renewalMonthlyRp !== null) },
+      { key: "renewal", label: "Hausse", done: persons.length > 0 && persons.every((x) => x.line.renewalMonthlyRp !== null) },
       { key: "strategy", label: "Stratégie", done: r.strategy !== null || allDecided },
       { key: "needs", label: "Besoins", done: r.needsConfirmedAt !== null || allDecided },
       { key: "decide", label: "Choix", done: allDecided },
       { key: "procedures", label: "Démarches", done: switching.every((x) => x.line.lcaAckAt && x.line.affiliationRequestedAt) && needsLetter.every((x) => sentLineIds.has(x.line.id)) },
-      { key: "confirmed", label: "Confir­mations", done: switching.every((x) => x.line.affiliationConfirmedAt) && letters.filter((l) => l.kind === "TERMINATION").every((l) => l.acknowledgedAt) },
+      { key: "confirmed", label: "Confirmé", done: switching.every((x) => x.line.affiliationConfirmedAt) && letters.filter((l) => l.kind === "TERMINATION").every((l) => l.acknowledgedAt) },
     ]),
   };
 }
@@ -437,6 +449,17 @@ export function closeReview(db: Db, reviewId: number, nowIso: string) {
   db.transaction((tx) => {
     for (const l of lines) {
       const prev = tx.select().from(lamalPolicy).where(eq(lamalPolicy.id, l.currentPolicyId)).get()!;
+      const existing = tx
+        .select()
+        .from(lamalPolicy)
+        .where(and(eq(lamalPolicy.personId, l.personId), eq(lamalPolicy.coverageYear, r.targetYear)))
+        .get();
+      if (existing?.source === "MANUAL") {
+        const p = tx.select({ firstName: person.firstName }).from(person).where(eq(person.id, l.personId)).get();
+        throw new UserError(
+          `Un contrat ${r.targetYear} saisi à la main existe déjà pour ${p?.firstName ?? "cette personne"} : supprimez-le ou gardez-le.`,
+        );
+      }
       const values = {
         personId: l.personId,
         coverageYear: r.targetYear,
@@ -450,7 +473,9 @@ export function closeReview(db: Db, reviewId: number, nowIso: string) {
         billedMonthlyRp: l.chosenMonthlyRp!,
         source: "REVIEW" as const,
       };
-      tx.insert(lamalPolicy).values(values).onConflictDoNothing().run();
+      // Un contrat importé (OFSP) ou issu d'une clôture précédente est remplacé par la décision.
+      if (existing) tx.update(lamalPolicy).set(values).where(eq(lamalPolicy.id, existing.id)).run();
+      else tx.insert(lamalPolicy).values(values).run();
     }
     tx.update(review).set({ status: "CLOSED", closedAt: nowIso }).where(eq(review.id, reviewId)).run();
   });

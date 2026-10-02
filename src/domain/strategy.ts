@@ -24,7 +24,7 @@ export const STRATEGY_INFO: Record<Strategy, StrategyInfo> = {
   ECONOMY: {
     label: "Économie max",
     tagline: "Le coût annuel le plus bas, quitte à changer de franchise ou de modèle.",
-    how: "Toutes les caisses, tous les modèles et toutes les franchises sont comparés sur le coût réel de l'année : prime, franchise et quote-part selon vos frais de santé.",
+    how: "Toutes les offres, classées par coût réel (prime, franchise et quote-part selon vos frais de santé).",
     tradeoff: "Un modèle avec premier recours (télémédecine, médecin de famille) et parfois une franchise plus élevée.",
   },
   KEEP: {
@@ -36,8 +36,8 @@ export const STRATEGY_INFO: Record<Strategy, StrategyInfo> = {
   BALANCE: {
     label: "Équilibre",
     tagline: "Un bon prix chez une caisse solide.",
-    how: "Le coût réel compte, mais chaque bon indicateur de la caisse (réserves élevées, frais de gestion bas, hausses passées modérées) vaut 3 % de bonus dans le classement, et chaque mauvais 3 % de malus.",
-    tradeoff: "Vous payez parfois un peu plus que l'offre la moins chère. Les indicateurs viennent des données officielles de l'OFSP : il n'existe pas de mesure publique de la qualité du service client.",
+    how: "Le coût réel, avec un bonus pour les caisses solides (réserves, frais de gestion, hausses passées) et un malus pour les autres.",
+    tradeoff: "Parfois un peu plus cher que l'offre la moins chère.",
   },
 };
 

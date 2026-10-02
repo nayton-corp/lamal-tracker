@@ -21,6 +21,10 @@ import { ActionForm } from "@/ui/action-form";
 import { SubmitButton } from "@/ui/submit";
 import { ImportPanel } from "./import-panel";
 import { PushPanel } from "./push-panel";
+import { SecurityPanel } from "./security-panel";
+import { listSessions } from "@/application/auth";
+import { currentSession } from "@/server/auth";
+import { nowIso } from "@/server/context";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Réglages" };
@@ -32,7 +36,8 @@ const STATUS = {
   IMPORTING: { label: "en cours", tone: "info" },
 } as const;
 
-export default function DataPage() {
+export default async function DataPage() {
+  const me = await currentSession();
   const datasets = db().select().from(tariffDataset).orderBy(desc(tariffDataset.id)).all();
   const currentYear = Number(today().slice(0, 4));
   const activeYears = new Set(datasets.filter((d) => d.status === "ACTIVE").map((d) => d.year));
@@ -59,7 +64,7 @@ export default function DataPage() {
           <Section title="Primes officielles">
             <Card className="space-y-4">
               <p className="text-sm text-muted">
-                L&apos;Office fédéral de la santé publique (OFSP) publie fin septembre les primes de toutes les caisses. L&apos;app les télécharge seule, chaque jour de mi-septembre à fin novembre.
+                Publiées fin septembre par l&apos;OFSP, téléchargées automatiquement.
                 {lastCheck && ` Dernière vérification : ${new Date(lastCheck.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" })}${lastCheck.ok ? "" : " (échec, nouvel essai prévu)"}.`}
               </p>
               {visibleDatasets.length > 0 && (
@@ -144,6 +149,12 @@ export default function DataPage() {
           <Section title="Rappels">
             <Card>
               <PushPanel devices={subscriptionCount(db())} />
+            </Card>
+          </Section>
+
+          <Section title="Sécurité">
+            <Card>
+              <SecurityPanel sessions={listSessions(db(), nowIso())} currentId={me?.id ?? ""} />
             </Card>
           </Section>
 

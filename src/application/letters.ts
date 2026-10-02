@@ -1,4 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
+import { isMinorOn } from "@/domain/age";
 import type { IsoDate } from "@/domain/dates";
 import { reviewDeadlines } from "@/domain/deadlines";
 import { buildLetter, type LetterContent } from "@/domain/letter";
@@ -42,6 +43,8 @@ export function generateLetters(db: Db, reviewId: number, today: IsoDate): Gener
 
   const created: number[] = [];
   db.transaction((tx) => {
+    // Toute lettre non envoyée est obsolète (une décision a pu être annulée) : on repart de zéro.
+    tx.delete(letter).where(and(eq(letter.reviewId, reviewId), isNull(letter.sentAt))).run();
     for (const [key, members] of groups) {
       const [insurerIdStr, kind] = key.split("|") as [string, "TERMINATION" | "CHANGE"];
       const insurerId = Number(insurerIdStr);
@@ -61,7 +64,7 @@ export function generateLetters(db: Db, reviewId: number, today: IsoDate): Gener
           fullName: `${m.person.firstName} ${m.person.lastName}`,
           birthDate: m.person.birthDate,
           policyNumber: m.policy.policyNumber,
-          isMinor: view.review.targetYear - 1 - Number(m.person.birthDate.slice(0, 4)) < 18,
+          isMinor: isMinorOn(m.person.birthDate, today),
         })),
         changes: members.map(
           (m) =>
@@ -69,9 +72,6 @@ export function generateLetters(db: Db, reviewId: number, today: IsoDate): Gener
         ),
         newInsurerName: newInsurers.length === 1 ? newInsurers[0] : null,
       });
-      tx.delete(letter)
-        .where(and(eq(letter.reviewId, reviewId), eq(letter.insurerId, insurerId), eq(letter.kind, kind), isNull(letter.sentAt)))
-        .run();
       const row = tx
         .insert(letter)
         .values({ reviewId, insurerId, kind, lineIds: members.map((m) => m.line.id), content })

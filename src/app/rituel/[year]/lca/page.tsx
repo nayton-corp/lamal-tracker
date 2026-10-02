@@ -24,22 +24,23 @@ export const metadata = { title: "Contrôle LCA" };
 export default async function LcaPage({ params }: { params: Promise<{ year: string }> }) {
   const year = Number((await params).year);
   const r = getReviewByYear(db(), year);
-  if (!r) redirect(`/rituel/${year}`);
+  if (!r || r.status === "CLOSED") redirect(`/rituel/${year}`);
   const view = getReviewView(db(), r.id, today());
   const switching = view.persons.filter((p) => p.line.decision === "SWITCH");
+  // Rien à vérifier tant que personne ne change de caisse.
+  if (switching.length === 0) redirect(`/rituel/${year}`);
   const allDone = switching.every((p) => p.line.lcaAckAt);
 
   return (
     <Page>
-      <PageHeader title="Complémentaires LCA" back={`/rituel/${year}`} />
+      <PageHeader title="Vérifier les complémentaires" back={`/rituel/${year}`} />
       <div className="rounded-2xl border-2 border-lca-strong bg-lca-soft p-4 text-lca">
         <div className="flex gap-3">
           <ShieldAlert aria-hidden className="size-8 shrink-0" />
           <div className="space-y-1">
             <p className="text-lg font-bold">Ne résiliez jamais votre LCA par erreur</p>
             <p className="text-sm text-foreground/90">
-              La LAMal (assurance de base) et la LCA (complémentaires) sont deux contrats distincts. Changer de caisse de base ne touche pas aux complémentaires, mais une
-              complémentaire résiliée peut être impossible à retrouver : la nouvelle caisse peut refuser selon votre état de santé.
+              La LAMal et vos complémentaires sont deux contrats. Changer de LAMal ne les résilie pas. Une complémentaire résiliée peut être refusée ensuite.
             </p>
           </div>
         </div>

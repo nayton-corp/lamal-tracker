@@ -2,23 +2,29 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { setHouseholdMode, type HouseholdMode } from "@/application/household";
-import { analyzePolicyText, type PolicyImport } from "@/application/policy-import";
+import { getHousehold, getHouseholdMode, listPersons, setHouseholdMode, type HouseholdMode } from "@/application/household";
 import { UserError } from "@/application/review";
 import { deleteSignature, saveSignature } from "@/application/signatures";
 import { saveNeeds, setStrategy } from "@/application/strategy";
 import { STRATEGIES, type Strategy } from "@/domain/strategy";
 import { chfField, toActionError, type ActionState } from "@/server/action";
-import { db, nowIso, today } from "@/server/context";
+import { db, nowIso } from "@/server/context";
+import { requireSession } from "@/server/auth";
 
 /** Étape 1 de l'accueil : une personne seule ou un foyer. */
 export async function chooseModeAction(form: FormData) {
-  setHouseholdMode(db(), String(form.get("mode")) as HouseholdMode);
+  await requireSession();
+  let mode = String(form.get("mode")) as HouseholdMode;
+  // Plusieurs personnes enregistrées : « pour moi seul·e » n'a plus de sens.
+  const h = getHousehold(db());
+  if (mode === "SOLO" && h && listPersons(db(), h.id).length > 1) mode = "FAMILY";
+  if (getHouseholdMode(db()) !== mode) setHouseholdMode(db(), mode);
   revalidatePath("/", "layout");
-  redirect("/bienvenue?etape=adresse");
+  redirect(mode === "SOLO" ? "/bienvenue?etape=vous" : "/bienvenue?etape=adresse");
 }
 
 export async function chooseStrategyAction(_: ActionState, form: FormData): Promise<ActionState> {
+  await requireSession();
   const year = Number(form.get("year"));
   try {
     const strategy = String(form.get("strategy")) as Strategy;
@@ -33,6 +39,7 @@ export async function chooseStrategyAction(_: ActionState, form: FormData): Prom
 
 /** Questionnaire des besoins : un groupe de champs par personne, suffixés par l'id de ligne. */
 export async function saveNeedsAction(_: ActionState, form: FormData): Promise<ActionState> {
+  await requireSession();
   const year = Number(form.get("year"));
   try {
     const lineIds = form.getAll("lineId").map(Number);
@@ -61,6 +68,7 @@ export async function saveNeedsAction(_: ActionState, form: FormData): Promise<A
 }
 
 export async function saveSignatureAction(personId: number, dataUrl: string): Promise<ActionState> {
+  await requireSession();
   try {
     saveSignature(db(), personId, dataUrl);
   } catch (e) {
@@ -71,17 +79,7 @@ export async function saveSignatureAction(personId: number, dataUrl: string): Pr
 }
 
 export async function deleteSignatureAction(form: FormData) {
+  await requireSession();
   deleteSignature(db(), Number(form.get("personId")));
   revalidatePath("/", "layout");
-}
-
-/** Texte lu sur une photo (OCR fait sur l'appareil) : même analyse qu'un PDF. */
-export async function analyzePolicyTextAction(text: string): Promise<{ result?: PolicyImport; error?: string }> {
-  if (typeof text !== "string" || text.length > 200_000) return { error: "Texte illisible." };
-  try {
-    return { result: analyzePolicyText(db(), text, Number(today().slice(0, 4))) };
-  } catch (e) {
-    if (e instanceof UserError) return { error: e.message.replace(/ce PDF ne contient pas de texte lisible.*/i, "Le texte de la photo est illisible : reprenez-la bien à plat, nette et éclairée.") };
-    return { error: "Lecture impossible." };
-  }
 }

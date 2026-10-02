@@ -1,32 +1,58 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import "server-only";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { closeSession, describeDevice, hasPassword, openSession, touchSession, type SessionInfo } from "@/application/auth";
+import { UserError } from "@/application/review";
+import { db, nowIso } from "./context";
 
-/**
- * Mot de passe optionnel (APP_PASSWORD). Sans lui, l'app est ouverte à qui atteint le Pi :
- * acceptable sur un réseau domestique ou derrière Tailscale, pas exposée sur Internet.
+/*
+ * Le mot de passe est obligatoire : sans mot de passe défini, tout mène à sa création ; sans
+ * session valable, à la connexion. Le proxy fait ce contrôle pour chaque requête, et les
+ * actions serveur le refont elles-mêmes (`requireSession`), pour ne pas dépendre du seul proxy.
  */
 export const SESSION_COOKIE = "lamal_session";
 
-export function passwordEnabled(): boolean {
-  return Boolean(process.env.APP_PASSWORD);
+export async function currentSession(): Promise<SessionInfo | null> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return touchSession(db(), token, nowIso());
 }
 
-function secret(): string {
-  return process.env.SESSION_SECRET || `lamal:${process.env.APP_PASSWORD ?? ""}`;
+/** À appeler au début de chaque action serveur : refuse tout appel sans session ouverte. */
+export async function requireSession(): Promise<SessionInfo> {
+  const s = await currentSession();
+  if (!s) throw new UserError("Session expirée : reconnectez-vous.");
+  return s;
 }
 
-export function sessionToken(): string {
-  return createHmac("sha256", secret()).update("session-v1").digest("base64url");
+export async function startSession() {
+  const h = await headers();
+  const { token, expiresAt } = openSession(db(), describeDevice(h.get("user-agent")), nowIso());
+  (await cookies()).set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: (h.get("x-forwarded-proto") ?? "http") === "https",
+    path: "/",
+    expires: new Date(expiresAt),
+  });
 }
 
-export function validSession(token: string | undefined): boolean {
-  if (!token) return false;
-  const a = Buffer.from(token);
-  const b = Buffer.from(sessionToken());
-  return a.length === b.length && timingSafeEqual(a, b);
+export async function endSession() {
+  const jar = await cookies();
+  closeSession(db(), jar.get(SESSION_COOKIE)?.value);
+  jar.delete(SESSION_COOKIE);
 }
 
-export function checkPassword(candidate: string): boolean {
-  const expected = Buffer.from(process.env.APP_PASSWORD ?? "");
-  const given = Buffer.from(candidate);
-  return expected.length > 0 && given.length === expected.length && timingSafeEqual(given, expected);
+/** Pages de connexion : inutiles quand on est déjà connecté. */
+export async function redirectIfSignedIn(to = "/") {
+  if (await currentSession()) redirect(to);
+}
+
+export function passwordDefined(): boolean {
+  return hasPassword(db());
+}
+
+/** Chemin de retour après connexion : seulement un chemin local. */
+export function safeNext(next: unknown): string {
+  const s = String(next ?? "");
+  return /^\/(?![/\\])/.test(s) ? s : "/";
 }

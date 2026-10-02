@@ -1,5 +1,6 @@
 import "server-only";
 import { ZodError } from "zod";
+import { parseChf } from "@/domain/money";
 import { UserError } from "@/application/review";
 
 export type ActionState = { ok?: string; error?: string; fieldErrors?: Record<string, string> } | null;
@@ -15,10 +16,31 @@ export function toActionError(error: unknown): ActionState {
   throw error;
 }
 
+/** Violation de clé étrangère SQLite (suppression d'une ligne encore référencée). */
+export function isForeignKeyError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as { code?: unknown }).code;
+  return code === "SQLITE_CONSTRAINT_FOREIGNKEY" || /FOREIGN KEY constraint failed/i.test(error.message);
+}
+
+/**
+ * Pour les actions de formulaire sans état (`<form action>`) : une erreur de référence connue
+ * devient une UserError lisible ; tout le reste remonte tel quel.
+ */
+export function rethrowForeignKey(error: unknown, message: string): never {
+  if (isForeignKeyError(error)) throw new UserError(message);
+  throw error;
+}
+
+/** Montant CHF saisi dans un formulaire → centimes entiers (via domain/money). Vide → null. */
 export function chfField(value: FormDataEntryValue | null): number | null {
   if (value === null || String(value).trim() === "") return null;
-  const cleaned = String(value).replace(/[\s'’]/g, "").replace(",", ".");
-  const n = Number(cleaned);
-  if (!Number.isFinite(n)) throw new UserError(`Montant invalide : « ${value} »`);
-  return Math.round(n * 100);
+  let rp: number;
+  try {
+    rp = parseChf(String(value));
+  } catch {
+    throw new UserError(`Montant invalide : « ${value} »`);
+  }
+  if (rp < 0) throw new UserError(`Montant invalide : « ${value} » (un montant ne peut pas être négatif)`);
+  return rp;
 }

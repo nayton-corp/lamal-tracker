@@ -145,16 +145,36 @@ export async function remoteSignature(url: string): Promise<RemoteSignature> {
   };
 }
 
+/** Plafond d'un téléchargement (le fichier OFSP complet fait quelques dizaines de Mo). */
+export const MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
+
+/** Interrompt un flux dès que le nombre d'octets dépasse `max`. */
+async function* capped(body: AsyncIterable<Uint8Array>, max: number, url: string): AsyncGenerator<Uint8Array> {
+  let total = 0;
+  for await (const chunk of body) {
+    total += chunk.byteLength;
+    if (total > max) throw new Error(`Téléchargement ${url} : plus de ${Math.round(max / 1048576)} Mo, interrompu.`);
+    yield chunk;
+  }
+}
+
 export async function download(url: string, dir: string): Promise<string> {
   fs.mkdirSync(dir, { recursive: true });
   const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(10 * 60_000) });
   if (!res.ok || !res.body) throw new Error(`Téléchargement ${url} : HTTP ${res.status}`);
+  const announced = Number(res.headers.get("content-length"));
+  if (announced > MAX_DOWNLOAD_BYTES) throw new Error(`Téléchargement ${url} : ${Math.round(announced / 1048576)} Mo annoncés, refusé.`);
   const type = res.headers.get("content-type") ?? "";
   const disposition = res.headers.get("content-disposition") ?? "";
   const ext = /\.zip/i.test(disposition) || /zip/i.test(type) || /\.zip/i.test(decodedPath(url)) ? ".zip" : /csv/i.test(type) ? ".csv" : ".xlsx";
   const target = path.join(dir, `primes-${new Date().toISOString().replace(/[:.]/g, "-")}${ext}`);
   const partial = `${target}.part`;
-  await pipeline(Readable.fromWeb(res.body as never), fs.createWriteStream(partial));
+  try {
+    await pipeline(Readable.from(capped(res.body as AsyncIterable<Uint8Array>, MAX_DOWNLOAD_BYTES, url)), fs.createWriteStream(partial));
+  } catch (error) {
+    fs.rmSync(partial, { force: true });
+    throw error;
+  }
   fs.renameSync(partial, target);
   return target;
 }

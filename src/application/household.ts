@@ -2,7 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { MODEL_TYPES, CANTONS } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
-import { household, insurer, lamalPolicy, lcaPolicy, person } from "@/infrastructure/db/schema";
+import { household, insurer, lamalPolicy, lcaPolicy, notificationLog, person, settings } from "@/infrastructure/db/schema";
 import { LCA_GUARANTEE_KEYS, guaranteeInfo } from "@/domain/lca";
 import { getSetting, setSetting } from "@/infrastructure/db/settings";
 
@@ -19,7 +19,7 @@ export function setHouseholdMode(db: Db, mode: HouseholdMode) {
 }
 
 export const householdInput = z.object({
-  name: z.string().trim().min(1, "Nom requis"),
+  name: z.string().trim().default(""),
   street: z.string().trim().default(""),
   postalCode: z.string().trim().default(""),
   city: z.string().trim().default(""),
@@ -70,6 +70,18 @@ export const lcaInput = z.object({
   noticeMonths: z.coerce.number().int().min(0).max(24).optional().nullable(),
   active: z.coerce.boolean().default(true),
 });
+
+/**
+ * Remise à zéro : efface tout ce que l'utilisateur a saisi (foyer, personnes, contrats, rituels,
+ * lettres, signatures, choix solo/foyer). Les primes officielles et les caisses restent.
+ */
+export function resetHousehold(db: Db) {
+  db.transaction(() => {
+    db.delete(household).run();
+    db.delete(settings).where(eq(settings.key, "household.mode")).run();
+    db.delete(notificationLog).run();
+  });
+}
 
 export function getHousehold(db: Db) {
   return db.select().from(household).orderBy(asc(household.id)).get() ?? null;

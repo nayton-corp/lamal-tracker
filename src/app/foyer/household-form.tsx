@@ -2,7 +2,7 @@
 
 import { CheckCircle2, MapPin } from "lucide-react";
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { postalCodeAction, saveHouseholdAction } from "@/app/actions/household";
+import { postalCodeAction, saveHouseholdAction, saveSoloAction } from "@/app/actions/household";
 import { CANTONS } from "@/domain/lamal";
 import type { CommuneOption } from "@/infrastructure/regions/postal";
 import { Field, FormError, Input, Select } from "@/ui/form";
@@ -20,13 +20,29 @@ interface Household {
   region: number;
 }
 
+export interface SoloIdentity {
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+}
+
 /**
- * Foyer : le code postal suffit pour trouver la commune, le canton et la région de primes
- * (table officielle BAG + swisstopo). Si le code postal couvre plusieurs communes, on propose
- * la plus probable et on laisse choisir. Saisie manuelle possible en dernier recours.
+ * Adresse du foyer : le code postal suffit pour trouver la commune, le canton et la région de
+ * primes (table officielle BAG + swisstopo). Si le code postal couvre plusieurs communes, on
+ * propose la plus probable et on laisse choisir. Saisie manuelle possible en dernier recours.
+ * Avec `person` (mode « pour moi seul »), l'identité est saisie dans le même formulaire.
  */
-export function HouseholdForm({ household, onDone, solo, submitLabel }: { household: Household | null; onDone?: () => void; solo?: boolean; submitLabel?: string }) {
-  const [state, action] = useActionState(saveHouseholdAction, null);
+export function HouseholdForm({ household, onDone, person, next, submitLabel }: {
+  household: Household | null;
+  onDone?: () => void;
+  /** Identité de la personne seule (null = pas encore créée) ; absent en mode foyer. */
+  person?: SoloIdentity | null;
+  /** Page où aller après l'enregistrement (accueil guidé). */
+  next?: string;
+  submitLabel?: string;
+}) {
+  const solo = person !== undefined;
+  const [state, action] = useActionState(solo ? saveSoloAction : saveHouseholdAction, null);
   const [npa, setNpa] = useState(household?.postalCode ?? "");
   const [city, setCity] = useState(household?.city ?? "");
   const [options, setOptions] = useState<CommuneOption[] | null>(null);
@@ -64,10 +80,25 @@ export function HouseholdForm({ household, onDone, solo, submitLabel }: { househ
       <input type="hidden" name="commune" value={useManual ? "" : chosen?.commune ?? household?.commune ?? ""} />
       <input type="hidden" name="bfsNumber" value={useManual ? "" : chosen?.bfs ?? ""} />
 
-      <Field label={solo ? "Votre nom" : "Nom du foyer"} htmlFor="name" error={fe.name} hint={solo ? "Expéditeur des courriers." : undefined}>
-        <Input id="name" name="name" required defaultValue={household?.name ?? ""} placeholder={solo ? "Alex Dupont" : "Famille Dupont"} autoComplete={solo ? "name" : "family-name"} />
-      </Field>
-      <Field label="Rue et numéro" htmlFor="street" hint="Expéditeur des lettres de résiliation.">
+      {next && <input type="hidden" name="next" value={next} />}
+      {solo ? (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Prénom" htmlFor="firstName" error={fe.firstName}>
+              <Input id="firstName" name="firstName" required defaultValue={person?.firstName} autoComplete="given-name" />
+            </Field>
+            <Field label="Nom" htmlFor="lastName" error={fe.lastName}>
+              <Input id="lastName" name="lastName" required defaultValue={person?.lastName} autoComplete="family-name" />
+            </Field>
+          </div>
+          <Field label="Date de naissance" htmlFor="birthDate" error={fe.birthDate}>
+            <Input id="birthDate" name="birthDate" type="date" required defaultValue={person?.birthDate} />
+          </Field>
+        </>
+      ) : (
+        <input type="hidden" name="name" value={household?.name ?? ""} />
+      )}
+      <Field label="Rue et numéro" htmlFor="street">
         <Input id="street" name="street" defaultValue={household?.street ?? ""} autoComplete="street-address" />
       </Field>
       <div className="grid grid-cols-[7rem_1fr] gap-3">

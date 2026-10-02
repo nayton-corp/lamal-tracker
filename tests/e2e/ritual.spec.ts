@@ -1,13 +1,26 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 import { generateFixtures, FIXTURES_DIR } from "../fixtures/generate";
+import { writePolicyPdf } from "../fixtures/policy-pdf";
 
 const shots = path.join("test-results", "screens");
 const shot = (page: Page, name: string) => page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: true });
 
 test.beforeAll(async () => {
   await generateFixtures();
+  await writePolicyPdf(FIXTURES_DIR);
 });
+
+const PASSWORD = "e2e-mot-de-passe";
+
+/** Les contextes de navigation suivants n'ont pas le cookie : connexion avec le mot de passe créé au premier test. */
+async function login(page: Page) {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Entrer" }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+}
 
 async function importFile(page: Page, file: string, year: number) {
   await page.goto("/donnees");
@@ -18,15 +31,25 @@ async function importFile(page: Page, file: string, year: number) {
 }
 
 test("rituel annuel complet sur mobile", async ({ page }) => {
-  // Première connexion : accueil guidé (pour qui, adresse, personnes, contrats).
+  // Premier démarrage : l'app exige un mot de passe avant tout.
   await page.goto("/");
+  await expect(page).toHaveURL(/\/login\/creer/);
+  await shot(page, "00-mot-de-passe");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByLabel("Confirmer").fill(PASSWORD);
+  await page.getByRole("button", { name: "Créer le mot de passe" }).click();
+
+  // Première connexion : accueil guidé (pour qui, adresse, personnes, contrats).
   await expect(page).toHaveURL(/\/bienvenue/);
+  // Pas de barre de navigation pendant l'accueil.
+  await expect(page.getByRole("navigation", { name: "Navigation principale" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /juste prix/ })).toBeVisible();
   await shot(page, "01-accueil-vide");
   await page.getByRole("button", { name: /Pour mon foyer/ }).click();
 
   await expect(page.getByRole("heading", { name: "Où habite votre foyer ?" })).toBeVisible();
-  await page.getByLabel("Nom du foyer").fill("Famille Test");
+  await expect(page.getByRole("radio", { name: /Depuis ma police/ })).toBeVisible();
+  await page.getByRole("radio", { name: /Saisir à la main/ }).click();
   await page.getByLabel("Rue et numéro").fill("Rue du Lac 1");
   await page.getByLabel("NPA").fill("1003");
   // Le code postal suffit : commune, canton et région sont trouvés.
@@ -51,7 +74,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByRole("link", { name: /C'est tout le monde/ }).click();
 
   await expect(page.getByRole("heading", { name: "Les contrats actuels" })).toBeVisible();
-  await expect(page.getByRole("radio", { name: /Scanner ma police/ })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Importer la police/ })).toBeVisible();
   await shot(page, "03a-contrats");
   await page.getByRole("radio", { name: /Saisie guidée/ }).click();
   await page.getByLabel("Rechercher une caisse").fill("hels");
@@ -71,7 +94,12 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
 
   // Fenêtre du rituel ouverte : l'accueil montre la reconduction tacite.
   await expect(page.getByText("Sans rien faire, en 2027 vous paierez")).toBeVisible();
-  await expect(page.getByText(/par reconduction tacite/)).toBeVisible();
+  await expect(page.getByText(/Sans courrier, votre caisse renouvelle/)).toBeVisible();
+  // Rituel ouvert : l'accueil ne prétend pas qu'il n'y a rien à faire.
+  await expect(page.getByText("Rien à faire pour le moment.")).toHaveCount(0);
+  // Les démarches n'ont pas de sens avant une décision : retour au rituel.
+  await page.goto("/rituel/2027/lettres");
+  await expect(page).toHaveURL(/\/rituel\/2027$/);
   await shot(page, "03b-accueil-reconduction");
 
   await page.goto("/foyer");
@@ -135,22 +163,19 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   const first = page.locator("ol > li > details").first();
   if (!(await first.getAttribute("open"))) await first.locator(":scope > summary").click();
   await first.getByRole("button", { name: /^Choisir/ }).click();
-  await expect(page).toHaveURL(/\/rituel\/2027/);
-  await expect(page.getByText("Je change de caisse")).toBeVisible();
-
-  // Garde-fou LCA : case + appui long
-  await page.getByRole("link", { name: "Contrôle des complémentaires LCA" }).click();
+  // Dernier choix fait : l'app enchaîne sur l'étape suivante, le garde-fou LCA (case à cocher puis confirmation).
+  await expect(page).toHaveURL(/\/rituel\/2027\/lca/);
   await expect(page.getByText("Ne résiliez jamais votre LCA par erreur")).toBeVisible();
   await expect(page.getByText("Hospitalisation demi-privée", { exact: true }).first()).toBeVisible();
   await shot(page, "08-lca");
-  const hold = page.getByRole("button", { name: "Maintenir pour confirmer" });
-  await expect(hold).toBeDisabled();
-  await page.getByText(/Je comprends que seule l'assurance de base/).click();
-  await hold.hover();
-  await page.mouse.down();
-  await page.waitForTimeout(1800);
-  await page.mouse.up();
+  const confirm = page.getByRole("button", { name: "J'ai compris, confirmer" });
+  await expect(confirm).toBeDisabled();
+  await page.getByText(/Seule l'assurance de base de Alex/).click();
+  await confirm.click();
   await expect(page.getByText(/Confirmé le/)).toBeVisible();
+  await page.goto("/rituel/2027");
+  await expect(page.getByText("Je change de caisse")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Faire les démarches" })).toBeVisible();
 
   // Adresse officielle de l'annuaire OFSP, modifiable au besoin
   await page.goto("/donnees/caisses");
@@ -225,7 +250,7 @@ test.describe("sur ordinateur", () => {
 
   test("navigation latérale, toutes les pages, et retour en arrière sur un rituel clôturé", async ({ page }) => {
     const nav = page.getByRole("navigation", { name: "Navigation principale" });
-    await page.goto("/");
+    await login(page);
     await expect(nav.getByRole("link", { name: /Foyer/ })).toBeVisible();
     await shot(page, "d01-accueil");
     for (const [name, file] of [["Foyer", "d02-foyer"], ["Historique", "d03-historique"], ["Réglages", "d04-reglages"]] as const) {
@@ -269,4 +294,44 @@ test.describe("sur ordinateur", () => {
     await expect(page.getByText("Je change de caisse")).toHaveCount(0);
     await shot(page, "d10-rituel-supprime");
   });
+});
+
+test("recommencer à zéro, puis une personne seule depuis sa police PDF", async ({ page }) => {
+  await login(page);
+
+  // Réglages › Sécurité : tout effacer, mot de passe à l'appui.
+  await page.goto("/donnees");
+  await page.getByRole("button", { name: "Recommencer à zéro" }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByLabel("Votre mot de passe, pour confirmer").fill(PASSWORD);
+  await sheet.getByRole("button", { name: "Tout effacer" }).click();
+  await expect(page).toHaveURL(/\/bienvenue/);
+  await expect(page.getByRole("heading", { name: /juste prix/ })).toBeVisible();
+
+  // Seul·e : identité, adresse et contrat lus dans la police, en une étape.
+  await page.getByRole("button", { name: /Pour moi seul/ }).click();
+  await expect(page.getByRole("heading", { name: "Qui êtes-vous ?" })).toBeVisible();
+  await page.getByRole("radio", { name: /Depuis ma police/ }).click();
+  await page.getByLabel("PDF de la police").setInputFiles(path.join(FIXTURES_DIR, "police-2026.pdf"));
+  await expect(page.getByText("Police Helsana 2026")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByLabel("Prénom 1")).toHaveValue("Alex");
+  await expect(page.getByLabel("Nom 1", { exact: true })).toHaveValue("Test");
+  await expect(page.getByLabel("Date de naissance 1")).toHaveValue("1988-04-12");
+  await expect(page.getByLabel("Rue et numéro")).toHaveValue("Rue du Lac 1");
+  await expect(page.getByText(/Lausanne \(VD\) · région de primes 1/)).toBeVisible();
+  await shot(page, "s01-police-lue");
+  await page.getByRole("button", { name: "Confirmer et lire les contrats" }).click();
+  await expect(page.getByText(/Profil créé/)).toBeVisible();
+  // Le numéro d'assuré (AVS) et le tarif sont repris de la police.
+  await expect(page.getByLabel("N° d'assuré")).toHaveValue("756.1234.5678.97");
+  await expect(page.getByText("Tarif officiel retrouvé")).toBeVisible();
+  await shot(page, "s02-contrat-lu");
+  await page.getByRole("button", { name: "Enregistrer le contrat 2026" }).click();
+  await expect(page).toHaveURL(/etape=contrats/);
+  await expect(page.getByText(/Helsana · franchise 2500/)).toBeVisible();
+  await page.getByRole("link", { name: /voir mon tableau de bord/ }).click();
+  await expect(page.getByRole("heading", { name: "Bonjour Alex" })).toBeVisible();
+  // Libellés au singulier en mode solo.
+  await expect(page.getByRole("navigation", { name: "Navigation principale" }).getByRole("link", { name: "Moi" })).toBeVisible();
+  await shot(page, "s03-accueil-solo");
 });

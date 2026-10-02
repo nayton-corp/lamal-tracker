@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import webpush from "web-push";
+import { z } from "zod";
 import type { Db } from "../db/client";
 import { notificationLog, pushSubscription } from "../db/schema";
 import { getSetting, setSetting } from "../db/settings";
@@ -19,7 +20,46 @@ export function vapidKeys(db: Db): Vapid {
   return keys;
 }
 
-export function saveSubscription(db: Db, sub: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+/**
+ * Hôtes des services push des navigateurs. Le serveur fait un POST vers l'endpoint reçu du
+ * client : sans cette liste, un abonnement forgé pourrait viser une adresse du réseau local.
+ */
+const PUSH_HOSTS = [
+  "fcm.googleapis.com",
+  "updates.push.services.mozilla.com",
+  /\.push\.apple\.com$/,
+  /\.notify\.windows\.com$/,
+  /\.push\.services\.mozilla\.com$/,
+];
+
+export function isPushEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  return PUSH_HOSTS.some((h) => (typeof h === "string" ? url.hostname === h : h.test(url.hostname)));
+}
+
+const key = z.string().trim().min(1).max(300);
+
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().max(2000).refine(isPushEndpoint, "Adresse de notification non reconnue."),
+  keys: z.object({ p256dh: key, auth: key }),
+});
+
+export type PushSubscriptionInput = z.infer<typeof pushSubscriptionSchema>;
+
+/** Un foyer n'a pas des dizaines d'appareils : au-delà, on refuse plutôt que d'accumuler. */
+export const MAX_SUBSCRIPTIONS = 20;
+
+export function saveSubscription(db: Db, sub: PushSubscriptionInput) {
+  const known = db.select({ id: pushSubscription.id }).from(pushSubscription).where(eq(pushSubscription.endpoint, sub.endpoint)).get();
+  if (!known && subscriptionCount(db) >= MAX_SUBSCRIPTIONS) {
+    throw new Error(`Trop d'appareils abonnés (${MAX_SUBSCRIPTIONS} au maximum) : désabonnez-en un d'abord.`);
+  }
   db.insert(pushSubscription)
     .values({ endpoint: sub.endpoint, keys: sub.keys })
     .onConflictDoUpdate({ target: pushSubscription.endpoint, set: { keys: sub.keys } })

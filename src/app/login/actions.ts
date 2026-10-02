@@ -1,23 +1,42 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { checkPassword, SESSION_COOKIE, sessionToken } from "@/server/auth";
+import { attemptLogin, hasPassword, setPassword } from "@/application/auth";
 import type { ActionState } from "@/server/action";
+import { toActionError } from "@/server/action";
+import { endSession, safeNext, startSession } from "@/server/auth";
+import { db, nowIso } from "@/server/context";
+
+/** Premier démarrage : choix du mot de passe, puis session ouverte dans la foulée. */
+export async function createPasswordAction(_: ActionState, form: FormData): Promise<ActionState> {
+  if (hasPassword(db())) return { error: "Un mot de passe existe déjà." };
+  const password = String(form.get("password") ?? "");
+  if (password !== String(form.get("confirm") ?? "")) return { error: "Les deux saisies ne correspondent pas.", fieldErrors: { confirm: "Différent du mot de passe." } };
+  try {
+    setPassword(db(), password);
+  } catch (e) {
+    return toActionError(e);
+  }
+  await startSession();
+  redirect("/");
+}
 
 export async function loginAction(_: ActionState, form: FormData): Promise<ActionState> {
-  if (!checkPassword(String(form.get("password") ?? ""))) {
-    await new Promise((r) => setTimeout(r, 800));
+  const res = attemptLogin(db(), String(form.get("password") ?? ""), nowIso());
+  if (!res.ok) {
+    // Ralentit toute tentative, réussie ou non, sans bloquer le serveur.
+    await new Promise((r) => setTimeout(r, 500));
+    if (res.lockedSeconds > 0) {
+      const min = Math.ceil(res.lockedSeconds / 60);
+      return { error: `Trop d'essais : réessayez dans ${min} minute${min > 1 ? "s" : ""}.` };
+    }
     return { error: "Mot de passe incorrect." };
   }
-  const proto = (await headers()).get("x-forwarded-proto") ?? "http";
-  (await cookies()).set(SESSION_COOKIE, sessionToken(), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: proto === "https",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
-  const next = String(form.get("next") || "/");
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+  await startSession();
+  redirect(safeNext(form.get("next")));
+}
+
+export async function logoutAction() {
+  await endSession();
+  redirect("/login");
 }

@@ -1,4 +1,5 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
+import { isMinorOn } from "@/domain/age";
 import type { IsoDate } from "@/domain/dates";
 import { LCA_GUARANTEE_KEYS, guaranteeInfo, type LcaGuarantee } from "@/domain/lca";
 import { MODEL_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal";
@@ -44,6 +45,8 @@ export function generateOfferRequests(db: Db, reviewId: number, today: IsoDate):
   const wishes = new Map(view.persons.map((pr) => [pr.line.id, lcaWishesFor(db, pr.line)]));
   const created: number[] = [];
   db.transaction((tx) => {
+    // Toute demande non envoyée est obsolète (une décision a pu être annulée) : on repart de zéro.
+    tx.delete(offerRequest).where(and(eq(offerRequest.reviewId, reviewId), isNull(offerRequest.sentAt))).run();
     for (const [insurerId, members] of groups) {
       const ins = tx.select().from(insurer).where(eq(insurer.id, insurerId)).get()!;
       const adults = members.filter((m) => m.line.targetAgeClass !== "KID");
@@ -67,13 +70,12 @@ export function generateOfferRequests(db: Db, reviewId: number, today: IsoDate):
             fullName: `${m.person.firstName} ${m.person.lastName}`,
             birthDate: m.person.birthDate,
             policyNumber: null,
-            isMinor: view.review.targetYear - 1 - Number(m.person.birthDate.slice(0, 4)) < 18,
+            isMinor: isMinorOn(m.person.birthDate, today),
             wish,
             lca: (wishes.get(m.line.id) ?? []).map((k) => guaranteeInfo(k)!.label.toLowerCase()),
           };
         }),
       });
-      tx.delete(offerRequest).where(and(eq(offerRequest.reviewId, reviewId), eq(offerRequest.insurerId, insurerId), isNull(offerRequest.sentAt))).run();
       created.push(tx.insert(offerRequest).values({ reviewId, insurerId, lineIds: members.map((m) => m.line.id), content }).returning().get().id);
     }
   });

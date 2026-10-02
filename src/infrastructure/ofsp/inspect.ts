@@ -1,5 +1,7 @@
 import AdmZip from "adm-zip";
 import ExcelJS from "exceljs";
+import fs from "node:fs";
+import path from "node:path";
 import { extractPremiumFile, isXlsxZip } from "./archive";
 import { readRows } from "./reader";
 
@@ -7,16 +9,26 @@ import { readRows } from "./reader";
 export async function inspectFile(file: string, maxRows = 6): Promise<string[]> {
   const out: string[] = [];
   let target = file;
+  let extracted: string | null = null;
   try {
     if (!isXlsxZip(file)) {
       const zip = new AdmZip(file);
       out.push("Archive :", ...zip.getEntries().map((e) => `  ${e.entryName} (${e.header.size} o)`));
-      target = extractPremiumFile(file);
+      target = extracted = extractPremiumFile(file);
       out.push(`Fichier retenu : ${target}`);
     }
   } catch {
     // pas un zip : csv
   }
+  try {
+    await inspectRows(target, out, maxRows);
+  } finally {
+    if (extracted) fs.rmSync(path.dirname(extracted), { recursive: true, force: true });
+  }
+  return out;
+}
+
+async function inspectRows(target: string, out: string[], maxRows: number): Promise<void> {
   if (isXlsxZip(target)) {
     const wb = new ExcelJS.stream.xlsx.WorkbookReader(target, { sharedStrings: "cache", worksheets: "emit", styles: "ignore", hyperlinks: "ignore", entries: "emit" });
     let n = 0;
@@ -37,5 +49,4 @@ export async function inspectFile(file: string, maxRows = 6): Promise<string[]> 
       if (++r >= maxRows) break;
     }
   }
-  return out;
 }

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { compareForLine } from "@/application/compare";
 import { listSignatures, saveSignature, signaturesByName } from "@/application/signatures";
 import { saveNeeds, setStrategy, strategyOverview } from "@/application/strategy";
@@ -16,6 +16,7 @@ import {
   confirmLineage,
   decide,
   getReviewView,
+  keepAsIs,
   markLetterSent,
   openReview,
   reopenReview,
@@ -224,6 +225,25 @@ describe("rituel annuel", () => {
     expect(() => undoDecision(db, lines.adult)).toThrow(UserError);
   });
 
+  it("oublie les lettres non envoyées devenues obsolètes quand une décision change", () => {
+    // Noa (changement de modèle, lettre non envoyée) revient à « je garde » : plus de lettre de changement.
+    undoDecision(db, lines.teen);
+    keepAsIs(db, lines.teen, NOW);
+    const res = generateLetters(db, 1, TODAY);
+    expect(res.blocked).toEqual([]);
+    expect(res.created).toEqual([]);
+    const letters = getReviewView(db, 1, TODAY).letters;
+    expect(letters).toHaveLength(1);
+    expect(letters[0]!.kind).toBe("TERMINATION");
+    expect(letters[0]!.sentAt).toBe(TODAY);
+    // On rétablit la décision du scénario (changement de modèle chez CSS).
+    const teenCmp = compareForLine(db, lines.teen, { all: true, everyOffer: true });
+    const other = teenCmp.offers.find((o) => o.insurerId === insurerId(8) && o.tariffCode === "CSS-TEL")!;
+    expect(decide(db, lines.teen, { tariffId: other.tariffId, franchiseChf: other.franchiseChf }, NOW)).toBe("ADJUST");
+    expect(generateLetters(db, 1, TODAY).created).toHaveLength(1);
+    expect(getReviewView(db, 1, TODAY).letters).toHaveLength(2);
+  });
+
   it("clôt la revue et crée les contrats de l'année suivante", () => {
     closeReview(db, 1, NOW);
     const policies2027 = db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all();
@@ -253,6 +273,30 @@ describe("rituel annuel", () => {
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(0);
     expect(getReviewView(db, 1, TODAY).persons.every((p) => p.line.decision !== "UNDECIDED")).toBe(true);
     closeReview(db, 1, NOW);
+    expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(2);
+  });
+
+  it("à la clôture, un contrat de l'année cible déjà présent est mis à jour, sauf s'il est manuel", () => {
+    reopenReview(db, 1);
+    const adult = getReviewView(db, 1, TODAY).persons[0]!;
+    const byPerson = and(eq(lamalPolicy.personId, adult.person.id), eq(lamalPolicy.coverageYear, 2027));
+    const manualId = savePolicy(db, {
+      personId: adult.person.id, coverageYear: 2027, insurerId: insurerId(1562), policyNumber: "HEL-2027",
+      tariffCode: null, tariffLabel: null, modelType: "STANDARD", franchiseChf: 300, accident: false, billedMonthlyRp: 45000,
+    });
+    expect(() => closeReview(db, 1, NOW)).toThrow(/2027 saisi à la main existe déjà pour Alex/);
+    expect(getReviewByYear(db, 2027)?.status).toBe("OPEN");
+    expect(db.select().from(lamalPolicy).where(byPerson).get()?.insurerId).toBe(insurerId(1562));
+
+    // Importé (OFSP) : la décision l'emporte et le contrat est repris par la clôture.
+    db.update(lamalPolicy).set({ source: "OFSP" }).where(eq(lamalPolicy.id, manualId)).run();
+    closeReview(db, 1, NOW);
+    expect(getReviewByYear(db, 2027)?.status).toBe("CLOSED");
+    const updated = db.select().from(lamalPolicy).where(byPerson).get()!;
+    expect(updated.id).toBe(manualId);
+    expect(updated.source).toBe("REVIEW");
+    expect(updated.insurerId).toBe(adult.line.chosenInsurerId);
+    expect(updated.billedMonthlyRp).toBe(adult.line.chosenMonthlyRp);
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(2);
   });
 

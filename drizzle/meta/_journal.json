@@ -29,6 +29,13 @@
       "when": 1790972096350,
       "tag": "0003_journey_strategy",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790977820661,
+      "tag": "0004_auth_sessions",
+      "breakpoints": true
     }
   ]
 }

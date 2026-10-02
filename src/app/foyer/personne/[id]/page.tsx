@@ -3,6 +3,7 @@ import { ShieldAlert, Trash2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { deleteLcaAction, deletePersonAction, deletePolicyAction } from "@/app/actions/household";
 import { getPerson, listInsurers, listLca, listPolicies } from "@/application/household";
+import { activeReview } from "@/application/review";
 import { ageClassForYear } from "@/domain/age";
 import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { insurerLabel } from "@/infrastructure/db/queries";
@@ -18,8 +19,9 @@ import { guaranteeInfo, suggestedLcaInsurer } from "@/domain/lca";
 
 export const dynamic = "force-dynamic";
 
-export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PersonPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ retour?: string }> }) {
   const { id } = await params;
+  const back = (await searchParams).retour === "bienvenue" ? "/bienvenue?etape=membres" : "/foyer";
   const p = getPerson(db(), Number(id));
   if (!p) notFound();
   const year = Number(today().slice(0, 4));
@@ -32,12 +34,19 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const years = Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i);
   const lamalInsurerId = policies[0]?.policy.insurerId ?? null;
   const hasCurrent = policies.some((x) => x.policy.coverageYear === year);
+  const openReview = activeReview(db());
 
   return (
     <Page wide>
-      <PageHeader title={`${p.firstName} ${p.lastName}`} back="/foyer" />
+      <PageHeader title={`${p.firstName} ${p.lastName}`} back={back} />
 
-      <ProfileCard person={p} insurers={insurers} year={year} ageLabel={`${AGE_CLASS_LABEL[ageClassForYear(p.birthDate, year)]} en ${year}`} />
+      <ProfileCard
+        person={p}
+        needs={{ healthCostsRp: p.healthCostsRp, allowedModels: p.allowedModels, doctorName: p.doctorName }}
+        needsHref={openReview ? `/rituel/${openReview.targetYear}/besoins` : null}
+        year={year}
+        ageLabel={`${AGE_CLASS_LABEL[ageClassForYear(p.birthDate, year)]} en ${year}`}
+      />
 
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
       <Section
