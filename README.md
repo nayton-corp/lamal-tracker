@@ -4,10 +4,11 @@ PWA personnelle, mobile d'abord, auto-hébergée sur un Raspberry Pi. Chaque aut
 
 1. **les primes officielles de l'OFSP sont importées automatiquement** dès leur publication (fin septembre) ;
 2. l'app calcule **la hausse de chaque membre du foyer** pour l'année suivante, sans rien changer ;
-3. le **comparateur** classe toutes les offres LAMal de votre région selon le **coût total attendu** (prime nette de CO2 + franchise + quote-part), avec un simulateur de franchise ;
+3. le **comparateur** classe les caisses de votre région selon le **coût total attendu** (prime nette de CO2 + franchise + quote-part), avec un simulateur de franchise, le portrait de chaque caisse (réserves, frais administratifs, taille, évolution de ses primes face au marché) et l'explication de chaque modèle ;
 4. un **garde-fou LCA** (confirmation par appui long) empêche de résilier une complémentaire par erreur ;
-5. les **lettres de résiliation PDF** (format enveloppe à fenêtre suisse) sont générées en un geste, avec suivi des envois recommandés et rappels avant le 30 novembre ;
-6. l'**historique pluriannuel** garde les primes réellement payées et les repères de marché.
+5. une **demande d'offre et d'affiliation** est préparée pour chaque nouvelle caisse (PDF et e-mail prérempli), complémentaires souhaitées comprises ;
+6. les **lettres de résiliation PDF** (format enveloppe à fenêtre suisse) sont générées en un geste, avec suivi des envois recommandés et rappels avant le 30 novembre ;
+7. l'**historique pluriannuel** garde les primes réellement payées et les repères de marché.
 
 > Outil d'aide à la décision, pas un conseil en assurance. Vérifiez toujours les conditions des modèles (liste de médecins, Telmed…) auprès de la caisse.
 
@@ -85,13 +86,12 @@ Cloner le dépôt sur le Pi, décommenter `build: .` dans `docker-compose.yml`, 
 
 | Quand | Quoi |
 |---|---|
-| Une fois | *Foyer* : adresse, canton, **région de primes** (sur la police), membres, et le contrat LAMal de l'année en cours de chacun (caisse, tarif, franchise, prime facturée). Ajouter les **complémentaires LCA**. *Réglages › Caisses-maladie* : adresses de résiliation de vos caisses. |
+| Une fois | *Foyer* : adresse, canton, **région de primes** (sur la police), membres, et le contrat LAMal de l'année en cours de chacun (caisse, tarif, franchise, prime facturée). Ajouter les **complémentaires LCA** (garantie choisie dans une liste, assureur prérempli d'après la caisse LAMal). Les adresses des caisses viennent de l'annuaire officiel ; ne les modifier que si la police en indique une autre. |
 | Fin septembre | L'OFSP publie les primes ; l'app les importe (contrôle quotidien du 15 septembre au 30 novembre) et envoie une notification. Import manuel possible dans *Réglages*. |
 | Octobre | *Rituel* : lancer l'analyse. Pour chaque personne : hausse, tarif de renouvellement (à confirmer si la caisse a renommé son tarif), comparateur, simulateur de franchise, choix. |
-| Avant de résilier | Demander l'**affiliation** à la nouvelle caisse (en ligne). Passer le **contrôle LCA**. |
+| Avant de résilier | Choisir les complémentaires à demander et passer le **contrôle LCA**. *Lettres* : envoyer la **demande d'offre et d'affiliation** à la nouvelle caisse (e-mail ou PDF). |
 | Avant ~23 novembre | Générer les lettres, imprimer, signer, envoyer en **recommandé** (réception au plus tard le 30 novembre). Saisir le n° de suivi. |
 | Décembre / janvier | Marquer les confirmations reçues, puis **clôturer** : les contrats de la nouvelle année sont créés et l'historique mis à jour. Ajuster la prime facturée si elle diffère. Un rituel, même clôturé, peut être **rouvert** (les choix sont gardés, les contrats créés retirés) ou **supprimé** (retour à l'état d'avant). |
-| Chaque année | *Réglages* : vérifier le montant de la **redistribution CO2** (2026 : 61.80, 2027 : 57.00 CHF/personne/an). |
 
 ## Données OFSP
 
@@ -101,7 +101,15 @@ Cloner le dépôt sur le Pi, décommenter `build: .` dans `docker-compose.yml`, 
 - Vos **propres contrats** des années passées (2010 et suivantes) se saisissent dans *Foyer* : l'historique se construit à partir d'eux.
 - Chaque import est un **jeu immuable** identifié par son empreinte SHA-256, validé (années, cantons, bornes de primes, variation par rapport à l'année précédente) avant d'être activé.
 - Le workflow *Surveillance du format OFSP* importe le vrai fichier chaque jour en septembre-octobre : s'il échoue, GitHub vous prévient avant le rituel.
-- L'Open Data ne contient **pas** : listes de médecins des modèles alternatifs, adresses de résiliation, contrats LCA, redistribution CO2. Ces informations sont saisies dans l'app.
+- L'Open Data des primes ne contient **pas** les listes de médecins des modèles alternatifs ni les tarifs des complémentaires LCA (aucune source publique : les comparateurs les obtiennent par accord avec les caisses). Les complémentaires se demandent donc aux caisses, via la demande d'offre.
+
+## Données officielles de référence
+
+Livrées avec l'image et revérifiées chaque semaine par le Raspberry Pi (*Réglages › Données officielles › Vérifier maintenant*) ; un workflow mensuel propose aussi leur mise à jour dans le dépôt (`scripts/build-reference.ts`).
+
+- **Annuaire des assureurs reconnus** (OFSP, xlsx semestriel) : raison sociale française, adresse postale, téléphone, e-mail, site, groupe. Sert d'adresse de résiliation et de destinataire des demandes d'offre. Une adresse modifiée dans l'app n'est jamais écrasée.
+- **Données de surveillance** (OFSP, une feuille par année) : assurés, primes, frais administratifs et réserves par assuré, pour le portrait des caisses.
+- **Redistribution CO2** (OFEV) : montant annuel par personne, repris automatiquement ; un montant saisi à la main reste prioritaire jusqu'au retour au montant officiel.
 
 ## Développement
 
