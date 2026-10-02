@@ -99,7 +99,7 @@ async function localities(): Promise<{ plz: string; locality: string; bfs: numbe
   console.log(`swisstopo : ${cols.join(" | ")}`);
   const idx = (re: RegExp) => cols.findIndex((c) => re.test(c));
   const iName = idx(/ortschaft/);
-  const iPlz = idx(/^plz$/);
+  const iPlz = idx(/^plz4?$/);
   const iCommune = idx(/gemeindename/);
   const iBfs = idx(/bfs/);
   const iCanton = idx(/kanton/);
