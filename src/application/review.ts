@@ -384,14 +384,25 @@ export function getReviewView(db: Db, reviewId: number, today: IsoDate): ReviewV
       potentialAnnualSavingsRp: persons.reduce((a, x) => a + Math.max(x.best?.savingsRp ?? 0, 0), 0),
     },
     letters,
-    steps: [
+    // Une étape n'est faite que si les précédentes le sont (pas de coche « vide » avant les décisions).
+    steps: sequential([
       { key: "renewal", label: "Hausse connue", done: persons.length > 0 && persons.every((x) => x.line.renewalMonthlyRp !== null) },
       { key: "decide", label: "Décisions", done: persons.length > 0 && persons.every((x) => x.line.decision !== "UNDECIDED") },
       { key: "lca", label: "Contrôle LCA", done: switching.every((x) => x.line.lcaAckAt) },
       { key: "letters", label: "Lettres", done: needsLetter.every((x) => letterLineIds.has(x.line.id)) },
       { key: "sent", label: "Envois", done: needsLetter.every((x) => sentLineIds.has(x.line.id)) },
-    ],
+    ]),
   };
+}
+
+function sequential(steps: { key: string; label: string; done: boolean }[]) {
+  // « Hausse connue » est indépendante ; les étapes suivantes s'enchaînent à partir des décisions.
+  let ok = true;
+  return steps.map((s, i) => {
+    if (i === 0) return s;
+    ok = ok && s.done;
+    return { ...s, done: ok };
+  });
 }
 
 export function lineIdsOf(db: Db, reviewId: number): number[] {

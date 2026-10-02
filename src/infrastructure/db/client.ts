@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
+import { seedReference } from "./seed";
 
 export type Db = BetterSQLite3Database<typeof schema> & { $client: Database.Database };
 
@@ -27,6 +28,7 @@ export function openDb(file: string): Db {
   sqlite.pragma("synchronous = NORMAL");
   const db = drizzle(sqlite, { schema }) as Db;
   migrate(db, { migrationsFolder: migrationsFolder() });
+  seedReference(db, new Date().getFullYear());
   return db;
 }
 

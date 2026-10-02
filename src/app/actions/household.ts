@@ -1,0 +1,136 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import {
+  deleteLca,
+  deletePerson,
+  deletePolicy,
+  saveHousehold,
+  saveLca,
+  savePerson,
+  savePolicy,
+  getHousehold,
+} from "@/application/household";
+import { tariffOptions, type TariffOptions } from "@/application/tariffs";
+import { UserError } from "@/application/review";
+import { chfField, toActionError, type ActionState } from "@/server/action";
+import { db } from "@/server/context";
+
+const str = (f: FormData, k: string) => {
+  const v = f.get(k);
+  return v === null ? undefined : String(v);
+};
+const opt = (f: FormData, k: string) => {
+  const v = str(f, k)?.trim();
+  return v ? v : null;
+};
+
+export async function saveHouseholdAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    saveHousehold(db(), {
+      name: str(form, "name") ?? "",
+      street: str(form, "street"),
+      postalCode: str(form, "postalCode"),
+      city: str(form, "city"),
+      canton: (str(form, "canton") ?? "") as never,
+      region: Number(str(form, "region")),
+    });
+  } catch (e) {
+    return toActionError(e);
+  }
+  revalidatePath("/", "layout");
+  return { ok: "Foyer enregistré." };
+}
+
+export async function savePersonAction(_: ActionState, form: FormData): Promise<ActionState> {
+  let id: number;
+  try {
+    const h = getHousehold(db());
+    if (!h) throw new UserError("Enregistrez d'abord le foyer.");
+    const healthCosts = chfField(form.get("healthCosts"));
+    id = savePerson(db(), h.id, {
+      id: opt(form, "id") ? Number(form.get("id")) : undefined,
+      firstName: str(form, "firstName") ?? "",
+      lastName: str(form, "lastName") ?? "",
+      birthDate: str(form, "birthDate") ?? "",
+      kidSubgroup: str(form, "kidSubgroup") ?? "K1",
+      employedAccidentCover: form.get("employedAccidentCover") === "on",
+      healthCostsRp: healthCosts ?? 50000,
+      allowedModels: form.getAll("allowedModels").map(String) as never,
+      excludedInsurerIds: form.getAll("excludedInsurerIds").map(Number),
+      doctorName: opt(form, "doctorName"),
+    });
+  } catch (e) {
+    return toActionError(e);
+  }
+  revalidatePath("/", "layout");
+  if (!form.get("id")) redirect(`/foyer/personne/${id}`);
+  return { ok: "Personne enregistrée." };
+}
+
+export async function deletePersonAction(form: FormData) {
+  deletePerson(db(), Number(form.get("id")));
+  revalidatePath("/", "layout");
+  redirect("/foyer");
+}
+
+export async function savePolicyAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const billed = chfField(form.get("billedMonthly"));
+    if (billed === null) throw new UserError("Indiquez la prime mensuelle facturée.");
+    savePolicy(db(), {
+      id: opt(form, "id") ? Number(form.get("id")) : undefined,
+      personId: Number(form.get("personId")),
+      coverageYear: Number(form.get("coverageYear")),
+      insurerId: Number(form.get("insurerId")),
+      policyNumber: opt(form, "policyNumber"),
+      tariffCode: opt(form, "tariffCode"),
+      tariffLabel: opt(form, "tariffLabel"),
+      modelType: str(form, "modelType") ?? "STANDARD",
+      franchiseChf: Number(form.get("franchiseChf")),
+      accident: form.get("accident") === "on",
+      billedMonthlyRp: billed,
+    }, opt(form, "tariffCode") ? "OFSP" : "MANUAL");
+  } catch (e) {
+    return toActionError(e);
+  }
+  revalidatePath("/", "layout");
+  return { ok: "Contrat enregistré." };
+}
+
+export async function deletePolicyAction(form: FormData) {
+  deletePolicy(db(), Number(form.get("id")));
+  revalidatePath("/", "layout");
+}
+
+export async function saveLcaAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    saveLca(db(), {
+      id: opt(form, "id") ? Number(form.get("id")) : undefined,
+      personId: Number(form.get("personId")),
+      insurerName: str(form, "insurerName") ?? "",
+      linkedInsurerId: opt(form, "linkedInsurerId") ? Number(form.get("linkedInsurerId")) : null,
+      productName: str(form, "productName") ?? "",
+      category: (str(form, "category") ?? "OTHER") as never,
+      policyNumber: opt(form, "policyNumber"),
+      monthlyRp: chfField(form.get("monthly")),
+      minTermEnd: opt(form, "minTermEnd"),
+      noticeMonths: opt(form, "noticeMonths") ? Number(form.get("noticeMonths")) : null,
+      active: form.getAll("active").includes("on"),
+    });
+  } catch (e) {
+    return toActionError(e);
+  }
+  revalidatePath("/", "layout");
+  return { ok: "Complémentaire enregistrée." };
+}
+
+export async function deleteLcaAction(form: FormData) {
+  deleteLca(db(), Number(form.get("id")));
+  revalidatePath("/", "layout");
+}
+
+export async function tariffOptionsAction(personId: number, year: number, insurerId: number): Promise<TariffOptions> {
+  return tariffOptions(db(), personId, year, insurerId);
+}

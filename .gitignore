@@ -9,3 +9,4 @@ test-results/
 tests/fixtures/generated/
 .env
 .env.local
+.e2e/

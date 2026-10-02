@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+data
+.e2e
+test-results
+playwright-report
+tests/fixtures/generated
+*.db
+.env*

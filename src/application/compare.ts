@@ -38,6 +38,9 @@ export interface CompareView {
   chosen: { tariffCode: string | null; franchiseChf: number | null; insurerId: number | null };
   currentInsurerId: number;
   curve: { franchises: number[]; points: CurvePoint[]; breakEvenRp: number | null };
+  /** Tarifs de l'assureur actuel (franchise de renouvellement), pour confirmer un renouvellement incertain. */
+  renewalCandidates: { code: string; label: string; modelType: ModelType; monthlyRp: number }[];
+  renewalStatus: string;
   market: ReturnType<typeof marketStats>;
 }
 
@@ -102,6 +105,13 @@ export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}
       points: franchiseCurve(cheapest, base, maxH, maxH / 40),
       breakEvenRp: breakEvenRp(cheapest, base, maxH * 2),
     },
+    renewalCandidates: [...new Map(
+      all
+        .filter((o) => o.insurerId === policy.insurerId && o.franchiseChf === line.renewalFranchiseChf)
+        .sort((a, b) => a.monthlyPremiumRp - b.monthlyPremiumRp)
+        .map((o) => [o.tariffCode, { code: o.tariffCode, label: o.tariffLabel, modelType: o.modelType, monthlyRp: o.monthlyPremiumRp }]),
+    ).values()],
+    renewalStatus: line.renewalStatus,
     market: marketStats(all.filter((o) => o.franchiseChf === (renewal?.franchiseChf ?? policy.franchiseChf)).map((o) => o.monthlyPremiumRp)),
   };
 }

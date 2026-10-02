@@ -1,0 +1,24 @@
+name: Surveillance du format OFSP
+
+# Chaque année l'OFSP peut changer colonnes et codes (ce fut le cas pour 2027).
+# Ce contrôle importe le fichier réel : un échec avertit avant le rituel d'automne.
+on:
+  schedule:
+    - cron: "17 6 * 9,10 *" # tous les jours en septembre-octobre
+    - cron: "17 6 * 1-8,11,12 1" # le lundi le reste de l'année
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - env:
+          DATABASE_PATH: /tmp/ofsp-check.db
+        run: pnpm cli download
