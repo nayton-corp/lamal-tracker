@@ -70,6 +70,13 @@ export interface ArchiveResource {
   listed: boolean;
 }
 
+/**
+ * Première année d'archive lisible. Jusqu'en 2014, l'OFSP utilisait un autre schéma
+ * (G_ID, C_ID, R_ID, M_ID, V_ID, F, P…) où la couverture accident n'est pas identifiable
+ * avec certitude : plutôt que deviner, ces années ne sont pas importées.
+ */
+export const MIN_ARCHIVE_YEAR = 2015;
+
 /** Archives annuelles annoncées dans la réponse CKAN (Archiv_Praemien_AAAA.zip). */
 export function pickArchiveResources(payload: unknown): ArchiveResource[] {
   const resources: CkanResource[] =
@@ -79,7 +86,7 @@ export function pickArchiveResources(payload: unknown): ArchiveResource[] {
     const url = r.download_url || r.url || "";
     const text = `${label(r.name)} ${label(r.title)} ${url} ${decodedPath(url)}`;
     const m = /archiv[^0-9]{0,20}(20\d\d)/i.exec(text);
-    if (url && m) found.set(Number(m[1]), url);
+    if (url && m && Number(m[1]) >= MIN_ARCHIVE_YEAR) found.set(Number(m[1]), url);
   }
   return [...found.entries()].sort((a, b) => b[0] - a[0]).map(([year, url]) => ({ year, url, listed: true }));
 }

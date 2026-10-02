@@ -26,6 +26,7 @@ describe("archives OFSP", () => {
           { name: { de: "Prämien_CH.xlsx" }, url: "https://x/?path=a", format: "XLSX" },
           { name: { de: "Archiv_Praemien_2025.zip" }, url: "https://x/2025", format: "ZIP" },
           { title: "Archiv Prämien 2024", url: "https://x/2024", format: "ZIP" },
+          { name: "Archiv_Praemien_2014.zip", url: "https://x/2014", format: "ZIP" },
           { name: "", url: guessedArchiveUrl(2026) },
         ],
       },
