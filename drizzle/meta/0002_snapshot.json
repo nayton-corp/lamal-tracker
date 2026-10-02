@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d58026fd-922f-4c2e-92c7-5b718f4500f6",
+  "id": "9c41af68-761e-4746-be3c-2e0ce0b9e8eb",
   "prevId": "c17033c4-79da-4833-acae-0c107f86c961",
   "tables": {
     "household": {
@@ -520,6 +520,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "guarantee": {
+          "name": "guarantee",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "policy_number": {
@@ -1406,6 +1413,13 @@
         },
         "affiliation_confirmed_at": {
           "name": "affiliation_confirmed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lca_wishes": {
+          "name": "lca_wishes",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

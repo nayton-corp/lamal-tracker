@@ -29,4 +29,6 @@ ALTER TABLE `insurer` ADD `phone` text;--> statement-breakpoint
 ALTER TABLE `insurer` ADD `group_name` text;--> statement-breakpoint
 ALTER TABLE `insurer` ADD `directory_date` text;--> statement-breakpoint
 ALTER TABLE `lamal_parameters` ADD `co2_source` text DEFAULT 'OFFICIAL' NOT NULL;--> statement-breakpoint
+ALTER TABLE `lca_policy` ADD `guarantee` text;--> statement-breakpoint
+ALTER TABLE `review_line` ADD `lca_wishes` text;--> statement-breakpoint
 UPDATE `lamal_parameters` SET `co2_source` = 'USER' WHERE `source_note` = 'Saisi manuellement';

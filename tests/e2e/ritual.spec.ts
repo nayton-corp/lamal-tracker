@@ -67,9 +67,10 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   // Complémentaire LCA chez le même groupe
   await page.getByRole("button", { name: "Ajouter une complémentaire LCA" }).click();
   const lca = page.getByRole("dialog");
-  await lca.getByLabel("Assureur LCA").fill("Helsana Assurances complémentaires SA");
-  await lca.getByLabel("Groupe de la caisse LAMal").selectOption({ label: "Helsana" });
-  await lca.getByLabel("Produit").fill("Hospitalisation mi-privée");
+  // La caisse LAMal de la personne est proposée d'office.
+  await expect(lca.getByLabel("Groupe de la caisse LAMal")).toHaveValue(/\d+/);
+  await expect(lca.getByLabel("Assureur LCA")).not.toHaveValue("");
+  await lca.getByLabel("Garantie").selectOption("HOSPITAL_SEMI_PRIVATE");
   await lca.getByRole("button", { name: "Enregistrer la complémentaire" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await shot(page, "04-personne");
@@ -100,7 +101,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   // Garde-fou LCA : case + appui long
   await page.getByRole("link", { name: "Contrôle des complémentaires LCA" }).click();
   await expect(page.getByText("Ne résiliez jamais votre LCA par erreur")).toBeVisible();
-  await expect(page.getByText("Hospitalisation mi-privée", { exact: true })).toBeVisible();
+  await expect(page.getByText("Hospitalisation demi-privée", { exact: true })).toBeVisible();
   await shot(page, "08-lca");
   const hold = page.getByRole("button", { name: "Maintenir pour confirmer" });
   await expect(hold).toBeDisabled();

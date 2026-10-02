@@ -172,6 +172,8 @@ export const lcaPolicy = sqliteTable("lca_policy", {
   linkedInsurerId: integer("linked_insurer_id").references(() => insurer.id),
   productName: text("product_name").notNull(),
   category: text("category", { enum: ["HOSPITAL", "AMBULATORY", "DENTAL", "OTHER"] }).notNull(),
+  /** Famille de garantie (liste fixe, voir domain/lca) ; null pour les saisies anciennes. */
+  guarantee: text("guarantee"),
   policyNumber: text("policy_number"),
   monthlyRp: integer("monthly_rp"),
   startDate: text("start_date"),
@@ -236,6 +238,8 @@ export const reviewLine = sqliteTable(
     lcaAckAt: text("lca_ack_at"),
     affiliationRequestedAt: text("affiliation_requested_at"),
     affiliationConfirmedAt: text("affiliation_confirmed_at"),
+    /** Complémentaires à demander à la nouvelle caisse (clés de domain/lca) ; null = reprendre celles en cours. */
+    lcaWishes: text("lca_wishes", { mode: "json" }).$type<string[]>(),
   },
   (t) => [uniqueIndex("review_line_person").on(t.reviewId, t.personId)],
 );

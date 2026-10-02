@@ -78,7 +78,7 @@ describe("rituel annuel", () => {
       personId: teen, coverageYear: 2026, insurerId: insurerId(8), policyNumber: null,
       tariffCode: "CSS-BASE", tariffLabel: "Base CSS", modelType: "STANDARD", franchiseChf: 0, accident: true, billedMonthlyRp: 12000,
     });
-    saveLca(db, { personId: adult, insurerName: "Helsana Assurances complémentaires SA", linkedInsurerId: insurerId(1562), productName: "Hospitalisation mi-privée", category: "HOSPITAL" });
+    saveLca(db, { personId: adult, insurerName: "Helsana Assurances complémentaires SA", linkedInsurerId: insurerId(1562), productName: "Hospitalisation mi-privée", guarantee: "HOSPITAL_SEMI_PRIVATE" });
   });
 
   it("ouvre la revue et retrouve les renouvellements", () => {
