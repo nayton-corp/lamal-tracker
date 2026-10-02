@@ -4,7 +4,7 @@ import nextTs from "eslint-config-next/typescript";
 const config = [
   ...nextVitals,
   ...nextTs,
-  { ignores: [".next/**", "node_modules/**", "drizzle/**", "public/sw.js", "test-results/**", "playwright-report/**", ".e2e/**", "next-env.d.ts"] },
+  { ignores: [".next/**", "node_modules/**", "drizzle/**", "public/sw.js", "public/ocr/**", "test-results/**", "playwright-report/**", ".e2e/**", "next-env.d.ts"] },
   {
     // Le domaine reste pur : ni framework, ni base, ni Node.
     files: ["src/domain/**/*.ts"],

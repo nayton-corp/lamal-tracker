@@ -124,6 +124,22 @@ export function openReview(db: Db, targetYear: number): { reviewId: number; skip
   return { reviewId: row.id, skipped };
 }
 
+/**
+ * Pendant la fenêtre du rituel, l'analyse s'ouvre d'elle-même dès que les primes de l'année
+ * cible sont publiées et qu'au moins une personne a son contrat de l'année en cours.
+ */
+export function ensureReview(db: Db, targetYear: number): number | null {
+  const existing = getReviewByYear(db, targetYear);
+  if (existing) return existing.id;
+  const h = getHousehold(db);
+  if (!h || !activeDataset(db, targetYear)) return null;
+  const persons = listPersons(db, h.id);
+  const anyContract = persons.some((p) =>
+    db.select({ id: lamalPolicy.id }).from(lamalPolicy).where(and(eq(lamalPolicy.personId, p.id), eq(lamalPolicy.coverageYear, targetYear - 1))).get(),
+  );
+  return anyContract ? openReview(db, targetYear).reviewId : null;
+}
+
 export function getReviewByYear(db: Db, targetYear: number) {
   const h = getHousehold(db);
   if (!h) return null;
@@ -365,6 +381,7 @@ export function getReviewView(db: Db, reviewId: number, today: IsoDate): ReviewV
   const needsLetter = persons.filter((x) => x.line.decision === "SWITCH" || x.line.decision === "ADJUST");
   const switching = persons.filter((x) => x.line.decision === "SWITCH");
   const sentLineIds = new Set(letters.filter((l) => l.sentAt).flatMap((l) => l.lineIds));
+  const allDecided = persons.length > 0 && persons.every((x) => x.line.decision !== "UNDECIDED");
 
   return {
     review: r,
@@ -385,18 +402,18 @@ export function getReviewView(db: Db, reviewId: number, today: IsoDate): ReviewV
     letters,
     // Une étape n'est faite que si les précédentes le sont (pas de coche « vide » avant les décisions).
     steps: sequential([
-      { key: "renewal", label: "Hausse connue", done: persons.length > 0 && persons.every((x) => x.line.renewalMonthlyRp !== null) },
-      { key: "decide", label: "Choix", done: persons.length > 0 && persons.every((x) => x.line.decision !== "UNDECIDED") },
-      { key: "lca", label: "Complé­mentaires", done: switching.every((x) => x.line.lcaAckAt) },
-      { key: "request", label: "Nouvelle caisse", done: switching.every((x) => x.line.affiliationRequestedAt) },
-      { key: "sent", label: "Résiliation", done: needsLetter.every((x) => sentLineIds.has(x.line.id)) },
+      { key: "renewal", label: "Recon­duction", done: persons.length > 0 && persons.every((x) => x.line.renewalMonthlyRp !== null) },
+      { key: "strategy", label: "Stratégie", done: r.strategy !== null || allDecided },
+      { key: "needs", label: "Besoins", done: r.needsConfirmedAt !== null || allDecided },
+      { key: "decide", label: "Choix", done: allDecided },
+      { key: "procedures", label: "Démarches", done: switching.every((x) => x.line.lcaAckAt && x.line.affiliationRequestedAt) && needsLetter.every((x) => sentLineIds.has(x.line.id)) },
       { key: "confirmed", label: "Confir­mations", done: switching.every((x) => x.line.affiliationConfirmedAt) && letters.filter((l) => l.kind === "TERMINATION").every((l) => l.acknowledgedAt) },
     ]),
   };
 }
 
 function sequential(steps: { key: string; label: string; done: boolean }[]) {
-  // « Hausse connue » est indépendante ; les étapes suivantes s'enchaînent à partir des décisions.
+  // « Reconduction » est indépendante ; les étapes suivantes s'enchaînent à partir des décisions.
   let ok = true;
   return steps.map((s, i) => {
     if (i === 0) return s;

@@ -70,7 +70,9 @@ export async function savePersonAction(_: ActionState, form: FormData): Promise<
     return toActionError(e);
   }
   revalidatePath("/", "layout");
-  if (!form.get("id")) redirect(`/foyer/personne/${id}`);
+  const next = String(form.get("next") ?? "");
+  if (next.startsWith("/bienvenue")) redirect(next);
+  if (!form.get("id") && !form.get("stay")) redirect(`/foyer/personne/${id}`);
   return { ok: "Personne enregistrée." };
 }
 

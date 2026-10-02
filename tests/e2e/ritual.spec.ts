@@ -18,12 +18,14 @@ async function importFile(page: Page, file: string, year: number) {
 }
 
 test("rituel annuel complet sur mobile", async ({ page }) => {
-  // Accueil vide → foyer
+  // Première connexion : accueil guidé (pour qui, adresse, personnes, contrats).
   await page.goto("/");
+  await expect(page).toHaveURL(/\/bienvenue/);
   await expect(page.getByRole("heading", { name: /juste prix/ })).toBeVisible();
   await shot(page, "01-accueil-vide");
-  await page.getByRole("link", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Pour mon foyer/ }).click();
 
+  await expect(page.getByRole("heading", { name: "Où habite votre foyer ?" })).toBeVisible();
   await page.getByLabel("Nom du foyer").fill("Famille Test");
   await page.getByLabel("Rue et numéro").fill("Rue du Lac 1");
   await page.getByLabel("NPA").fill("1003");
@@ -31,38 +33,50 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText(/Lausanne \(VD\) · région de primes 1/)).toBeVisible();
   await expect(page.getByLabel("Localité")).toHaveValue("Lausanne");
   await shot(page, "01b-foyer");
-  await page.getByRole("button", { name: "Enregistrer le foyer" }).click();
-  await expect(page.getByText("Canton VD · région de primes 1")).toBeVisible();
+  await page.getByRole("button", { name: "Continuer" }).click();
+  await expect(page.getByRole("heading", { name: "Qui est assuré dans votre foyer ?" })).toBeVisible();
 
   // Primes officielles 2026 et 2027
   await importFile(page, "primes-2026.xlsx", 2026);
   await importFile(page, "primes-2027.xlsx", 2027);
   await shot(page, "02-donnees");
 
-  // Personne + contrat 2026 pré-rempli depuis les données OFSP
-  await page.goto("/foyer/personne/nouvelle");
+  // Personnes, puis contrat 2026 par la saisie guidée (la prime officielle est retrouvée).
+  await page.goto("/bienvenue?etape=membres");
   await page.getByLabel("Prénom").fill("Alex");
   await page.getByLabel("Nom", { exact: true }).fill("Test");
   await page.getByLabel("Date de naissance").fill("1988-04-12");
-  await page.getByRole("button", { name: "Ajouter la personne" }).click();
-  await expect(page.getByRole("heading", { name: "Alex Test" })).toBeVisible();
+  await page.getByRole("button", { name: "Ajouter cette personne" }).click();
+  await expect(page.getByText("Alex Test")).toBeVisible();
+  await page.getByRole("link", { name: /C'est tout le monde/ }).click();
 
-  await page.getByRole("button", { name: "Ajouter un contrat LAMal" }).click();
-  const sheet = page.getByRole("dialog");
-  await sheet.getByLabel("Année").selectOption("2026");
-  await sheet.getByLabel("Caisse-maladie").selectOption({ label: "Helsana" });
-  await expect(sheet.getByLabel("Produit")).toBeVisible();
-  await sheet.getByLabel("Produit").selectOption("HEL-TEL26");
-  await sheet.getByLabel("Franchise").selectOption("2500");
-  await sheet.getByLabel("Avec accident").uncheck();
-  // La prime officielle est reprise sans saisie.
-  await expect(sheet.getByText("Prime officielle OFSP")).toBeVisible();
-  await sheet.getByText("N° d'assuré (pour les lettres)").click();
-  await sheet.getByLabel("Numéro d'assuré").fill("HEL-123");
+  await expect(page.getByRole("heading", { name: "Les contrats actuels" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Scanner ma police/ })).toBeVisible();
+  await shot(page, "03a-contrats");
+  await page.getByRole("radio", { name: /Saisie guidée/ }).click();
+  await page.getByLabel("Rechercher une caisse").fill("hels");
+  await page.getByRole("button", { name: "Helsana", exact: true }).click();
+  await page.getByRole("button", { name: "Continuer" }).click();
+  await page.getByRole("radio", { name: /Télémédecine/ }).check();
+  await page.getByRole("button", { name: "Continuer" }).click();
+  await page.getByRole("button", { name: "CHF 2500" }).click();
+  await page.getByLabel("Couverture accidents comprise").uncheck();
+  await page.getByRole("button", { name: "Continuer" }).click();
+  await expect(page.getByText("Prime officielle OFSP")).toBeVisible();
+  await page.getByLabel(/N° d'assuré/).fill("HEL-123");
   await shot(page, "03-contrat");
-  await sheet.getByRole("button", { name: "Enregistrer le contrat" }).click();
-  await expect(page.getByRole("dialog")).toBeHidden();
-  await expect(page.getByText("Helsana", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Enregistrer le contrat" }).click();
+  await expect(page.getByText(/Helsana · franchise 2500/)).toBeVisible();
+  await page.getByRole("link", { name: /voir mon tableau de bord/ }).click();
+
+  // Fenêtre du rituel ouverte : l'accueil montre la reconduction tacite.
+  await expect(page.getByText("Sans rien faire, en 2027 vous paierez")).toBeVisible();
+  await expect(page.getByText(/par reconduction tacite/)).toBeVisible();
+  await shot(page, "03b-accueil-reconduction");
+
+  await page.goto("/foyer");
+  await page.getByRole("link", { name: /Alex Test/ }).click();
+  await expect(page.getByRole("heading", { name: "Alex Test" })).toBeVisible();
 
   // Complémentaire LCA chez le même groupe
   await page.getByRole("button", { name: "Ajouter une complémentaire LCA" }).click();
@@ -75,17 +89,26 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByRole("dialog")).toBeHidden();
   await shot(page, "04-personne");
 
-  // Rituel 2027
+  // Rituel 2027 : reconduction, stratégie, besoins, comparaison
   await page.getByRole("link", { name: "Rituel" }).click();
-  await page.getByRole("button", { name: "Lancer l'analyse 2027" }).click();
-  await expect(page.getByText("Votre foyer en 2027, sans rien changer")).toBeVisible();
+  await expect(page.getByText("Sans rien faire, en 2027 vous paierez")).toBeVisible();
   // Le tarif renommé entre 2026 et 2027 est retrouvé sans rien demander.
   await expect(page.getByText("Produit à préciser")).toHaveCount(0);
   await shot(page, "05-rituel");
+  await page.getByRole("link", { name: "Choisir ma stratégie" }).first().click();
+  await expect(page.getByRole("heading", { name: "Quelle stratégie ?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Maintien" })).toBeVisible();
+  await shot(page, "05b-strategie");
+  await page.getByRole("button", { name: "Choisir « Économie max »" }).click();
+  await expect(page.getByRole("heading", { name: "Votre besoin" })).toBeVisible();
+  await page.getByRole("radio", { name: /Quelques consultations/ }).check();
+  await shot(page, "05c-besoins");
+  await page.getByRole("button", { name: "Comparer les offres" }).click();
 
-  // Comparateur : renouvellement connu, choisir la meilleure offre
-  await page.getByRole("link", { name: "Comparer pour Alex" }).click();
+  // Comparateur : renouvellement connu, top 3 de la stratégie, choisir la meilleure offre
   await expect(page.getByText("Sans rien faire en 2027")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Top 3 · Économie max/ })).toBeVisible();
+  await expect(page.getByText("Selon chaque stratégie")).toBeVisible();
   await shot(page, "06-comparateur");
   await page.getByRole("button", { name: "Simulateur de franchise" }).click();
   await expect(page.getByText("Quelle franchise ?")).toBeVisible();
@@ -144,6 +167,19 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   // Démarches : demande à la nouvelle caisse, résiliation, confirmations
   await page.goto("/rituel/2027/lettres");
   await expect(page.getByText("Qui change quoi")).toBeVisible();
+  // Signature à l'écran, apposée sur les courriers PDF.
+  await page.getByRole("button", { name: "Signer à l'écran" }).click();
+  const pad = page.getByLabel("Zone de signature de Alex");
+  await expect(pad).toBeVisible();
+  await page.waitForTimeout(600); // fin de l'animation du panneau
+  const box = (await pad.boundingBox())!;
+  await page.mouse.move(box.x + 30, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + 20, { steps: 8 });
+  await page.mouse.move(box.x + box.width - 30, box.y + box.height - 20, { steps: 8 });
+  await page.mouse.up();
+  await page.getByRole("button", { name: "Enregistrer la signature" }).click();
+  await expect(page.getByRole("img", { name: "Signature de Alex" })).toBeVisible();
   await page.getByRole("button", { name: "Préparer tous les courriers" }).click();
   await expect(page.getByText("2 courrier(s) prêt(s).")).toBeVisible();
   await expect(page.getByText(/avec offre de complémentaires/)).toBeVisible();
@@ -228,7 +264,9 @@ test.describe("sur ordinateur", () => {
     // … ou le supprimer complètement.
     await page.getByRole("button", { name: "Supprimer ce rituel" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Supprimer le rituel" }).click();
-    await expect(page.getByRole("button", { name: "Lancer l'analyse 2027" })).toBeVisible();
+    // Les primes sont publiées : une analyse vierge s'ouvre, sans aucun choix.
+    await expect(page.getByRole("link", { name: "Choisir ma stratégie" }).first()).toBeVisible();
+    await expect(page.getByText("Je change de caisse")).toHaveCount(0);
     await shot(page, "d10-rituel-supprime");
   });
 });

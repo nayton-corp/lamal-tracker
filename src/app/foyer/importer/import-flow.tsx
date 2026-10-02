@@ -1,10 +1,11 @@
 "use client";
 
-import { CheckCircle2, FileUp, ShieldCheck } from "lucide-react";
+import { Camera, CheckCircle2, FileUp, Loader2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { analyzePolicyAction, applyPolicyImportAction } from "@/app/actions/household";
+import { analyzePolicyTextAction } from "@/app/actions/journey";
 import type { ImportedPerson, PolicyImport } from "@/application/policy-import";
 import { MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { Alert } from "@/ui/alert";
@@ -12,6 +13,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
+import { readImageText, type OcrProgress } from "./ocr";
 
 type Row = ImportedPerson & { include: boolean; premium: string; lcaKeep: boolean[] };
 
@@ -21,7 +23,7 @@ const toRp = (s: string) => {
   return s.trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
 };
 
-export function ImportFlow({ insurers, years, hasPersons }: { insurers: { id: number; name: string }[]; years: number[]; hasPersons: boolean }) {
+export function ImportFlow({ insurers, years, hasPersons, onSaved }: { insurers: { id: number; name: string }[]; years: number[]; hasPersons: boolean; onSaved?: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export function ImportFlow({ insurers, years, hasPersons }: { insurers: { id: nu
   const [insurerId, setInsurerId] = useState<string>("");
   const [year, setYear] = useState<number>(years[1] ?? years[0]!);
   const [rows, setRows] = useState<Row[]>([]);
+  const [ocr, setOcr] = useState<OcrProgress | null>(null);
 
   if (!hasPersons) {
     return (
@@ -39,20 +42,38 @@ export function ImportFlow({ insurers, years, hasPersons }: { insurers: { id: nu
     );
   }
 
-  function analyze(form: FormData) {
+  function show(res: { result?: PolicyImport; error?: string }) {
+    if (res.error || !res.result) {
+      setError(res.error ?? "Lecture impossible.");
+      setResult(null);
+      return;
+    }
+    setResult(res.result);
+    setInsurerId(res.result.insurerId ? String(res.result.insurerId) : "");
+    setYear(res.result.year);
+    setRows(res.result.persons.map((p) => ({ ...p, include: true, premium: toChf(p.billedMonthlyRp), lcaKeep: p.lca.map(() => true) })));
+  }
+
+  /** PDF : texte extrait sur le Raspberry Pi. Photo : texte lu sur l'appareil, puis analysé. */
+  function analyze(file: File | undefined) {
+    if (!file) return;
     setError(null);
     setDone(null);
     start(async () => {
-      const res = await analyzePolicyAction(form);
-      if (res.error || !res.result) {
-        setError(res.error ?? "Lecture impossible.");
-        setResult(null);
+      if (file.type.startsWith("image/")) {
+        try {
+          const text = await readImageText(file, setOcr);
+          setOcr(null);
+          show(await analyzePolicyTextAction(text));
+        } catch {
+          setOcr(null);
+          setError("La photo n'a pas pu être lue. Reprenez-la à plat, bien éclairée, ou importez le PDF.");
+        }
         return;
       }
-      setResult(res.result);
-      setInsurerId(res.result.insurerId ? String(res.result.insurerId) : "");
-      setYear(res.result.year);
-      setRows(res.result.persons.map((p) => ({ ...p, include: true, premium: toChf(p.billedMonthlyRp), lcaKeep: p.lca.map(() => true) })));
+      const form = new FormData();
+      form.set("file", file);
+      show(await analyzePolicyAction(form));
     });
   }
 
@@ -82,6 +103,7 @@ export function ImportFlow({ insurers, years, hasPersons }: { insurers: { id: nu
         setDone(res.ok ?? "Enregistré.");
         setResult(null);
         router.refresh();
+        onSaved?.();
       }
     });
   }
@@ -89,18 +111,34 @@ export function ImportFlow({ insurers, years, hasPersons }: { insurers: { id: nu
   return (
     <div className="space-y-4">
       <Card className="space-y-3">
-        <form action={analyze} className="space-y-3">
-          <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-4 text-center text-sm hover:bg-surface-2">
-            <FileUp aria-hidden className="size-6 text-primary" />
-            <span className="font-medium">Choisir le PDF de la police</span>
-            <input type="file" name="file" accept="application/pdf,.pdf" required className="max-w-full text-sm" aria-label="PDF de la police" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/40 bg-primary-soft/30 p-4 text-center text-sm hover:bg-primary-soft/60">
+            <Camera aria-hidden className="size-7 text-primary" />
+            <span className="font-semibold">Photo de la police ou de la carte d&apos;assuré</span>
+            <span className="text-xs text-muted">Bien à plat, toute la page visible</span>
+            <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label="Photo de la police" disabled={pending} onChange={(e) => { analyze(e.target.files?.[0]); e.target.value = ""; }} />
           </label>
-          <Button type="submit" block disabled={pending}>
-            {pending && !result ? "Lecture…" : "Lire la police"}
-          </Button>
-        </form>
+          <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-4 text-center text-sm hover:bg-surface-2">
+            <FileUp aria-hidden className="size-7 text-primary" />
+            <span className="font-semibold">PDF de la police</span>
+            <span className="text-xs text-muted">Reçu par e-mail ou sur le portail client</span>
+            <input type="file" accept="application/pdf,.pdf,image/*" className="sr-only" aria-label="PDF de la police" disabled={pending} onChange={(e) => { analyze(e.target.files?.[0]); e.target.value = ""; }} />
+          </label>
+        </div>
+        {pending && !result && (
+          <div className="space-y-2" role="status">
+            <p className="flex items-center gap-2 text-sm">
+              <Loader2 aria-hidden className="size-4 animate-spin text-primary" /> {ocr ? `${ocr.label}… ${ocr.percent} %` : "Lecture de la police…"}
+            </p>
+            {ocr && (
+              <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${ocr.percent}%` }} />
+              </div>
+            )}
+          </div>
+        )}
         <p className="flex items-start gap-2 text-xs text-muted">
-          <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" /> Lecture locale, sans service externe. Les documents scannés (photos) ne sont pas lisibles : utilisez le PDF reçu de la caisse.
+          <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" /> Tout est lu chez vous : la photo est déchiffrée sur votre téléphone, le PDF sur votre Raspberry Pi. Aucun service externe. Vous vérifiez chaque valeur avant d&apos;enregistrer.
         </p>
         <FormError message={error} />
         {done && (

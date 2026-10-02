@@ -4,6 +4,19 @@ import { MODEL_TYPES, CANTONS } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
 import { household, insurer, lamalPolicy, lcaPolicy, person } from "@/infrastructure/db/schema";
 import { LCA_GUARANTEE_KEYS, guaranteeInfo } from "@/domain/lca";
+import { getSetting, setSetting } from "@/infrastructure/db/settings";
+
+/** Une personne seule ou un foyer de plusieurs membres : change le vocabulaire et l'accueil. */
+export type HouseholdMode = "SOLO" | "FAMILY";
+
+export function getHouseholdMode(db: Db): HouseholdMode | null {
+  return getSetting<HouseholdMode>(db, "household.mode");
+}
+
+export function setHouseholdMode(db: Db, mode: HouseholdMode) {
+  if (mode !== "SOLO" && mode !== "FAMILY") throw new Error("Mode inconnu");
+  setSetting(db, "household.mode", mode);
+}
 
 export const householdInput = z.object({
   name: z.string().trim().min(1, "Nom requis"),

@@ -1,4 +1,4 @@
-import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import type { LetterContent } from "@/domain/letter";
 
 // A4 ; destinataire placé pour une enveloppe C5/C4 à fenêtre à droite (norme suisse).
@@ -19,10 +19,12 @@ const s = StyleSheet.create({
   signatures: { flexDirection: "row", flexWrap: "wrap", marginTop: mm(12) },
   signature: { width: mm(72), marginRight: mm(8), marginBottom: mm(6) },
   line: { borderTopWidth: 0.6, borderTopColor: "#555", marginTop: mm(14), paddingTop: 3, fontSize: 9.5 },
+  signed: { height: mm(14), marginBottom: -mm(14), objectFit: "contain", objectPosition: "left bottom" },
   footer: { position: "absolute", bottom: mm(12), left: mm(22), right: mm(20), fontSize: 8, color: "#666" },
 });
 
-export function LetterDocument({ content }: { content: LetterContent }) {
+/** `signed` : signatures dessinées à l'écran, par nom complet (apposées au-dessus de la ligne). */
+export function LetterDocument({ content, signed = {} }: { content: LetterContent; signed?: Record<string, string> }) {
   return (
     <Document title={content.subject} author={content.senderLines[0]} language="fr-CH">
       <Page size="A4" style={s.page}>
@@ -69,6 +71,8 @@ export function LetterDocument({ content }: { content: LetterContent }) {
           <View style={s.signatures} wrap={false}>
             {content.signatures.map((name) => (
               <View key={name} style={s.signature}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- image PDF, pas de texte alternatif */}
+                {signed[name] && <Image src={signed[name]} style={s.signed} />}
                 <Text style={s.line}>{name}</Text>
               </View>
             ))}
@@ -82,6 +86,6 @@ export function LetterDocument({ content }: { content: LetterContent }) {
   );
 }
 
-export function renderLetterPdf(content: LetterContent): Promise<Buffer> {
-  return renderToBuffer(<LetterDocument content={content} />);
+export function renderLetterPdf(content: LetterContent, signed?: Record<string, string>): Promise<Buffer> {
+  return renderToBuffer(<LetterDocument content={content} signed={signed} />);
 }

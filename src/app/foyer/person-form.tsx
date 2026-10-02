@@ -30,7 +30,21 @@ function isMinorAround(birthDate: string, year: number): boolean {
   }
 }
 
-export function PersonForm({ person, insurers, year, onDone }: { person: PersonDefaults | null; insurers: { id: number; name: string }[]; year: number; onDone?: () => void }) {
+/**
+ * `compact` : seulement l'identité (accueil) ; les préférences du comparateur se règlent au
+ * questionnaire des besoins du rituel. `stay` : rester sur la page après un ajout.
+ */
+export function PersonForm({ person, insurers, year, onDone, compact, stay, next, submitLabel }: {
+  person: PersonDefaults | null;
+  insurers: { id: number; name: string }[];
+  year: number;
+  onDone?: () => void;
+  compact?: boolean;
+  stay?: boolean;
+  /** Page où aller après l'enregistrement (accueil guidé). */
+  next?: string;
+  submitLabel?: string;
+}) {
   const [state, action] = useActionState(savePersonAction, null);
   const [birthDate, setBirthDate] = useState(person?.birthDate ?? "");
   const fe = state?.fieldErrors ?? {};
@@ -41,6 +55,8 @@ export function PersonForm({ person, insurers, year, onDone }: { person: PersonD
   return (
     <form action={action} className="space-y-4">
       {person?.id && <input type="hidden" name="id" value={person.id} />}
+      {stay && <input type="hidden" name="stay" value="1" />}
+      {next && <input type="hidden" name="next" value={next} />}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Prénom" htmlFor="firstName" error={fe.firstName}>
           <Input id="firstName" name="firstName" required defaultValue={person?.firstName} autoComplete="given-name" />
@@ -52,9 +68,11 @@ export function PersonForm({ person, insurers, year, onDone }: { person: PersonD
       <Field label="Date de naissance" htmlFor="birthDate" error={fe.birthDate} hint="Détermine la catégorie (enfant, jeune adulte, adulte) pour chaque année.">
         <Input id="birthDate" name="birthDate" type="date" required value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
       </Field>
+      {!compact && (
       <Field label="Frais de santé attendus par an (CHF)" htmlFor="healthCosts" hint="Factures médicales estimées. Sert à classer les offres selon le coût total (prime + franchise + quote-part).">
         <Input id="healthCosts" name="healthCosts" inputMode="decimal" defaultValue={((person?.healthCostsRp ?? 50000) / 100).toFixed(0)} />
       </Field>
+      )}
       {minor ? (
         <Field label="Échelon enfant" htmlFor="kidSubgroup" hint="K1 = tarif normal. Certaines caisses accordent un rabais dès le 2e ou 3e enfant (K3, K4, K5) : voir la police.">
           <Select id="kidSubgroup" name="kidSubgroup" defaultValue={person?.kidSubgroup ?? "K1"}>
@@ -70,6 +88,8 @@ export function PersonForm({ person, insurers, year, onDone }: { person: PersonD
         <Checkbox name="employedAccidentCover" defaultChecked={person?.employedAccidentCover} label="Employé·e au moins 8 h/semaine (accidents couverts par l'employeur : la LAMal peut exclure l'accident)" />
       )}
 
+      {!compact && (
+      <>
       <fieldset className="space-y-1">
         <legend className="mb-1 text-sm font-medium">Modèles acceptés pour le comparateur</legend>
         <p className="mb-2 text-sm text-muted">Aucun coché = tous les modèles.</p>
@@ -92,10 +112,12 @@ export function PersonForm({ person, insurers, year, onDone }: { person: PersonD
           ))}
         </div>
       </details>
+      </>
+      )}
 
       <FormError message={state?.error} />
       {state?.ok && <Alert tone="success" title={state.ok} />}
-      <SubmitButton block>{person?.id ? "Enregistrer" : "Ajouter la personne"}</SubmitButton>
+      <SubmitButton block>{submitLabel ?? (person?.id ? "Enregistrer" : "Ajouter la personne")}</SubmitButton>
     </form>
   );
 }

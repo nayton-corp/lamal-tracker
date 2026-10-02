@@ -24,6 +24,15 @@ import { person, reviewLine } from "@/infrastructure/db/schema";
 import { toActionError, chfField, type ActionState } from "@/server/action";
 import { db, nowIso, today } from "@/server/context";
 
+/** Après un choix : la personne suivante sans choix, sinon le rituel. */
+function afterDecision(year: number, lineId: number) {
+  const line = db().select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
+  const next = line
+    ? db().select().from(reviewLine).where(eq(reviewLine.reviewId, line.reviewId)).all().find((l) => l.decision === "UNDECIDED")
+    : undefined;
+  done(year, next ? `/personne/${next.id}` : `#ligne-${lineId}`);
+}
+
 function done(year: number, path = "") {
   revalidatePath("/", "layout");
   redirect(`/rituel/${year}${path}`);
@@ -51,7 +60,7 @@ export async function decideAction(_: ActionState, form: FormData): Promise<Acti
   } catch (e) {
     return toActionError(e);
   }
-  done(year, `#ligne-${form.get("lineId")}`);
+  afterDecision(year, Number(form.get("lineId")));
   return null;
 }
 
@@ -62,7 +71,7 @@ export async function keepAction(_: ActionState, form: FormData): Promise<Action
   } catch (e) {
     return toActionError(e);
   }
-  done(year, `#ligne-${form.get("lineId")}`);
+  afterDecision(year, Number(form.get("lineId")));
   return null;
 }
 
