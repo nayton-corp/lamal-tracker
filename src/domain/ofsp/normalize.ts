@@ -73,6 +73,7 @@ export interface PremiumRow {
 export type SkipReason =
   | "hors_suisse"
   | "canton_inconnu"
+  | "canton_vide"
   | "region_illisible"
   | "classe_age_illisible"
   | "accident_illisible"
@@ -91,6 +92,21 @@ function text(v: unknown): string {
     return ((v as { richText: { text: string }[] }).richText ?? []).map((r) => r.text).join("").trim();
   }
   return String(v).trim();
+}
+
+/** « ZH », « KT-ZH », « PR_KAN_ZH »… → ZH ; null si aucun code de canton reconnu. */
+export function parseCanton(v: string): Canton | null {
+  const u = v.trim().toUpperCase();
+  if (isCanton(u)) return u;
+  const m = /(?:^|[^A-Z])([A-Z]{2})$/.exec(u);
+  return m && isCanton(m[1]!) ? m[1] : null;
+}
+
+/** Hoheitsgebiet : « CH », « HGB_CH », « Schweiz »… → true ; un autre pays → false ; vide → null. */
+export function parseSwissTerritory(v: string): boolean | null {
+  const u = v.trim().toUpperCase();
+  if (!u) return null;
+  return /(^|[^A-Z])CH$|^CHE$|SCHWEIZ|SUISSE|SVIZZERA/.test(u);
 }
 
 export function parseRegion(v: string): number | null {
@@ -164,11 +180,11 @@ export function normalizeRow(
   const get = (c: Column) => (index[c] === undefined ? "" : text(cells[index[c]!]));
   const raw = (c: Column) => (index[c] === undefined ? undefined : cells[index[c]!]);
 
-  const territory = get("Hoheitsgebiet").toUpperCase();
-  if (territory && territory !== "CH") return { ok: false, reason: "hors_suisse" };
+  if (parseSwissTerritory(get("Hoheitsgebiet")) === false) return { ok: false, reason: "hors_suisse" };
 
-  const canton = get("Kanton").toUpperCase();
-  if (!isCanton(canton)) return { ok: false, reason: canton ? "canton_inconnu" : "hors_suisse" };
+  const rawCanton = get("Kanton");
+  const canton = parseCanton(rawCanton);
+  if (!canton) return { ok: false, reason: rawCanton ? "canton_inconnu" : "canton_vide" };
 
   const insurerBag = Number(get("Versicherer"));
   if (!Number.isInteger(insurerBag) || insurerBag <= 0) return { ok: false, reason: "assureur_illisible" };

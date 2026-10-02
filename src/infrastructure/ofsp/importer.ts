@@ -86,6 +86,15 @@ export async function importPremiumFile(
     }
   });
 
+  // Quelques valeurs brutes par colonne, gardées pour le rapport (diagnostic d'un format inattendu).
+  const samples: Record<string, Set<string>> = {};
+  const sample = (cells: readonly unknown[]) => {
+    for (const [col, i] of Object.entries(index ?? {})) {
+      const set = (samples[col] ??= new Set());
+      const v = cells[i as number];
+      if (set.size < 6 && v !== undefined && v !== null) set.add(typeof v === "object" ? JSON.stringify(v).slice(0, 60) : String(v).slice(0, 60));
+    }
+  };
   let index: Partial<Record<Column, number>> | null = null;
   let missing: string[] = [];
   let batch: PremiumRow[] = [];
@@ -101,6 +110,7 @@ export async function importPremiumFile(
         if (missing.length) break;
         continue;
       }
+      if (acc.rowsRead % 997 === 0) sample(cells);
       const result = normalizeRow(cells, index);
       if (!result.ok) {
         acc.skip(result.reason);
@@ -121,6 +131,7 @@ export async function importPremiumFile(
     if (batch.length) writeBatch(batch);
   } catch (error) {
     const report = acc.report(missing);
+    report.samples = Object.fromEntries(Object.entries(samples).map(([k, v]) => [k, [...v]]));
     report.ok = false;
     report.errors.push(`Lecture impossible : ${error instanceof Error ? error.message : String(error)}`);
     return fail(db, dataset.id, report);
@@ -130,6 +141,7 @@ export async function importPremiumFile(
   const draft = acc.report(missing);
   const previous = draft.year === null ? undefined : previousMedians(db, draft.year - 1);
   const report = acc.report(missing, previous);
+  report.samples = Object.fromEntries(Object.entries(samples).map(([k, v]) => [k, [...v]]));
   if (filtered) report.warnings.push(`${filtered} lignes hors des cantons retenus (${[...cantonFilter!].join(", ")}) ignorées.`);
 
   if (!report.ok || report.year === null) return fail(db, dataset.id, report);

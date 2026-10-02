@@ -19,7 +19,7 @@ function print(outcome: ImportOutcome) {
     return;
   }
   const r = outcome.report;
-  console.log(JSON.stringify({ status: outcome.status, year: r.year, stats: { ...r.stats, adultMedianByCanton: undefined }, errors: r.errors, warnings: r.warnings }, null, 2));
+  console.log(JSON.stringify({ status: outcome.status, year: r.year, stats: { ...r.stats, adultMedianByCanton: undefined }, errors: r.errors, warnings: r.warnings, samples: r.samples }, null, 2));
   const medians = Object.entries(r.stats.adultMedianByCanton)
     .sort()
     .map(([c, v]) => `${c} ${(v / 100).toFixed(2)}`)

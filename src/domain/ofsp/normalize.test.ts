@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyModel, mapHeader, normalizeRow, premiumKey } from "./normalize";
+import { classifyModel, mapHeader, normalizeRow, parseCanton, parseSwissTerritory, premiumKey } from "./normalize";
 import { ImportAccumulator } from "./report";
 
 const header = [
@@ -48,6 +48,19 @@ describe("ligne", () => {
     expect(bad(14, "n/a")).toEqual({ ok: false, reason: "prime_illisible" });
     expect(bad(13, "FRA")).toEqual({ ok: false, reason: "franchise_illisible" });
     expect(bad(6, "AKA_99")).toEqual({ ok: false, reason: "classe_age_illisible" });
+  });
+
+  it("tolère les codes préfixés de canton et de territoire", () => {
+    expect(parseCanton("ZH")).toBe("ZH");
+    expect(parseCanton("PR_KAN_ZH")).toBe("ZH");
+    expect(parseCanton("KT-vd")).toBe("VD");
+    expect(parseCanton("XX")).toBeNull();
+    expect(parseSwissTerritory("CH")).toBe(true);
+    expect(parseSwissTerritory("HGB_CH")).toBe(true);
+    expect(parseSwissTerritory("Schweiz")).toBe(true);
+    expect(parseSwissTerritory("DE")).toBe(false);
+    expect(parseSwissTerritory("EU_DE")).toBe(false);
+    expect(parseSwissTerritory("")).toBeNull();
   });
 
   it("classe les anciens tarifs « divers » d'après le libellé", () => {

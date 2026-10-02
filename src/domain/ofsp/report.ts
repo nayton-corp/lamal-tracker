@@ -4,6 +4,8 @@ import type { PremiumRow, SkipReason } from "./normalize";
 
 export interface ValidationReport {
   ok: boolean;
+  /** Échantillon de valeurs brutes par colonne : diagnostic quand le format change. */
+  samples?: Record<string, string[]>;
   year: number | null;
   errors: string[];
   warnings: string[];
@@ -83,7 +85,7 @@ export class ImportAccumulator {
       warnings.push(`Cantons absents : ${missingCantons.join(", ")}.`);
     }
     const skippedTotal = Object.values(this.skipped).reduce((a, b) => a + (b ?? 0), 0);
-    const illegible = skippedTotal - (this.skipped.hors_suisse ?? 0);
+    const illegible = skippedTotal - (this.skipped.hors_suisse ?? 0) - (this.skipped.canton_vide ?? 0);
     if (this.rowsRead > 0 && illegible / this.rowsRead > 0.01) {
       warnings.push(`${illegible} lignes illisibles (${Math.round((illegible * 100) / this.rowsRead)} %) : le format a peut-être changé.`);
     }
