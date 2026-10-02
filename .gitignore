@@ -46,3 +46,5 @@ next-env.d.ts
 *.sqlite-*
 /playwright-report/
 /test-results/
+/.e2e-data/
+.sandbox-ca.crt

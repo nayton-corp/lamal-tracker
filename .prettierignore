@@ -6,3 +6,4 @@ test-results
 playwright-report
 data
 public/offline.html
+.e2e-data

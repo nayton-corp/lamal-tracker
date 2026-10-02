@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+data
+test-results
+playwright-report
+coverage
+*.sqlite*
+.env*
+
+Dockerfile
+docker-compose.yml
+.e2e-data

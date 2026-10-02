@@ -40,7 +40,9 @@ function fakeFetch(year: number, opts: { found?: boolean } = {}): typeof fetch {
     const url = String(input);
     if (url.startsWith(SEARCH)) return Response.json(opts.found === false ? { result: { results: [] } } : ckanPayload(year));
     if (url === `https://data.example/praemien-${year}.csv`) {
-      return new Response(new Blob([fixtureBytes({ year, inflation: 1.06 }) as Uint8Array<ArrayBuffer>]), { headers: { "content-type": "text/csv" } });
+      return new Response(new Blob([fixtureBytes({ year, inflation: 1.06 }) as Uint8Array<ArrayBuffer>]), {
+        headers: { "content-type": "text/csv" },
+      });
     }
     return new Response("not found", { status: 404 });
   }) as typeof fetch;

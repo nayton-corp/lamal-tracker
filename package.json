@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "arch": "depcruise src --config .dependency-cruiser.cjs",
+    "lint:arch": "depcruise src --config .dependency-cruiser.cjs",
     "format": "prettier --write .",
     "db:generate": "drizzle-kit generate",
     "ingest": "tsx scripts/ingest.ts",

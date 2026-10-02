@@ -1,0 +1,18 @@
+# Déploiement sur le Raspberry Pi : docker compose up -d
+services:
+  lamal:
+    image: ghcr.io/naythanb/lamal-tracker:latest
+    # Pour construire sur le Pi au lieu de télécharger l'image : décommenter la ligne suivante.
+    # build: .
+    container_name: lamal-tracker
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: Europe/Zurich
+      # Facultatif : mot de passe (authentification HTTP) si l'app est accessible hors de ton réseau.
+      # APP_PASSWORD: change-moi
+      # Facultatif : contact affiché aux services push (sinon une valeur locale par défaut).
+      # VAPID_SUBJECT: mailto:toi@example.ch

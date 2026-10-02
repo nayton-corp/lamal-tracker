@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3210;
-const DATA_DIR = "test-results/e2e-data";
+const DATA_DIR = ".e2e-data";
 
 /** Tests de bout en bout sur l'app compilée (`pnpm build` d'abord), avec une base de démonstration à date fixe. */
 export default defineConfig({
