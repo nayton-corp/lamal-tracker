@@ -85,6 +85,43 @@ export function startImport(
   });
 }
 
+/**
+ * Importe les primes d'une année : le fichier courant s'il porte sur cette année, sinon
+ * l'archive annuelle. Sans effet si l'année est déjà présente.
+ */
+export function startYearImport(year: number): boolean {
+  return run(`Primes ${year}`, async (s) => {
+    if (activeDataset(db(), year)) return;
+    const archives = await listArchives();
+    const archive = archives.find((a) => a.year === year);
+    const url = archive?.url ?? (await resolvePremiumsUrl());
+    const file = await download(url, path.join(dataDir(), "downloads"));
+    s.outcome = await importOne(s, file, url);
+  });
+}
+
+/**
+ * Premier démarrage : primes publiées les plus récentes, puis celles de l'année en cours
+ * (contrats actuels pré-remplis sans rien faire).
+ */
+export function startBootstrapImport(currentYear: number, onLatest?: (outcome: ImportOutcome) => void | Promise<void>): boolean {
+  return run("Première importation des primes", async (s) => {
+    const url = await resolvePremiumsUrl();
+    const file = await download(url, path.join(dataDir(), "downloads"));
+    s.outcome = await importOne(s, file, url);
+    await onLatest?.(s.outcome);
+    if (!activeDataset(db(), currentYear)) {
+      const archive = (await listArchives()).find((a) => a.year === currentYear);
+      if (archive) {
+        s.phase = "download";
+        s.label = `Archive ${currentYear}`;
+        const f = await download(archive.url, path.join(dataDir(), "downloads"));
+        s.outcome = await importOne(s, f, archive.url);
+      }
+    }
+  });
+}
+
 /** Importe les archives OFSP des années précédentes qui ne sont pas encore dans la base. */
 export function startArchivesImport(): boolean {
   return run("Archives des années précédentes", async (s) => {

@@ -71,6 +71,16 @@ describe("ligne", () => {
     expect(classifyModel("TAR-DIV", "Pharmed")).toBe("PHARMACY");
     expect(classifyModel("TAR-HMO", "")).toBe("PRAXIS");
     expect(classifyModel("TAR-DIV", "Spécial")).toBe("OTHER");
+    // Vrais libellés 2026
+    expect(classifyModel("TAR-DIV", "Sanmed24")).toBe("TELMED");
+    expect(classifyModel("TAR-DIV", "Premed-24")).toBe("TELMED");
+    expect(classifyModel("TAR-DIV", "EGK-TelCare")).toBe("TELMED");
+    expect(classifyModel("TAR-DIV", "Digimed")).toBe("TELMED");
+    expect(classifyModel("TAR-DIV", "AGRIcontact")).toBe("TELMED");
+    expect(classifyModel("TAR-DIV", "FlexHelp 24")).toBe("FLEX");
+    expect(classifyModel("TAR-DIV", "PrimaFlex")).toBe("FLEX");
+    expect(classifyModel("TAR-DIV", "Combi Care")).toBe("FLEX");
+    expect(classifyModel("TAR-DIV", "Gesundheitnetz")).toBe("PRAXIS");
   });
 });
 

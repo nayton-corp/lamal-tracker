@@ -11,6 +11,7 @@ import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
 import { Chf } from "@/ui/money";
 import { EmptyState, Page, PageHeader } from "@/ui/page";
+import { HouseholdCard } from "./household-card";
 import { HouseholdForm } from "./household-form";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,15 @@ export default function FoyerPage() {
 
   return (
     <Page>
-      <PageHeader title="Foyer" subtitle={h ? `${h.city || "—"} · ${h.canton}, région ${h.region}` : "Commencez par décrire votre foyer."} />
+      <PageHeader title="Foyer" subtitle={h ? undefined : "Commencez par décrire votre foyer : l'adresse sert d'expéditeur des lettres, le code postal donne la région de primes."} />
+
+      {h ? (
+        <HouseholdCard household={h} />
+      ) : (
+        <Card>
+          <HouseholdForm household={null} />
+        </Card>
+      )}
 
       {h && (
         <Section
@@ -87,12 +96,6 @@ export default function FoyerPage() {
           )}
         </Section>
       )}
-
-      <Section title={h ? "Adresse et région" : "Votre foyer"}>
-        <Card>
-          <HouseholdForm household={h} />
-        </Card>
-      </Section>
     </Page>
   );
 }

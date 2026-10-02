@@ -62,7 +62,7 @@ function renewalFor(db: Db, reviewRow: typeof review.$inferSelect, p: PersonRow,
         .get()
     : undefined;
   const result = findRenewal(
-    { insurerId: policy.insurerId, tariffCode: policy.tariffCode, modelType: policy.modelType as ModelType, franchiseChf: policy.franchiseChf },
+    { insurerId: policy.insurerId, tariffCode: policy.tariffCode, tariffLabel: policy.tariffLabel, modelType: policy.modelType as ModelType, franchiseChf: policy.franchiseChf },
     offers,
     franchisesFor(params, ageClass),
     lineage?.toCode ?? null,

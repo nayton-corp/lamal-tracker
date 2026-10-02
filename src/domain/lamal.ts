@@ -33,6 +33,18 @@ export const MODEL_LABEL: Record<ModelType, string> = {
   OTHER: "Autre modèle",
 };
 
+/**
+ * Libellé lisible d'un tarif. L'OFSP nomme le tarif standard « BASE » (2027) ou
+ * « Grundversicherung » (avant) : on affiche « Standard (libre choix) ».
+ */
+export function displayTariffLabel(label: string | null | undefined, modelType: ModelType): string {
+  const l = (label ?? "").trim();
+  if (!l || /^(base|grundversicherung|assurance de base|assicurazione di base)$/i.test(l)) {
+    return modelType === "STANDARD" ? "Standard (libre choix)" : MODEL_LABEL[modelType];
+  }
+  return l;
+}
+
 /** Un modèle alternatif impose un premier recours : le médecin traitant doit être vérifié. */
 export function requiresDoctorCheck(model: ModelType): boolean {
   return model === "PRAXIS" || model === "FLEX" || model === "OTHER";

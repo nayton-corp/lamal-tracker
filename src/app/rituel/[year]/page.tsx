@@ -4,7 +4,7 @@ import { closeReviewAction, openReviewAction, undoAction } from "@/app/actions/r
 import { getHousehold, listPersons } from "@/application/household";
 import { getReviewByYear, getReviewView, type PersonReview, type ReviewView } from "@/application/review";
 import { formatDateLong } from "@/domain/dates";
-import { AGE_CLASS_LABEL, MODEL_LABEL, type ModelType } from "@/domain/lamal";
+import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { changePermille } from "@/domain/money";
 import { DECISION_LABEL } from "@/domain/review";
 import { activeDataset } from "@/infrastructure/db/queries";
@@ -32,11 +32,13 @@ const URGENCY = {
   late: "bg-increase text-white",
 };
 
+// Le renouvellement est retrouvé automatiquement ; on ne sollicite l'utilisateur que s'il
+// faut vraiment choisir (plusieurs produits possibles) ou si la caisse ne propose plus rien.
 const RENEWAL_BADGE = {
   MATCHED: null,
-  PROBABLE: { tone: "info", label: "Tarif à confirmer" },
-  AMBIGUOUS: { tone: "increase", label: "Tarif à choisir" },
-  MISSING: { tone: "increase", label: "Tarif introuvable" },
+  PROBABLE: null,
+  AMBIGUOUS: { tone: "increase", label: "Produit à préciser", hint: "Votre caisse propose plusieurs produits proches en {year} : indiquez lequel vous aurez." },
+  MISSING: { tone: "increase", label: "Plus proposé", hint: "Votre caisse ne propose plus ce contrat dans votre région en {year} : il faudra en choisir un autre." },
 } as const;
 
 export default async function RitualPage({ params }: { params: Promise<{ year: string }> }) {
@@ -226,7 +228,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
         <div>
           <p className="text-lg font-semibold">{pr.person.firstName}</p>
           <p className="text-sm text-muted">
-            {pr.currentInsurer} · {pr.policy.tariffLabel || MODEL_LABEL[pr.policy.modelType as ModelType]} · F {pr.policy.franchiseChf}
+            {pr.currentInsurer} · {displayTariffLabel(pr.policy.tariffLabel, pr.policy.modelType as ModelType)} · F {pr.policy.franchiseChf}
           </p>
         </div>
         <Badge tone={decided ? (pr.line.decision === "KEEP" ? "primary" : "saving") : "neutral"}>{DECISION_LABEL[pr.line.decision]}</Badge>
@@ -261,7 +263,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
             <CircleAlert aria-hidden className="size-3.5" />
             {badge.label}
           </Badge>
-          <span className="text-muted">Le code tarif a changé : confirmez-le dans le comparateur.</span>
+          <span className="text-muted">{badge.hint.replace("{year}", String(year))}</span>
         </p>
       )}
 
@@ -269,7 +271,7 @@ function PersonCard({ pr, year, closed }: { pr: PersonReview; year: number; clos
         <div className="flex items-center justify-between gap-3 rounded-xl border border-saving/30 bg-saving-soft/50 p-3 text-sm">
           <div>
             <p className="font-medium">
-              {pr.chosenInsurer} · {pr.line.chosenLabel}
+              {pr.chosenInsurer} · {displayTariffLabel(pr.line.chosenLabel, (pr.line.chosenModelType ?? "OTHER") as ModelType)}
             </p>
             <p className="text-muted">Franchise {pr.line.chosenFranchiseChf}</p>
           </div>

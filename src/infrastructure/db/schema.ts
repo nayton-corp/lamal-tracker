@@ -91,6 +91,9 @@ export const household = sqliteTable("household", {
   street: text("street").notNull().default(""),
   postalCode: text("postal_code").notNull().default(""),
   city: text("city").notNull().default(""),
+  /** Commune de domicile (déterminante pour la région de primes) et son n° OFS. */
+  commune: text("commune").notNull().default(""),
+  bfsNumber: integer("bfs_number"),
   canton: text("canton").notNull(),
   region: integer("region").notNull(),
   createdAt: createdAt(),

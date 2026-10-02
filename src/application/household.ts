@@ -9,6 +9,8 @@ export const householdInput = z.object({
   street: z.string().trim().default(""),
   postalCode: z.string().trim().default(""),
   city: z.string().trim().default(""),
+  commune: z.string().trim().default(""),
+  bfsNumber: z.coerce.number().int().positive().optional().nullable(),
   canton: z.enum(CANTONS),
   region: z.coerce.number().int().min(0).max(3),
 });

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { deleteLcaAction, deletePersonAction, deletePolicyAction } from "@/app/actions/household";
 import { getPerson, listInsurers, listLca, listPolicies } from "@/application/household";
 import { ageClassForYear } from "@/domain/age";
-import { AGE_CLASS_LABEL, MODEL_LABEL, type ModelType } from "@/domain/lamal";
+import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { db, today } from "@/server/context";
 import { Badge } from "@/ui/badge";
@@ -12,7 +12,7 @@ import { Card, Section } from "@/ui/card";
 import { Chf } from "@/ui/money";
 import { Page, PageHeader } from "@/ui/page";
 import { LcaSheet, PolicySheet } from "../../editors";
-import { PersonForm } from "../../person-form";
+import { ProfileCard } from "../../profile-card";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
   return (
     <Page>
-      <PageHeader title={`${p.firstName} ${p.lastName}`} subtitle={`${AGE_CLASS_LABEL[ageClassForYear(p.birthDate, year)]} en ${year}`} back="/foyer" />
+      <PageHeader title={`${p.firstName} ${p.lastName}`} back="/foyer" />
+
+      <ProfileCard person={p} insurers={insurers} year={year} ageLabel={`${AGE_CLASS_LABEL[ageClassForYear(p.birthDate, year)]} en ${year}`} />
 
       <Section
         title="Contrats LAMal"
@@ -61,7 +63,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                 </div>
                 <div className="mt-1 flex items-center gap-2">
                   <p className="min-w-0 flex-1 text-sm text-muted">
-                    {policy.tariffLabel || MODEL_LABEL[policy.modelType as ModelType]} · franchise {policy.franchiseChf}
+                    {displayTariffLabel(policy.tariffLabel, policy.modelType as ModelType)} · franchise {policy.franchiseChf}
                     {policy.accident ? " · avec accident" : ""}
                     {policy.policyNumber ? ` · n° ${policy.policyNumber}` : ""}
                   </p>
@@ -107,11 +109,6 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         )}
       </Section>
 
-      <Section title="Profil">
-        <Card>
-          <PersonForm person={p} insurers={insurers} />
-        </Card>
-      </Section>
 
       <form action={deletePersonAction} className="pt-2">
         <input type="hidden" name="id" value={p.id} />

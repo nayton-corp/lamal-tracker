@@ -26,11 +26,12 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByLabel("Nom du foyer").fill("Famille Test");
   await page.getByLabel("Rue et numéro").fill("Rue du Lac 1");
   await page.getByLabel("NPA").fill("1003");
-  await page.getByLabel("Localité").fill("Lausanne");
-  await page.getByLabel("Canton").selectOption("VD");
-  await page.getByLabel("Région de primes").selectOption("1");
+  // Le code postal suffit : commune, canton et région sont trouvés.
+  await expect(page.getByText(/Lausanne \(VD\) · région de primes 1/)).toBeVisible();
+  await expect(page.getByLabel("Localité")).toHaveValue("Lausanne");
+  await shot(page, "01b-foyer");
   await page.getByRole("button", { name: "Enregistrer le foyer" }).click();
-  await expect(page.getByText("Foyer enregistré.")).toBeVisible();
+  await expect(page.getByText("Canton VD · région de primes 1")).toBeVisible();
 
   // Primes officielles 2026 et 2027
   await importFile(page, "primes-2026.xlsx", 2026);
@@ -48,12 +49,15 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByRole("button", { name: "Ajouter un contrat LAMal" }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByLabel("Année").selectOption("2026");
-  await sheet.getByLabel("N° d'assuré").fill("HEL-123");
-  await sheet.getByLabel("Caisse-maladie (LAMal)").selectOption({ label: "Helsana Versicherungen AG" });
-  await expect(sheet.getByLabel("Tarif (données OFSP)")).toBeVisible();
-  await sheet.getByLabel("Tarif (données OFSP)").selectOption("HEL-TEL26");
-  await sheet.getByLabel("Franchise (CHF)").selectOption("2500");
-  await expect(sheet.getByLabel("Prime mensuelle facturée (CHF)")).not.toHaveValue("");
+  await sheet.getByLabel("Caisse-maladie").selectOption({ label: "Helsana Versicherungen AG" });
+  await expect(sheet.getByLabel("Produit")).toBeVisible();
+  await sheet.getByLabel("Produit").selectOption("HEL-TEL26");
+  await sheet.getByLabel("Franchise").selectOption("2500");
+  await sheet.getByLabel("Avec accident").uncheck();
+  // La prime officielle est reprise sans saisie.
+  await expect(sheet.getByText("Prime officielle OFSP")).toBeVisible();
+  await sheet.getByText("N° d'assuré (pour les lettres)").click();
+  await sheet.getByLabel("Numéro d'assuré").fill("HEL-123");
   await shot(page, "03-contrat");
   await sheet.getByRole("button", { name: "Enregistrer le contrat" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
@@ -73,12 +77,12 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByRole("link", { name: "Rituel" }).click();
   await page.getByRole("button", { name: "Lancer l'analyse 2027" }).click();
   await expect(page.getByText("Votre foyer en 2027, sans rien changer")).toBeVisible();
-  await expect(page.getByText("Tarif à confirmer")).toBeVisible();
+  // Le tarif renommé entre 2026 et 2027 est retrouvé sans rien demander.
+  await expect(page.getByText("Produit à préciser")).toHaveCount(0);
   await shot(page, "05-rituel");
 
-  // Comparateur : confirmer le renouvellement puis choisir la meilleure offre
+  // Comparateur : renouvellement connu, choisir la meilleure offre
   await page.getByRole("link", { name: "Comparer pour Alex" }).click();
-  await page.getByRole("button", { name: "C'est celui-ci" }).first().click();
   await expect(page.getByText("Sans rien faire en 2027")).toBeVisible();
   await shot(page, "06-comparateur");
   await page.getByRole("button", { name: "Simulateur de franchise" }).click();

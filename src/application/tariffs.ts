@@ -54,5 +54,9 @@ export function tariffOptions(db: Db, personId: number, year: number, insurerId:
     opt.premiums[r.franchise] = pair;
     byCode.set(r.code, opt);
   }
-  return { available: true, franchises, tariffs: [...byCode.values()] };
+  // Le tarif standard d'abord, puis les modèles alternatifs par nom.
+  const tariffs = [...byCode.values()].sort(
+    (a, b) => Number(b.modelType === "STANDARD") - Number(a.modelType === "STANDARD") || a.label.localeCompare(b.label, "fr"),
+  );
+  return { available: true, franchises, tariffs };
 }
