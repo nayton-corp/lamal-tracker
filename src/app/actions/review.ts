@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { generateLetters } from "@/application/letters";
+import { deleteOfferRequest, generateOfferRequests, markOfferRequestAnswered, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
   acknowledgeLca,
   closeReview,
@@ -182,4 +183,35 @@ export async function deleteReviewAction(_: ActionState, form: FormData): Promis
   }
   done(year);
   return null;
+}
+
+export async function generateOffersAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ids = generateOfferRequests(db(), Number(form.get("reviewId")), today());
+    revalidatePath("/", "layout");
+    return { ok: ids.length ? `${ids.length} demande(s) prête(s).` : "Aucune nouvelle caisse choisie." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function offerSentAction(form: FormData) {
+  markOfferRequestSent(db(), Number(form.get("offerId")), form.get("undo") ? null : today());
+  revalidatePath("/", "layout");
+}
+
+export async function offerAnsweredAction(form: FormData) {
+  markOfferRequestAnswered(db(), Number(form.get("offerId")), form.get("undo") ? null : today());
+  revalidatePath("/", "layout");
+}
+
+export async function deleteOfferAction(form: FormData) {
+  deleteOfferRequest(db(), Number(form.get("offerId")));
+  revalidatePath("/", "layout");
+}
+
+export async function lcaWishesAction(_: ActionState, form: FormData): Promise<ActionState> {
+  setLcaWishes(db(), Number(form.get("lineId")), form.getAll("wish").map(String));
+  revalidatePath("/", "layout");
+  return { ok: "Complémentaires à demander enregistrées." };
 }

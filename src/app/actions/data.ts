@@ -6,7 +6,9 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { saveInsurer } from "@/application/household";
 import { UserError } from "@/application/review";
-import { lamalParameters } from "@/infrastructure/db/schema";
+import { insurer, lamalParameters } from "@/infrastructure/db/schema";
+import { officialCo2 } from "@/infrastructure/reference/apply";
+import { refreshReference } from "@/server/reference";
 import { saveSubscription, removeSubscription, notifyAll } from "@/infrastructure/push/push";
 import { chfField, toActionError, type ActionState } from "@/server/action";
 import { db, nowIso } from "@/server/context";
@@ -50,12 +52,39 @@ export async function saveCo2Action(_: ActionState, form: FormData): Promise<Act
   try {
     const year = Number(form.get("year"));
     const amount = chfField(form.get("co2Annual"));
-    db().update(lamalParameters).set({ co2AnnualRp: amount, sourceNote: "Saisi manuellement" }).where(eq(lamalParameters.year, year)).run();
+    db().update(lamalParameters).set({ co2AnnualRp: amount, co2Source: "USER", sourceNote: "Saisi manuellement" }).where(eq(lamalParameters.year, year)).run();
   } catch (e) {
     return toActionError(e);
   }
   revalidatePath("/", "layout");
   return { ok: "Montant enregistré." };
+}
+
+/** Abandonne la saisie : le montant officiel (OFEV) reprend la main et suivra ses mises à jour. */
+export async function resetCo2Action(_: ActionState, form: FormData): Promise<ActionState> {
+  const year = Number(form.get("year"));
+  db()
+    .update(lamalParameters)
+    .set({ co2AnnualRp: officialCo2(year), co2Source: "OFFICIAL", sourceNote: "Office fédéral de l'environnement (OFEV)" })
+    .where(eq(lamalParameters.year, year))
+    .run();
+  revalidatePath("/", "layout");
+  return { ok: "Montant officiel rétabli." };
+}
+
+export async function resetInsurerAddressAction(_: ActionState, form: FormData): Promise<ActionState> {
+  db().update(insurer).set({ terminationAddress: null, addressVerifiedAt: null }).where(eq(insurer.id, Number(form.get("id")))).run();
+  revalidatePath("/", "layout");
+  return { ok: "Adresse officielle rétablie." };
+}
+
+export async function refreshReferenceAction(): Promise<ActionState> {
+  try {
+    const check = await refreshReference();
+    return check.ok ? { ok: check.results.join(" ") } : { error: check.results.join(" ") };
+  } catch (e) {
+    return toActionError(e);
+  }
 }
 
 export async function saveInsurerAction(_: ActionState, form: FormData): Promise<ActionState> {

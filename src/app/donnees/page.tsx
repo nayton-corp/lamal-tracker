@@ -13,6 +13,12 @@ import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
 import { Co2Form } from "./co2-form";
+import { refreshReferenceAction } from "@/app/actions/data";
+import { formatDateLong } from "@/domain/dates";
+import { officialCo2 } from "@/infrastructure/reference/apply";
+import type { ReferenceCheck } from "@/server/reference";
+import { ActionForm } from "@/ui/action-form";
+import { SubmitButton } from "@/ui/submit";
 import { ImportPanel } from "./import-panel";
 import { PushPanel } from "./push-panel";
 
@@ -39,7 +45,9 @@ export default function DataPage() {
     .filter((p) => activeYears.has(p.year) || p.year >= currentYear);
   const visibleDatasets = datasets.filter((d) => d.status !== "SUPERSEDED");
   const insurers = listInsurers(db());
-  const missingAddresses = insurers.filter((i) => !i.terminationAddress).length;
+  const customAddresses = insurers.filter((i) => i.terminationAddress?.trim()).length;
+  const directoryDate = insurers.map((i) => i.directoryDate).filter(Boolean).sort().at(-1);
+  const reference = getSetting<ReferenceCheck>(db(), "reference.lastCheck");
   const lastCheck = getSetting<{ at: string; ok: boolean }>(db(), "ofsp.lastCheck");
 
   return (
@@ -93,11 +101,13 @@ export default function DataPage() {
           <Section title="Redistribution CO2">
             <Card className="space-y-3">
               <p className="text-sm text-muted">
-                Chaque année, la Confédération reverse à chaque habitant une part de la taxe CO2, déduite de vos factures de caisse-maladie. Le montant (en CHF par personne et par an) est déjà rempli ; corrigez-le seulement s&apos;il est différent sur votre facture.
+                Chaque année, la Confédération reverse à chaque habitant une part des taxes CO2 et COV, déduite de vos factures de caisse-maladie. Les montants (en CHF par personne et par an) sont repris de l&apos;Office fédéral de l&apos;environnement et se mettent à jour seuls.
               </p>
-              {params.map((p) => (
-                <Co2Form key={p.year} year={p.year} amountRp={p.co2AnnualRp} />
-              ))}
+              <div className="divide-y divide-border">
+                {params.map((p) => (
+                  <Co2Form key={p.year} year={p.year} amountRp={p.co2AnnualRp} source={p.co2Source} officialRp={officialCo2(p.year)} />
+                ))}
+              </div>
             </Card>
           </Section>
         </div>
@@ -107,11 +117,28 @@ export default function DataPage() {
             <Link href="/donnees/caisses" className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
               <Landmark aria-hidden className="size-5 text-primary" />
               <div className="flex-1">
-                <p className="font-medium">Adresses pour les lettres de résiliation</p>
-                <p className="text-sm text-muted">Seules les caisses que vous quittez ont besoin d&apos;une adresse ({insurers.length - missingAddresses} renseignée(s)).</p>
+                <p className="font-medium">Adresses et contacts des caisses</p>
+                <p className="text-sm text-muted">
+                  Repris de l&apos;annuaire officiel{directoryDate ? ` du ${formatDateLong(directoryDate)}` : ""}
+                  {customAddresses > 0 ? ` · ${customAddresses} adresse(s) modifiée(s) par vous` : ""}.
+                </p>
               </div>
               <ChevronRight aria-hidden className="size-5 text-muted" />
             </Link>
+          </Section>
+
+          <Section title="Données officielles">
+            <Card className="space-y-3">
+              <p className="text-sm text-muted">
+                Adresses des caisses, indicateurs (réserves, frais) et redistribution CO2 sont vérifiés chaque semaine auprès de l&apos;OFSP et de l&apos;OFEV.
+                {reference && ` Dernière vérification : ${new Date(reference.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" })}${reference.ok ? "" : " (en partie impossible, nouvel essai prévu)"}.`}
+              </p>
+              <ActionForm action={refreshReferenceAction}>
+                <SubmitButton variant="secondary" size="sm" pendingLabel="Vérification…">
+                  Vérifier maintenant
+                </SubmitButton>
+              </ActionForm>
+            </Card>
           </Section>
 
           <Section title="Rappels">

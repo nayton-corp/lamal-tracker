@@ -3,6 +3,7 @@ import { z } from "zod";
 import { MODEL_TYPES, CANTONS } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
 import { household, insurer, lamalPolicy, lcaPolicy, person } from "@/infrastructure/db/schema";
+import { LCA_GUARANTEE_KEYS, guaranteeInfo } from "@/domain/lca";
 
 export const householdInput = z.object({
   name: z.string().trim().min(1, "Nom requis"),
@@ -47,8 +48,9 @@ export const lcaInput = z.object({
   personId: z.coerce.number().int().positive(),
   insurerName: z.string().trim().min(1, "Assureur requis"),
   linkedInsurerId: z.coerce.number().int().positive().optional().nullable(),
-  productName: z.string().trim().min(1, "Produit requis"),
-  category: z.enum(["HOSPITAL", "AMBULATORY", "DENTAL", "OTHER"]),
+  guarantee: z.enum(LCA_GUARANTEE_KEYS, { message: "Garantie requise" }),
+  /** Nom commercial du produit ; à défaut, le libellé de la garantie. */
+  productName: z.string().trim().optional().nullable(),
   policyNumber: z.string().trim().optional().nullable(),
   monthlyRp: z.coerce.number().int().min(0).optional().nullable(),
   minTermEnd: z.string().optional().nullable(),
@@ -130,7 +132,9 @@ export function listLca(db: Db, personId: number) {
 }
 
 export function saveLca(db: Db, input: z.input<typeof lcaInput>) {
-  const { id, ...data } = lcaInput.parse(input);
+  const { id, guarantee, productName, ...rest } = lcaInput.parse(input);
+  const info = guaranteeInfo(guarantee)!;
+  const data = { ...rest, guarantee, category: info.category, productName: productName || info.label };
   if (id) {
     db.update(lcaPolicy).set(data).where(eq(lcaPolicy.id, id)).run();
     return id;

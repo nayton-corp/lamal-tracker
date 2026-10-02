@@ -11,10 +11,13 @@ src/
     comparison.ts    filtres, classement déterministe, statistiques de marché
     renewal.ts       retrouve le tarif de renouvellement (code, lignée confirmée, modèle)
     review.ts        garde-fous des lettres et du contrôle LCA
-    letter.ts        contenu des lettres (indépendant du rendu)
+    letter.ts        contenu des lettres et des demandes d'offre (indépendant du rendu)
+    lca.ts           familles de garanties complémentaires
+    insurer-profile.ts portrait d'une caisse : réserves en mois de primes, frais, évolution des primes
     ofsp/            lecture d'une ligne OFSP (formats ≤2026 et ≥2027), rapport d'import
   application/     Cas d'usage : foyer, revue annuelle, comparateur, lettres, historique
-  infrastructure/  SQLite (Drizzle), import OFSP en flux, rendu PDF, notifications push
+  infrastructure/  SQLite (Drizzle), import OFSP en flux, rendu PDF, notifications push,
+                   référentiels officiels (reference/ : annuaire OFSP, surveillance OFSP, CO2 OFEV)
   server/          Contexte serveur (horloge Europe/Zurich, tâches d'import, planificateur)
   app/             Pages Next.js (App Router) et server actions
   ui/              Composants d'interface (design system) : mobile d'abord ; dès 1024 px, navigation latérale (AppNav),
@@ -40,11 +43,14 @@ d'extérieur ; l'application ne dépend pas de l'interface.
 
 - Référentiel : `tariff_dataset` → `tariff` (code, libellé, type de modèle par caisse) → `premium`
   (canton, région, classe d'âge, sous-groupe, accident, franchise, prime mensuelle) ; `insurer`
-  (n° OFSP, nom, adresse de résiliation) ; `lamal_parameters` (par année) ; `tariff_lineage`
+  (n° OFSP, nom, coordonnées officielles de l'annuaire, adresse propre facultative) ;
+  `insurer_indicator` (comptes publiés par caisse et par année) ; `lamal_parameters` (par année,
+  CO2 officiel ou saisi) ; `tariff_lineage`
   (correspondance confirmée d'un code tarif d'une année à l'autre).
 - Foyer : `household`, `person`, `lamal_policy` (un contrat par personne et par année, prime
   réellement facturée), `lca_policy`.
-- Rituel : `review` (une par année cible), `review_line` (une par personne), `letter`.
+- Rituel : `review` (une par année cible), `review_line` (une par personne, complémentaires à
+  demander), `letter`, `offer_request` (demande d'offre à une nouvelle caisse, contenu figé).
 - Divers : `settings`, `push_subscription`, `notification_log` (rappels dédoublonnés).
 
 Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `pnpm db:generate`
@@ -54,4 +60,5 @@ Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `p
 
 `src/instrumentation.ts` lance un planificateur horaire : contrôle de la signature HTTP du
 fichier OFSP (quotidien du 15.09 au 30.11, hebdomadaire sinon), import en arrière-plan si
-le fichier a changé, notification ; rappels J-30, J-14, J-7, J-3, J-1 avant la date d'envoi.
+le fichier a changé, notification ; rappels J-30, J-14, J-7, J-3, J-1 avant la date d'envoi ; vérification hebdomadaire des
+référentiels officiels (`server/reference.ts`).

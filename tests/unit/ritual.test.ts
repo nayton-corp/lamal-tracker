@@ -5,6 +5,7 @@ import { compareForLine } from "@/application/compare";
 import { householdHistory } from "@/application/history";
 import { listInsurers, saveHousehold, saveInsurer, saveLca, savePerson, savePolicy } from "@/application/household";
 import { generateLetters, getLetter } from "@/application/letters";
+import { generateOfferRequests, lcaWishesFor, listOfferRequests, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
   acknowledgeLca,
   closeReview,
@@ -78,7 +79,7 @@ describe("rituel annuel", () => {
       personId: teen, coverageYear: 2026, insurerId: insurerId(8), policyNumber: null,
       tariffCode: "CSS-BASE", tariffLabel: "Base CSS", modelType: "STANDARD", franchiseChf: 0, accident: true, billedMonthlyRp: 12000,
     });
-    saveLca(db, { personId: adult, insurerName: "Helsana Assurances complémentaires SA", linkedInsurerId: insurerId(1562), productName: "Hospitalisation mi-privée", category: "HOSPITAL" });
+    saveLca(db, { personId: adult, insurerName: "Helsana Assurances complémentaires SA", linkedInsurerId: insurerId(1562), productName: "Hospitalisation mi-privée", guarantee: "HOSPITAL_SEMI_PRIVATE" });
   });
 
   it("ouvre la revue et retrouve les renouvellements", () => {
@@ -109,22 +110,49 @@ describe("rituel annuel", () => {
 
   it("compare et décide", () => {
     const cmp = compareForLine(db, lines.adult, { sort: "total" });
-    expect(cmp.offers.length).toBeGreaterThan(10);
+    expect(cmp.offers.length).toBeGreaterThan(3);
+    expect(new Set(cmp.offers.map((o) => o.insurerId)).size).toBe(cmp.offers.length);
+    expect(cmp.matchingOffers).toBeGreaterThan(cmp.offers.length);
     expect(cmp.offers[0]!.rank).toBe(1);
     expect(cmp.renewal?.franchiseChf).toBe(2500);
     expect(cmp.curve.points.length).toBeGreaterThan(10);
     const best = cmp.offers[0]!;
     expect(decide(db, lines.adult, { tariffId: best.tariffId, franchiseChf: best.franchiseChf }, NOW)).toBe("SWITCH");
 
-    const teenCmp = compareForLine(db, lines.teen, { all: true });
+    const teenCmp = compareForLine(db, lines.teen, { all: true, everyOffer: true });
     const sameInsurerOther = teenCmp.offers.find((o) => o.insurerId === insurerId(8) && o.tariffCode === "CSS-TEL")!;
     expect(decide(db, lines.teen, { tariffId: sameInsurerOther.tariffId, franchiseChf: sameInsurerOther.franchiseChf }, NOW)).toBe("ADJUST");
   });
 
-  it("refuse les lettres sans contrôle LCA ni adresse", () => {
+  it("prépare la demande d'offre à la nouvelle caisse, complémentaires comprises", () => {
+    const ids = generateOfferRequests(db, 1, TODAY);
+    expect(ids).toHaveLength(1);
+    const [req] = listOfferRequests(db, 1);
+    expect(req!.content.subject).toMatch(/Demande d'offre et d'affiliation .* 1er janvier 2027/);
+    expect(req!.content.personRows[0]).toMatch(/^Alex Test, né·e le .*franchise CHF \d+, (avec|sans) couverture accident/);
+    expect(req!.content.extraRows).toEqual(["Alex Test : hospitalisation demi-privée"]);
+    expect(req!.content.mailing).toBeNull();
+
+    // Complémentaires modifiées : la demande non envoyée est refaite.
+    setLcaWishes(db, lines.adult, ["HOSPITAL_SEMI_PRIVATE", "DENTAL", "bidon"]);
+    expect(lcaWishesFor(db, { personId: 0, lcaWishes: ["DENTAL", "bidon"] })).toEqual(["DENTAL"]);
+    generateOfferRequests(db, 1, TODAY);
+    const [again] = listOfferRequests(db, 1);
+    expect(listOfferRequests(db, 1)).toHaveLength(1);
+    expect(again!.content.extraRows).toEqual(["Alex Test : hospitalisation demi-privée, soins dentaires"]);
+
+    // Envoyée : vaut demande d'affiliation, et n'est plus régénérée.
+    markOfferRequestSent(db, again!.id, TODAY);
+    expect(getReviewView(db, 1, TODAY).persons[0]!.line.affiliationRequestedAt).toBe(TODAY);
+    expect(generateOfferRequests(db, 1, TODAY)).toEqual([]);
+  });
+
+  it("refuse la résiliation sans contrôle LCA ; l'adresse officielle suffit", () => {
     const res = generateLetters(db, 1, TODAY);
-    expect(res.created).toEqual([]);
-    expect(res.blocked.map((b) => b.person)).toEqual(["Alex Test", "Noa Test"]);
+    // Noa change seulement de modèle chez CSS : l'adresse de l'annuaire officiel suffit.
+    expect(res.created).toHaveLength(1);
+    expect(getLetter(db, res.created[0]!)!.content.insurerLines).toEqual(["CSS Assurance-maladie SA", "Tribschenstrasse 21", "Postfach 2568", "6002 Luzern"]);
+    expect(res.blocked.map((b) => b.person)).toEqual(["Alex Test"]);
     expect(res.blocked[0]!.reasons.join(" ")).toMatch(/LCA/);
   });
 
@@ -138,7 +166,7 @@ describe("rituel annuel", () => {
     const termination = getLetter(db, res.created[0]!)!;
     expect(termination.kind).toBe("TERMINATION");
     expect(termination.content.lcaClause).toMatch(/LCA/);
-    expect(termination.content.insurerLines).toEqual(["Helsana Versicherungen AG", "Case postale", "8081 Zurich"]);
+    expect(termination.content.insurerLines).toEqual(["Helsana Assurances SA", "Case postale", "8081 Zurich"]);
     expect(termination.content.personRows[0]).toMatch(/HEL-123/);
     // Régénérer remplace les lettres non envoyées.
     const again = generateLetters(db, 1, TODAY);

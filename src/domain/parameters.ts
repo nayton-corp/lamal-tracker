@@ -14,13 +14,11 @@ export interface LamalParameters {
   co2AnnualRp: Rappen | null;
 }
 
-/** Montants publiés par la Confédération (redistribution des taxes environnementales). */
-const KNOWN_CO2: Record<number, Rappen> = {
-  2026: 6180,
-  2027: 5700,
-};
-
-export function defaultParameters(year: number): LamalParameters {
+/**
+ * Paramètres légaux par défaut d'une année. La redistribution CO2 vient du référentiel officiel
+ * (OFEV), fourni par l'appelant : le domaine ne connaît aucun montant en dur.
+ */
+export function defaultParameters(year: number, co2AnnualRp: Rappen | null = null): LamalParameters {
   return {
     year,
     franchisesAdult: [300, 500, 1000, 1500, 2000, 2500],
@@ -28,7 +26,7 @@ export function defaultParameters(year: number): LamalParameters {
     coinsuranceRateBp: 1000,
     coinsuranceMaxAdultRp: 70000,
     coinsuranceMaxKidRp: 35000,
-    co2AnnualRp: KNOWN_CO2[year] ?? null,
+    co2AnnualRp,
   };
 }
 

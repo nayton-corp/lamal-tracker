@@ -13,6 +13,7 @@ import { Chf } from "@/ui/money";
 import { Page, PageHeader } from "@/ui/page";
 import { LcaSheet, PolicySheet } from "../../editors";
 import { ProfileCard } from "../../profile-card";
+import { guaranteeInfo, suggestedLcaInsurer } from "@/domain/lca";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,14 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const p = getPerson(db(), Number(id));
   if (!p) notFound();
   const year = Number(today().slice(0, 4));
-  const insurers = listInsurers(db()).map((i) => ({ id: i.id, name: insurerLabel(i) }));
+  const allInsurers = listInsurers(db());
+  const insurers = allInsurers.map((i) => ({ id: i.id, name: insurerLabel(i) }));
+  const lcaInsurers = allInsurers.map((i) => ({ id: i.id, name: insurerLabel(i), lcaName: suggestedLcaInsurer({ name: insurerLabel(i), groupName: i.groupName }) }));
   const policies = listPolicies(db(), p.id).reverse();
   const lca = listLca(db(), p.id);
   // Contrats saisissables de 2010 à l'année prochaine (historique personnel).
   const years = Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i);
+  const lamalInsurerId = policies[0]?.policy.insurerId ?? null;
   const hasCurrent = policies.some((x) => x.policy.coverageYear === year);
 
   return (
@@ -82,7 +86,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         )}
       </Section>
 
-      <Section title="Complémentaires LCA" action={<LcaSheet personId={p.id} insurers={insurers} lca={null} />}>
+      <Section title="Complémentaires LCA" action={<LcaSheet personId={p.id} insurers={lcaInsurers} lca={null} lamalInsurerId={lamalInsurerId} />}>
         {lca.length === 0 && (
           <p className="flex gap-2 px-1 text-sm text-muted">
             <ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-lca-strong" />
@@ -94,12 +98,15 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             {lca.map((c) => (
               <li key={c.id} className="flex items-center gap-3 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium">{c.productName}</p>
-                  <p className="truncate text-sm text-muted">{c.insurerName}</p>
+                  <p className="font-medium">{guaranteeInfo(c.guarantee)?.label ?? c.productName}</p>
+                  <p className="truncate text-sm text-muted">
+                    {c.insurerName}
+                    {c.guarantee && c.productName !== guaranteeInfo(c.guarantee)?.label ? ` · ${c.productName}` : ""}
+                  </p>
                 </div>
                 {!c.active && <Badge>terminée</Badge>}
                 {c.monthlyRp ? <Chf rp={c.monthlyRp} className="font-semibold" /> : null}
-                <LcaSheet personId={p.id} insurers={insurers} lca={c} />
+                <LcaSheet personId={p.id} insurers={lcaInsurers} lca={c} lamalInsurerId={lamalInsurerId} />
                 <form action={deleteLcaAction}>
                   <input type="hidden" name="id" value={c.id} />
                   <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer ${c.productName}`} className="text-increase" message={`Supprimer ${c.productName} ?`} confirmLabel="Supprimer" details={<p>Elle ne sera plus surveillée lors d&apos;un changement de caisse. Rien n&apos;est envoyé à l&apos;assureur.</p>}>

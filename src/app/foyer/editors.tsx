@@ -4,7 +4,7 @@ import { Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/ui/button";
 import { Sheet } from "@/ui/sheet";
-import { LcaForm, type LcaDefaults } from "./lca-form";
+import { LcaForm, type LcaDefaults, type LcaInsurerOption } from "./lca-form";
 import { PolicyForm, type PolicyDefaults } from "./policy-form";
 
 type Insurers = { id: number; name: string }[];
@@ -33,7 +33,7 @@ export function PolicySheet({ personId, insurers, years, policy, label }: { pers
   );
 }
 
-export function LcaSheet({ personId, insurers, lca }: { personId: number; insurers: Insurers; lca: LcaDefaults | null }) {
+export function LcaSheet({ personId, insurers, lca, lamalInsurerId }: { personId: number; insurers: LcaInsurerOption[]; lca: LcaDefaults | null; lamalInsurerId: number | null }) {
   const [open, setOpen] = useState(false);
   return (
     <Sheet
@@ -53,7 +53,7 @@ export function LcaSheet({ personId, insurers, lca }: { personId: number; insure
         )
       }
     >
-      <LcaForm personId={personId} insurers={insurers} lca={lca} onDone={() => setOpen(false)} />
+      <LcaForm personId={personId} insurers={insurers} lca={lca} lamalInsurerId={lamalInsurerId} onDone={() => setOpen(false)} />
     </Sheet>
   );
 }

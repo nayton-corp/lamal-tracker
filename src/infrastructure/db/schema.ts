@@ -24,6 +24,8 @@ export const lamalParameters = sqliteTable("lamal_parameters", {
   coinsuranceMaxAdultRp: integer("coinsurance_max_adult_rp").notNull(),
   coinsuranceMaxKidRp: integer("coinsurance_max_kid_rp").notNull(),
   co2AnnualRp: integer("co2_annual_rp"),
+  /** Origine du montant CO2 : référentiel officiel (mis à jour seul) ou saisie (jamais écrasée). */
+  co2Source: text("co2_source", { enum: ["OFFICIAL", "USER"] }).notNull().default("OFFICIAL"),
   sourceNote: text("source_note"),
 });
 
@@ -32,10 +34,35 @@ export const insurer = sqliteTable("insurer", {
   bagNumber: integer("bag_number").notNull().unique(),
   name: text("name").notNull(),
   displayName: text("display_name"),
+  /** Raison sociale française (annuaire OFSP), utilisée dans les lettres. */
+  legalNameFr: text("legal_name_fr"),
+  /** Adresse du siège selon l'annuaire OFSP, une ligne par ligne d'adresse ; mise à jour seule. */
+  officialAddress: text("official_address"),
+  /** Adresse de résiliation saisie par l'utilisateur ; prioritaire sur l'adresse officielle. */
   terminationAddress: text("termination_address"),
   addressVerifiedAt: text("address_verified_at"),
   website: text("website"),
+  email: text("email"),
+  phone: text("phone"),
+  groupName: text("group_name"),
+  /** Date de l'annuaire OFSP dont proviennent les coordonnées officielles. */
+  directoryDate: text("directory_date"),
 });
+
+/** Indicateurs annuels d'une caisse (données de surveillance OFSP), par n° OFSP. */
+export const insurerIndicator = sqliteTable(
+  "insurer_indicator",
+  {
+    bagNumber: integer("bag_number").notNull(),
+    year: integer("year").notNull(),
+    insured: integer("insured").notNull(),
+    premiumPerInsuredRp: integer("premium_per_insured_rp").notNull(),
+    benefitsPerInsuredRp: integer("benefits_per_insured_rp"),
+    adminPerInsuredRp: integer("admin_per_insured_rp"),
+    reservesPerInsuredRp: integer("reserves_per_insured_rp"),
+  },
+  (t) => [primaryKey({ columns: [t.bagNumber, t.year] })],
+);
 
 export const tariffDataset = sqliteTable(
   "tariff_dataset",
@@ -145,6 +172,8 @@ export const lcaPolicy = sqliteTable("lca_policy", {
   linkedInsurerId: integer("linked_insurer_id").references(() => insurer.id),
   productName: text("product_name").notNull(),
   category: text("category", { enum: ["HOSPITAL", "AMBULATORY", "DENTAL", "OTHER"] }).notNull(),
+  /** Famille de garantie (liste fixe, voir domain/lca) ; null pour les saisies anciennes. */
+  guarantee: text("guarantee"),
   policyNumber: text("policy_number"),
   monthlyRp: integer("monthly_rp"),
   startDate: text("start_date"),
@@ -209,6 +238,8 @@ export const reviewLine = sqliteTable(
     lcaAckAt: text("lca_ack_at"),
     affiliationRequestedAt: text("affiliation_requested_at"),
     affiliationConfirmedAt: text("affiliation_confirmed_at"),
+    /** Complémentaires à demander à la nouvelle caisse (clés de domain/lca) ; null = reprendre celles en cours. */
+    lcaWishes: text("lca_wishes", { mode: "json" }).$type<string[]>(),
   },
   (t) => [uniqueIndex("review_line_person").on(t.reviewId, t.personId)],
 );
@@ -225,6 +256,18 @@ export const letter = sqliteTable("letter", {
   sentAt: text("sent_at"),
   trackingNumber: text("tracking_number"),
   acknowledgedAt: text("acknowledged_at"),
+});
+
+/** Demande d'offre adressée à une nouvelle caisse (contenu figé, comme une lettre). */
+export const offerRequest = sqliteTable("offer_request", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  reviewId: integer("review_id").notNull().references(() => review.id, { onDelete: "cascade" }),
+  insurerId: integer("insurer_id").notNull().references(() => insurer.id),
+  lineIds: text("line_ids", { mode: "json" }).$type<number[]>().notNull(),
+  content: text("content", { mode: "json" }).notNull(),
+  generatedAt: createdAt(),
+  sentAt: text("sent_at"),
+  answeredAt: text("answered_at"),
 });
 
 export const pushSubscription = sqliteTable("push_subscription", {

@@ -33,6 +33,16 @@ export const MODEL_LABEL: Record<ModelType, string> = {
   OTHER: "Autre modèle",
 };
 
+/** Ce que le modèle implique au quotidien, en une phrase. */
+export const MODEL_HINT: Record<ModelType, string> = {
+  STANDARD: "Vous consultez le médecin de votre choix, sans démarche préalable.",
+  PRAXIS: "Vous passez d'abord par votre médecin de famille ou un cabinet de groupe (HMO), sauf urgence, gynécologue et ophtalmologue.",
+  TELMED: "Vous appelez d'abord un centre de conseil médical par téléphone ou application, qui vous oriente.",
+  PHARMACY: "Vous passez d'abord par une pharmacie partenaire, qui vous conseille ou vous oriente.",
+  FLEX: "Vous choisissez à chaque fois le premier recours parmi une liste (médecin, téléphone, pharmacie).",
+  OTHER: "Modèle propre à la caisse : lisez ses conditions avant de choisir.",
+};
+
 /**
  * Libellé lisible d'un tarif. L'OFSP nomme le tarif standard « BASE » (2027) ou
  * « Grundversicherung » (avant) : on affiche « Standard (libre choix) ».

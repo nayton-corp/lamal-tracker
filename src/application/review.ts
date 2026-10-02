@@ -9,7 +9,7 @@ import { franchisesFor } from "@/domain/parameters";
 import { findRenewal } from "@/domain/renewal";
 import { checkLetter, lcaWarnings, type LetterCheck, type LcaWarning } from "@/domain/review";
 import type { Db } from "@/infrastructure/db/client";
-import { activeDataset, insurerLabel, offersFor, parametersFor } from "@/infrastructure/db/queries";
+import { activeDataset, insurerAddressLines, insurerLabel, offersFor, parametersFor } from "@/infrastructure/db/queries";
 import {
   insurer,
   lamalPolicy,
@@ -346,7 +346,7 @@ export function getReviewView(db: Db, reviewId: number, today: IsoDate): ReviewV
         currentInsurerId: policy.insurerId,
         chosenInsurerId: line.chosenInsurerId,
         lcaAckAt: line.lcaAckAt,
-        insurerHasAddress: Boolean(current.terminationAddress?.trim()),
+        insurerHasAddress: insurerAddressLines(current).length > 0,
         policyNumber: policy.policyNumber,
         affiliationRequestedAt: line.affiliationRequestedAt,
       }),

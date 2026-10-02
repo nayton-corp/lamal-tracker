@@ -34,6 +34,10 @@ export interface LetterContent {
   closing: string;
   signatures: string[];
   footer: string;
+  /** Mention au-dessus du destinataire ; absente des anciennes lettres = « RECOMMANDÉ ». */
+  mailing?: string | null;
+  /** Liste à puces après les personnes (complémentaires demandées). */
+  extraRows?: string[];
 }
 
 /** Contenu d'une lettre, indépendant du rendu (PDF, aperçu HTML, tests). */
@@ -90,4 +94,67 @@ export function buildLetter(input: LetterInput): LetterContent {
       ? "Pour les personnes mineures, la lettre est signée par leur représentant·e légal·e."
       : "Envoi en recommandé.",
   };
+}
+
+export interface OfferRequestPerson extends LetterPerson {
+  /** « Télémédecine (Callmed), franchise CHF 2500, sans couverture accident » */
+  wish: string;
+  /** Complémentaires souhaitées (libellés), vide si aucune. */
+  lca: string[];
+}
+
+export interface OfferRequestInput {
+  senderLines: string[];
+  insurerLines: string[];
+  place: string;
+  date: IsoDate;
+  targetYear: number;
+  persons: OfferRequestPerson[];
+  /** Adresse de domicile, utile à la caisse pour la région de prime. */
+  domicile: string;
+}
+
+/**
+ * Demande d'offre et d'affiliation adressée à la nouvelle caisse : l'assurance de base doit
+ * être acceptée sans réserve (art. 4 LAMal), les complémentaires restent soumises à
+ * questionnaire de santé ; on le rappelle pour ne rien résilier avant leur acceptation.
+ */
+export function buildOfferRequest(input: OfferRequestInput): LetterContent {
+  const several = input.persons.length > 1;
+  const withLca = input.persons.filter((p) => p.lca.length > 0);
+  const paragraphs = [
+    `Je souhaite affilier à votre caisse, pour l'assurance obligatoire des soins (LAMal) dès le 1er janvier ${input.targetYear}, ${several ? "les personnes suivantes" : "la personne suivante"}, domiciliée${several ? "s" : ""} ${input.domicile} :`,
+    "__PERSONS__",
+    "Je vous prie de m'adresser une offre correspondante ainsi que la confirmation d'affiliation ou les documents à remplir.",
+  ];
+  if (withLca.length) {
+    paragraphs.push(
+      "Je vous prie également de me faire une offre pour les assurances complémentaires (LCA) suivantes, avec les questionnaires de santé nécessaires :",
+      "__EXTRA__",
+      "Je ne résilierai mes complémentaires actuelles qu'après votre acceptation écrite de celles-ci.",
+    );
+  }
+  return {
+    senderLines: input.senderLines,
+    insurerLines: input.insurerLines,
+    placeAndDate: `${input.place}, le ${formatDateLong(input.date)}`,
+    subject: `Demande d'offre et d'affiliation à l'assurance de base dès le 1er janvier ${input.targetYear}`,
+    salutation: "Madame, Monsieur,",
+    paragraphs,
+    personRows: input.persons.map((p) => [p.fullName, `né·e le ${formatDateLong(p.birthDate)}`, p.wish].join(", ")),
+    extraRows: withLca.map((p) => `${p.fullName} : ${p.lca.join(", ")}`),
+    lcaClause: null,
+    closing: "En vous remerciant de votre réponse, je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées.",
+    signatures: input.persons.filter((p) => !p.isMinor).map((p) => p.fullName).concat(input.persons.every((p) => p.isMinor) ? ["Représentant·e légal·e"] : []),
+    footer: "Demande sans engagement. La résiliation auprès de la caisse actuelle est envoyée séparément.",
+    mailing: null,
+  };
+}
+
+/** Version texte d'un courrier, pour un e-mail. */
+export function letterPlainText(c: LetterContent): string {
+  const blocks = c.paragraphs.map((p) =>
+    p === "__PERSONS__" ? c.personRows.map((r) => `- ${r}`).join("\n") : p === "__EXTRA__" ? (c.extraRows ?? []).map((r) => `- ${r}`).join("\n") : p,
+  );
+  return [c.salutation, ...blocks, ...(c.lcaClause ? [c.lcaClause] : []), c.closing, [...c.signatures, ...c.senderLines.slice(1)].join("\n")].join("\n\n");
 }

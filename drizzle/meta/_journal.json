@@ -15,6 +15,13 @@
       "when": 1790959458010,
       "tag": "0001_household_commune",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790964596073,
+      "tag": "0002_reference_offers",
+      "breakpoints": true
     }
   ]
 }

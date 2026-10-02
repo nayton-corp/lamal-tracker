@@ -32,7 +32,7 @@ export function LetterDocument({ content }: { content: LetterContent }) {
           ))}
         </View>
         <View style={s.recipient}>
-          <Text style={s.recommended}>RECOMMANDÉ</Text>
+          {content.mailing !== null && <Text style={s.recommended}>{content.mailing ?? "RECOMMANDÉ"}</Text>}
           {content.insurerLines.map((l) => (
             <Text key={l}>{l}</Text>
           ))}
@@ -45,6 +45,14 @@ export function LetterDocument({ content }: { content: LetterContent }) {
             p === "__PERSONS__" ? (
               <View key={i} style={s.persons}>
                 {content.personRows.map((r) => (
+                  <Text key={r} style={s.person}>
+                    • {r}
+                  </Text>
+                ))}
+              </View>
+            ) : p === "__EXTRA__" ? (
+              <View key={i} style={s.persons}>
+                {(content.extraRows ?? []).map((r) => (
                   <Text key={r} style={s.person}>
                     • {r}
                   </Text>

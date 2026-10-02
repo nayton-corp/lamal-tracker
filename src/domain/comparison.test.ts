@@ -15,7 +15,7 @@ function offer(p: Partial<Offer> & Pick<Offer, "tariffId" | "monthlyPremiumRp">)
   };
 }
 
-const params = defaultParameters(2027);
+const params = defaultParameters(2027, 5700);
 
 describe("comparaison", () => {
   const offers = [

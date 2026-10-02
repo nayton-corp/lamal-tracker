@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import {
+  bestPerInsurer,
   cheapestPerFranchise,
   costOf,
   filterOffers,
@@ -9,12 +10,14 @@ import {
   type SortKey,
 } from "@/domain/comparison";
 import { breakEvenRp, franchiseCurve, type CurvePoint } from "@/domain/cost";
+import type { InsurerProfile } from "@/domain/insurer-profile";
 import type { ModelType } from "@/domain/lamal";
 import { coinsuranceMaxFor, franchisesFor } from "@/domain/parameters";
 import type { Db } from "@/infrastructure/db/client";
 import { offersFor, parametersFor } from "@/infrastructure/db/queries";
-import { lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
+import { insurer, lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
 import { getHousehold } from "./household";
+import { insurerProfiles } from "./insurers";
 import { UserError } from "./review";
 
 export interface CompareOptions {
@@ -24,6 +27,13 @@ export interface CompareOptions {
   sort?: SortKey;
   /** Ignore les exclusions et modèles préférés de la personne. */
   all?: boolean;
+  /** Toutes les offres de chaque caisse, au lieu de sa meilleure seulement. */
+  everyOffer?: boolean;
+}
+
+export interface InsurerCard {
+  website: string | null;
+  profile: InsurerProfile | null;
 }
 
 export interface CompareView {
@@ -42,6 +52,10 @@ export interface CompareView {
   renewalCandidates: { code: string; label: string; modelType: ModelType; monthlyRp: number }[];
   renewalStatus: string;
   market: ReturnType<typeof marketStats>;
+  /** Portrait de chaque caisse présente dans les offres (comptes OFSP, évolution des primes). */
+  insurers: Record<number, InsurerCard>;
+  /** Nombre d'offres avant regroupement par caisse. */
+  matchingOffers: number;
 }
 
 export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}): CompareView {
@@ -80,7 +94,21 @@ export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}
     franchises: opts.franchises,
     excludedInsurerIds: opts.all ? [] : p.excludedInsurerIds,
   });
-  const ranked = rankOffers(filtered, { ...ctx, referenceTotalRp: renewal?.totalRp ?? null }, opts.sort ?? "total");
+  const rankedAll = rankOffers(filtered, { ...ctx, referenceTotalRp: renewal?.totalRp ?? null }, opts.sort ?? "total");
+  const ranked = opts.everyOffer ? rankedAll : bestPerInsurer(rankedAll);
+
+  const profiles = insurerProfiles(db, {
+    canton: h.canton,
+    region: h.region,
+    ageClass: line.targetAgeClass,
+    accident: line.accident,
+    subgroup: line.subgroup,
+    targetYear: r.targetYear,
+  });
+  const insurers: Record<number, InsurerCard> = {};
+  for (const row of db.select({ id: insurer.id, website: insurer.website }).from(insurer).all()) {
+    insurers[row.id] = { website: row.website, profile: profiles.get(row.id) ?? null };
+  }
 
   const cheapest = cheapestPerFranchise(filterOffers(all, { models: opts.models }));
   const base = {
@@ -97,6 +125,8 @@ export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}
     healthCostsRp,
     offers: ranked,
     totalOffers: all.length,
+    matchingOffers: rankedAll.length,
+    insurers,
     renewal,
     chosen: { tariffCode: line.chosenTariffCode, franchiseChf: line.chosenFranchiseChf, insurerId: line.chosenInsurerId },
     currentInsurerId: policy.insurerId,
