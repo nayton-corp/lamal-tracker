@@ -204,6 +204,10 @@ export const review = sqliteTable(
     targetYear: integer("target_year").notNull(),
     datasetId: integer("dataset_id").notNull().references(() => tariffDataset.id),
     status: text("status", { enum: ["OPEN", "DECIDED", "LETTERS_SENT", "CLOSED"] }).notNull(),
+    /** Stratégie choisie pour comparer (économie max, maintien, équilibre) ; null = pas encore choisie. */
+    strategy: text("strategy", { enum: ["ECONOMY", "KEEP", "BALANCE"] }),
+    /** Besoins confirmés (franchise, modèles, consommation) : le comparateur peut s'ouvrir. */
+    needsConfirmedAt: text("needs_confirmed_at"),
     createdAt: createdAt(),
     closedAt: text("closed_at"),
   },
@@ -240,6 +244,10 @@ export const reviewLine = sqliteTable(
     affiliationConfirmedAt: text("affiliation_confirmed_at"),
     /** Complémentaires à demander à la nouvelle caisse (clés de domain/lca) ; null = reprendre celles en cours. */
     lcaWishes: text("lca_wishes", { mode: "json" }).$type<string[]>(),
+    /** Franchise souhaitée pour comparer ; null = l'app cherche la plus avantageuse. */
+    wishFranchiseChf: integer("wish_franchise_chf"),
+    /** Modèles acceptés pour ce rituel ; null = préférences de la personne. */
+    wishModels: text("wish_models", { mode: "json" }).$type<string[]>(),
   },
   (t) => [uniqueIndex("review_line_person").on(t.reviewId, t.personId)],
 );
@@ -268,6 +276,13 @@ export const offerRequest = sqliteTable("offer_request", {
   generatedAt: createdAt(),
   sentAt: text("sent_at"),
   answeredAt: text("answered_at"),
+});
+
+/** Signature dessinée à l'écran (PNG en data URL), apposée sur les courriers de la personne. */
+export const signature = sqliteTable("signature", {
+  personId: integer("person_id").primaryKey().references(() => person.id, { onDelete: "cascade" }),
+  dataUrl: text("data_url").notNull(),
+  createdAt: createdAt(),
 });
 
 export const pushSubscription = sqliteTable("push_subscription", {

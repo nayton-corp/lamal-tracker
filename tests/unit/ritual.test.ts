@@ -2,6 +2,8 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { compareForLine } from "@/application/compare";
+import { listSignatures, saveSignature, signaturesByName } from "@/application/signatures";
+import { saveNeeds, setStrategy, strategyOverview } from "@/application/strategy";
 import { householdHistory } from "@/application/history";
 import { listInsurers, saveHousehold, saveInsurer, saveLca, savePerson, savePolicy } from "@/application/household";
 import { generateLetters, getLetter } from "@/application/letters";
@@ -106,6 +108,52 @@ describe("rituel annuel", () => {
     confirmLineage(db, lines.adult, "HEL-TEL");
     const view = getReviewView(db, 1, TODAY);
     expect(view.persons[0]!.line.renewalStatus).toBe("MATCHED");
+  });
+
+  it("compare les trois stratégies, puis applique la stratégie et les besoins", () => {
+    const overview = strategyOverview(db, 1);
+    expect(overview.map((o) => o.strategy)).toEqual(["ECONOMY", "KEEP", "BALANCE"]);
+    const economy = overview.find((o) => o.strategy === "ECONOMY")!;
+    const keep = overview.find((o) => o.strategy === "KEEP")!;
+    // Économie max explore tout : jamais moins d'économie que le maintien.
+    expect(economy.annualSavingsRp!).toBeGreaterThanOrEqual(keep.annualSavingsRp!);
+    const keepAdult = keep.persons.find((p) => p.lineId === lines.adult)!.offer!;
+    expect(keepAdult.modelType).toBe("TELMED");
+    expect(keepAdult.franchiseChf).toBe(2500);
+
+    let view = getReviewView(db, 1, TODAY);
+    expect(view.steps.map((s) => [s.key, s.done])).toEqual([
+      ["renewal", true], ["strategy", false], ["needs", false], ["decide", false], ["procedures", false], ["confirmed", false],
+    ]);
+
+    setStrategy(db, 1, "KEEP");
+    const kept = compareForLine(db, lines.adult);
+    expect(kept.sort).toBe("strategy");
+    expect(kept.effective).toEqual({ models: ["TELMED"], franchiseChf: 2500 });
+    expect(kept.offers.every((o) => o.modelType === "TELMED" && o.franchiseChf === 2500)).toBe(true);
+    expect(kept.picks).toHaveLength(3);
+    // Un filtre explicite (URL) l'emporte sur les besoins ; [] = tous.
+    expect(compareForLine(db, lines.adult, { franchises: [], models: [], everyOffer: true }).offers.some((o) => o.franchiseChf !== 2500)).toBe(true);
+
+    setStrategy(db, 1, "ECONOMY");
+    saveNeeds(db, 1, [
+      { lineId: lines.adult, franchiseChf: null, models: ["TELMED", "STANDARD", "BOGUS"], healthCostsRp: 120_000, doctorName: "Dr Martin" },
+    ], NOW);
+    const cmp = compareForLine(db, lines.adult);
+    expect(cmp.effective).toEqual({ models: ["TELMED", "STANDARD"], franchiseChf: null });
+    expect(cmp.healthCostsRp).toBe(120_000);
+    view = getReviewView(db, 1, TODAY);
+    expect(view.review.strategy).toBe("ECONOMY");
+    expect(view.steps.slice(0, 4).map((s) => s.done)).toEqual([true, true, true, false]);
+    // On rend les modèles de départ pour la suite du scénario.
+    saveNeeds(db, 1, [{ lineId: lines.adult, franchiseChf: null, models: [], healthCostsRp: 50_000, doctorName: null }], NOW);
+  });
+
+  it("enregistre une signature dessinée et la retrouve par nom", () => {
+    const alex = listSignatures(db).find((s) => s.firstName === "Alex")!;
+    expect(() => saveSignature(db, alex.personId, "data:text/html;base64,AAAA")).toThrow(UserError);
+    saveSignature(db, alex.personId, "data:image/png;base64,iVBORw0KGgo=");
+    expect(signaturesByName(db)).toEqual({ "Alex Test": "data:image/png;base64,iVBORw0KGgo=" });
   });
 
   it("compare et décide", () => {

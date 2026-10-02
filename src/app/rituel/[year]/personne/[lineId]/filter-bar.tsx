@@ -8,15 +8,24 @@ import { Button } from "@/ui/button";
 import { cn } from "@/ui/cn";
 import { Sheet } from "@/ui/sheet";
 
-export function FilterBar({ franchises }: { franchises: number[] }) {
+/**
+ * Filtres du comparateur. Sans paramètre d'URL, ce sont les besoins de la personne qui
+ * s'appliquent (`activeFranchise`, `activeModels`) ; « all » lève un filtre explicitement.
+ */
+export function FilterBar({ franchises, activeFranchise, activeModels, sort, strategyLabel }: {
+  franchises: number[];
+  activeFranchise: number | null;
+  activeModels: ModelType[];
+  sort: string;
+  strategyLabel: string | null;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, start] = useTransition();
 
-  const models = (params.get("m") ?? "").split(",").filter(Boolean) as ModelType[];
-  const franchise = params.get("f") ?? "";
-  const sort = params.get("sort") ?? "total";
+  const models = activeModels;
+  const franchise = activeFranchise === null ? "" : String(activeFranchise);
   const all = params.get("all") === "1";
   const every = params.get("every") === "1";
 
@@ -33,7 +42,7 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
     const set = new Set(models);
     if (set.has(m)) set.delete(m);
     else set.add(m);
-    update({ m: [...set].join(",") || null });
+    update({ m: [...set].join(",") || "all" });
   };
 
   const chip = (active: boolean) =>
@@ -44,18 +53,19 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
 
   return (
     <div className="space-y-3">
-      <div role="radiogroup" aria-label="Trier par" className="grid grid-cols-2 rounded-xl bg-surface-2 p-1">
+      <div role="radiogroup" aria-label="Trier par" className={cn("grid rounded-xl bg-surface-2 p-1", strategyLabel ? "grid-cols-3" : "grid-cols-2")}>
         {(
           [
-            ["total", "Coût total"],
+            ...(strategyLabel ? [["strategy", strategyLabel]] : []),
+            ["total", "Coût réel"],
             ["premium", "Prime seule"],
-          ] as const
+          ] as [string, string][]
         ).map(([key, label]) => (
           <button
             key={key}
             role="radio"
             aria-checked={sort === key}
-            onClick={() => update({ sort: key === "total" ? null : key })}
+            onClick={() => update({ sort: key })}
             className={cn("min-h-11 cursor-pointer rounded-lg text-sm font-medium transition-colors", sort === key ? "bg-surface text-foreground shadow-card" : "text-muted")}
           >
             {label}
@@ -63,11 +73,11 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
         ))}
       </div>
       <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] lg:flex-wrap lg:overflow-visible">
-        <button className={chip(franchise === "")} onClick={() => update({ f: null })} aria-pressed={franchise === ""}>
+        <button className={chip(franchise === "")} onClick={() => update({ f: "all" })} aria-pressed={franchise === ""}>
           Toutes franchises
         </button>
         {franchises.map((f) => (
-          <button key={f} className={chip(franchise === String(f))} onClick={() => update({ f: franchise === String(f) ? null : String(f) })} aria-pressed={franchise === String(f)}>
+          <button key={f} className={chip(franchise === String(f))} onClick={() => update({ f: franchise === String(f) ? "all" : String(f) })} aria-pressed={franchise === String(f)}>
             F {f}
           </button>
         ))}
@@ -79,7 +89,7 @@ export function FilterBar({ franchises }: { franchises: number[] }) {
       <div className="flex items-center gap-2">
         <Sheet
           title="Modèles d'assurance"
-          description="Médecin de famille, télémédecine… Sans choix ici, on applique les préférences de la personne."
+          description="Médecin de famille, télémédecine… Aucun choix = tous les modèles."
           trigger={
             <Button variant="secondary" size="sm">
               <SlidersHorizontal aria-hidden className="size-4" /> Modèles d&apos;assurance{models.length ? ` (${models.length})` : ""}

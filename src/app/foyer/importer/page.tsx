@@ -17,7 +17,7 @@ export default function ImportPolicyPage() {
     <Page>
       <PageHeader
         title="Importer une police"
-        subtitle="Le PDF de votre police (portail client ou e-mail de la caisse) : la caisse, les personnes, le produit, la franchise, la prime et les complémentaires sont repris. Vous vérifiez avant d'enregistrer. Le fichier reste sur votre Raspberry Pi."
+        subtitle="Photographiez votre police ou votre carte d'assuré, ou choisissez le PDF reçu de la caisse : la caisse, les personnes, le produit, la franchise, la prime et les complémentaires sont repris. Vous vérifiez avant d'enregistrer."
         back="/foyer"
       />
       <ImportFlow

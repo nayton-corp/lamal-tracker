@@ -95,7 +95,7 @@ export function analyzePolicyText(db: Db, text: string, currentYear: number): Po
     maxYear: currentYear + 1,
   });
   const warnings: string[] = [];
-  if (extract.noText) throw new UserError("Ce PDF ne contient pas de texte lisible (document scanné ou photo). Importez le PDF reçu de la caisse (portail client ou e-mail).");
+  if (extract.noText) throw new UserError("Ce PDF ne contient pas de texte lisible (document scanné). Choisissez plutôt « Photo » : le texte sera lu sur votre appareil.");
   const year = extract.year ?? currentYear;
   if (!extract.year) warnings.push(`Année de la police non trouvée : ${year} par défaut.`);
   if (extract.persons.length === 0) warnings.push("Aucun membre du foyer reconnu : vérifiez les dates de naissance dans Foyer.");

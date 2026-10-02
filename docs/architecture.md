@@ -15,6 +15,8 @@ src/
     lca.ts           familles de garanties complémentaires
     policy-import.ts lecture d'une police (texte du PDF) : personnes, franchise, modèle, montants, complémentaires
     insurer-profile.ts portrait d'une caisse : réserves en mois de primes, frais, évolution des primes
+    strategy.ts      stratégies du rituel (économie max, maintien, équilibre), points de solidité d'une caisse,
+                     profils de consommation
     ofsp/            lecture d'une ligne OFSP (formats ≤2026 et ≥2027), rapport d'import
   application/     Cas d'usage : foyer, revue annuelle, comparateur, lettres, historique
   infrastructure/  SQLite (Drizzle), import OFSP en flux, rendu PDF, notifications push,
@@ -50,9 +52,11 @@ d'extérieur ; l'application ne dépend pas de l'interface.
   (correspondance confirmée d'un code tarif d'une année à l'autre).
 - Foyer : `household`, `person`, `lamal_policy` (un contrat par personne et par année, prime
   réellement facturée), `lca_policy`.
-- Rituel : `review` (une par année cible), `review_line` (une par personne, complémentaires à
+- Rituel : `review` (une par année cible, stratégie choisie, besoins confirmés), `review_line`
+  (franchise et modèles souhaités), (une par personne, complémentaires à
   demander), `letter`, `offer_request` (demande d'offre à une nouvelle caisse, contenu figé).
-- Divers : `settings`, `push_subscription`, `notification_log` (rappels dédoublonnés).
+- Signature dessinée par personne (`signature`, PNG), apposée sur les PDF au rendu.
+- Divers : `settings` (dont le mode « une personne / foyer »), `push_subscription`, `notification_log` (rappels dédoublonnés).
 
 Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `pnpm db:generate`
 (migration SQL dans `drizzle/`, appliquée au démarrage).
@@ -63,3 +67,12 @@ Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `p
 fichier OFSP (quotidien du 15.09 au 30.11, hebdomadaire sinon), import en arrière-plan si
 le fichier a changé, notification ; rappels J-30, J-14, J-7, J-3, J-1 avant la date d'envoi ; vérification hebdomadaire des
 référentiels officiels (`server/reference.ts`).
+
+## Parcours
+
+- `/bienvenue` : accueil de la première connexion (pour qui, adresse, personnes, contrats).
+- `/rituel/[année]` : reconduction tacite → `strategie` → `besoins` → `comparer` (onglets par personne)
+  → `lca` → `lettres` (démarches, signature) → clôture. L'analyse s'ouvre seule pendant la fenêtre
+  du rituel (`ritualWindowOpen`, `ensureReview`).
+- OCR : Tesseract dans le navigateur ; ses fichiers sont copiés dans `public/ocr` au build
+  (`scripts/copy-ocr-assets.mjs`), aucune photo ne quitte l'appareil.

@@ -2,6 +2,8 @@ import { ArrowRight, Check, FileText, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { deleteSignatureAction } from "@/app/actions/journey";
+import { listSignatures } from "@/application/signatures";
 import { deleteLetterAction, deleteOfferAction, letterAckAction, letterSentAction, offerAnsweredAction, offerSentAction, prepareAllAction } from "@/app/actions/review";
 import { listOfferRequests } from "@/application/offers";
 import { getReviewByYear, getReviewView } from "@/application/review";
@@ -20,6 +22,7 @@ import { Input } from "@/ui/form";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
 import { ShareButton } from "./share-button";
+import { SignaturePad } from "./signature-pad";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Démarches" };
@@ -83,6 +86,8 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
   const requestsDone = switching.length > 0 && switching.every((p) => p.line.affiliationRequestedAt);
   const lettersDone = [...switching, ...adjusting].length > 0 && [...terminations, ...changes].length > 0 && [...terminations, ...changes].every((l) => l.sentAt);
   const confirmDone = offers.every((o) => o.answeredAt) && terminations.every((l) => l.acknowledgedAt) && offers.length + terminations.length > 0;
+  const involved = new Set([...switching, ...adjusting].map((p) => p.person.id));
+  const signers = listSignatures(db()).filter((s) => involved.has(s.personId) && year - 1 - Number(s.birthDate.slice(0, 4)) >= 18);
   let n = 0;
 
   return (
@@ -136,6 +141,48 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
         )}
       </Card>
 
+      {signers.length > 0 && (
+        <Card className="space-y-3">
+          <div>
+            <p className="font-medium">Signature électronique</p>
+            <p className="text-sm text-muted">
+              Signez une fois à l&apos;écran : la signature est apposée sur chaque courrier PDF, prêt à envoyer par e-mail ou à imprimer sans stylo.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {signers.map((s) => (
+              <li key={s.personId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span className="flex items-center gap-3">
+                  {s.dataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.dataUrl} alt={`Signature de ${s.firstName}`} className="h-10 w-28 rounded border border-border bg-white object-contain" />
+                  ) : (
+                    <span className="flex h-10 w-28 items-center justify-center rounded border border-dashed border-border text-xs text-muted">non signé</span>
+                  )}
+                  <span className="font-medium">
+                    {s.firstName} {s.lastName}
+                  </span>
+                </span>
+                <span className="flex gap-1">
+                  <SignaturePad personId={s.personId} name={s.firstName} signed={Boolean(s.dataUrl)} />
+                  {s.dataUrl && (
+                    <form action={deleteSignatureAction}>
+                      <input type="hidden" name="personId" value={s.personId} />
+                      <Button size="icon" variant="ghost" className="text-increase" aria-label={`Retirer la signature de ${s.firstName}`}>
+                        <Trash2 aria-hidden className="size-4" />
+                      </Button>
+                    </form>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted">
+            Une signature dessinée n&apos;a pas la même valeur qu&apos;une signature manuscrite (art. 14 CO). La plupart des caisses l&apos;acceptent ; pour la résiliation, le plus sûr reste le recommandé signé à la main.
+          </p>
+        </Card>
+      )}
+
       {nothing && (
         <Alert tone="success" title="Rien à envoyer">
           Personne ne change de caisse, de franchise ou de modèle.
@@ -145,9 +192,9 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
       {switching.length > 0 && (
         <Step
           n={++n}
-          title="Demander l'affiliation à la nouvelle caisse"
+          title="Souscrire auprès de la nouvelle caisse"
           done={requestsDone}
-          hint="La caisse doit vous accepter pour l'assurance de base, sans questionnaire de santé. Par e-mail, c'est fait en une minute ; les complémentaires demandées passent, elles, par un questionnaire."
+          hint="La demande d'affiliation est pré-remplie (personnes, dates de naissance, produit, franchise, début au 1er janvier). La caisse doit vous accepter pour l'assurance de base, sans questionnaire de santé ; les complémentaires demandées passent, elles, par un questionnaire."
         >
           {offers.length === 0 && <p className="text-sm text-muted">Préparez les courriers ci-dessus.</p>}
           {offers.map((o) => (
@@ -213,7 +260,14 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
                 </div>
                 <PdfButtons url={`/api/letters/${l.id}/pdf`} filename={`lettre-${l.id}.pdf`} primary={!l.sentAt} />
                 {l.sentAt ? (
-                  l.trackingNumber && <p className="text-sm break-all text-muted">Suivi : {l.trackingNumber}</p>
+                  l.trackingNumber && (
+                    <p className="text-sm break-all text-muted">
+                      Suivi : {l.trackingNumber}{" "}
+                      <a className="text-primary underline" href={`https://service.post.ch/ekp-web/ui/entry/search/${encodeURIComponent(l.trackingNumber.replace(/\s/g, ""))}`} target="_blank" rel="noopener">
+                        Suivre l&apos;envoi
+                      </a>
+                    </p>
+                  )
                 ) : (
                   <ActionForm action={letterSentAction} hidden={{ letterId: l.id }} className="grid grid-cols-2 items-end gap-2">
                     <label className="space-y-1 text-sm">

@@ -1,15 +1,16 @@
 # Primes LAMal — suivi et comparateur annuel
 
-PWA personnelle, mobile d'abord, auto-hébergée sur un Raspberry Pi. Chaque automne :
+PWA personnelle, mobile d'abord, auto-hébergée sur un Raspberry Pi. À la première connexion, un **accueil guidé** demande pour qui gérer l'assurance (une personne ou un foyer), l'adresse, les personnes, puis leurs contrats actuels : **photo ou PDF de la police** (lecture sur l'appareil, recommandé) ou **saisie guidée** en quatre questions. Chaque automne :
 
 1. **les primes officielles de l'OFSP sont importées automatiquement** dès leur publication (fin septembre) ;
-2. l'app calcule **la hausse de chaque membre du foyer** pour l'année suivante, sans rien changer ;
+2. pendant la fenêtre de changement (publication des primes → 30 novembre), l'accueil montre la **reconduction tacite** : ce que le foyer paiera l'an prochain sans rien faire, personne par personne, l'écart avec cette année et le compte à rebours ;
+3. on choisit une **stratégie** (Économie max, Maintien, Équilibre), puis on confirme ses **besoins** (fréquence des consultations, franchise, modèles de soins, médecin) : le comparateur s'ouvre réglé en conséquence, avec le top 3 de chaque personne et des onglets pour passer d'un membre à l'autre ;
 3. le **comparateur** (offres détaillées, comparaison côte à côte de 2 à 4 offres, coût sans frais / attendu / année chargée) classe les caisses de votre région selon le **coût total attendu** (prime nette de CO2 + franchise + quote-part), avec un simulateur de franchise, le portrait de chaque caisse (réserves, frais administratifs, taille, évolution de ses primes face au marché) et l'explication de chaque modèle ;
 4. un **garde-fou LCA** (confirmation par appui long) empêche de résilier une complémentaire par erreur ;
-5. la page **Démarches** guide pas à pas : demande d'affiliation à la nouvelle caisse (PDF et e-mail prérempli, complémentaires souhaitées comprises), résiliation chez l'ancienne, puis confirmations ;
+5. la page **Démarches** guide pas à pas, avec une **signature à l'écran** apposée sur les courriers PDF : demande d'affiliation à la nouvelle caisse (PDF et e-mail prérempli, complémentaires souhaitées comprises), résiliation chez l'ancienne, puis confirmations ;
 6. les **lettres de résiliation PDF** (format enveloppe à fenêtre suisse) sont générées en un geste, avec suivi des envois recommandés et rappels avant le 30 novembre ;
 7. l'**historique pluriannuel** garde les primes réellement payées, les économies des rituels et la position du foyer dans le marché ;
-8. le **PDF de la police** peut être importé (*Foyer › Importer une police*) : caisse, personnes, tarif officiel, franchise, prime et complémentaires sont repris, lecture locale sans service externe.
+8. la **police** peut être importée en photo (police ou carte d'assuré, texte lu dans le navigateur avec Tesseract) ou en PDF (*Foyer › Importer une police*) : caisse, personnes, tarif officiel, franchise, prime et complémentaires sont repris, sans service externe.
 
 > Outil d'aide à la décision, pas un conseil en assurance. Vérifiez toujours les conditions des modèles (liste de médecins, Telmed…) auprès de la caisse.
 
@@ -89,7 +90,7 @@ Cloner le dépôt sur le Pi, décommenter `build: .` dans `docker-compose.yml`, 
 |---|---|
 | Une fois | *Foyer* : adresse, canton, **région de primes** (sur la police), membres, puis le contrat LAMal de l'année en cours de chacun, saisi ou importé depuis le PDF de la police. Ajouter les **complémentaires LCA** (garantie choisie dans une liste, assureur prérempli d'après la caisse LAMal). Les adresses des caisses viennent de l'annuaire officiel ; ne les modifier que si la police en indique une autre. |
 | Fin septembre | L'OFSP publie les primes ; l'app les importe (contrôle quotidien du 15 septembre au 30 novembre) et envoie une notification. Import manuel possible dans *Réglages*. |
-| Octobre | *Rituel* : lancer l'analyse. Pour chaque personne : hausse, tarif de renouvellement (à confirmer si la caisse a renommé son tarif), comparateur, simulateur de franchise, choix. |
+| Octobre | L'analyse s'ouvre seule. *Rituel* : reconduction tacite, choix de la **stratégie**, questionnaire des **besoins**, puis comparateur par personne (top 3, filtres, comparaison côte à côte, simulateur de franchise) et choix. |
 | Avant ~23 novembre | Passer le **contrôle LCA**, puis *Démarches* : envoyer la **demande d'affiliation** à la nouvelle caisse, imprimer, signer et envoyer la **résiliation en recommandé** (réception au plus tard le 30 novembre), saisir le n° de suivi, cocher les confirmations reçues. |
 | Décembre / janvier | Marquer les confirmations reçues, puis **clôturer** : les contrats de la nouvelle année sont créés et l'historique mis à jour. Ajuster la prime facturée si elle diffère. Un rituel, même clôturé, peut être **rouvert** (les choix sont gardés, les contrats créés retirés) ou **supprimé** (retour à l'état d'avant). |
 

@@ -1,8 +1,6 @@
-import { eq } from "drizzle-orm";
 import {
   bestPerInsurer,
   cheapestPerFranchise,
-  costOf,
   filterOffers,
   marketStats,
   rankOffers,
@@ -12,19 +10,20 @@ import {
 import { breakEvenRp, costScenarios, franchiseCurve, type CostScenarios, type CurvePoint } from "@/domain/cost";
 import type { InsurerProfile } from "@/domain/insurer-profile";
 import type { ModelType } from "@/domain/lamal";
-import { coinsuranceMaxFor, franchisesFor } from "@/domain/parameters";
+import { coinsuranceMaxFor } from "@/domain/parameters";
+import { rankForStrategy, type Strategy } from "@/domain/strategy";
 import type { Db } from "@/infrastructure/db/client";
-import { offersFor, parametersFor } from "@/infrastructure/db/queries";
-import { insurer, lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
-import { getHousehold } from "./household";
-import { insurerProfiles } from "./insurers";
-import { UserError } from "./review";
+import { insurer } from "@/infrastructure/db/schema";
+import { effectiveNeeds, lineContext, picksFor, type StrategyPick } from "./strategy";
 
 export interface CompareOptions {
+  /** Modèles retenus ; absent = besoins de la personne, vide = tous. */
   models?: ModelType[];
+  /** Franchises retenues ; absent = besoins de la personne, vide = toutes. */
   franchises?: number[];
   healthCostsRp?: number;
-  sort?: SortKey;
+  /** « strategy » : classement de la stratégie du rituel (par défaut quand elle est choisie). */
+  sort?: SortKey | "strategy";
   /** Ignore les exclusions et modèles préférés de la personne. */
   all?: boolean;
   /** Toutes les offres de chaque caisse, au lieu de sa meilleure seulement. */
@@ -68,55 +67,47 @@ export interface CompareView {
   coinsuranceMaxRp: number;
   /** Nombre d'offres avant regroupement par caisse. */
   matchingOffers: number;
+  strategy: Strategy | null;
+  sort: SortKey | "strategy";
+  /** Filtres appliqués (après besoins et paramètres d'URL). */
+  effective: { models: ModelType[]; franchiseChf: number | null };
+  /** Points de solidité de chaque caisse (−3 à +3), pour l'équilibre. */
+  quality: Record<number, number>;
+  /** Meilleure offre selon chacune des trois stratégies. */
+  picks: StrategyPick[];
 }
 
 export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}): CompareView {
-  const line = db.select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
-  if (!line) throw new UserError("Ligne introuvable.");
-  const r = db.select().from(review).where(eq(review.id, line.reviewId)).get()!;
-  const p = db.select().from(person).where(eq(person.id, line.personId)).get()!;
-  const policy = db.select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
-  const h = getHousehold(db)!;
-  const params = parametersFor(db, r.targetYear);
-  const allowedFranchises = franchisesFor(params, line.targetAgeClass);
-  const healthCostsRp = opts.healthCostsRp ?? p.healthCostsRp;
-  const ctx = { ageClass: line.targetAgeClass, params, healthCostsRp };
-
-  const all = offersFor(db, {
-    datasetId: r.datasetId,
-    canton: h.canton,
-    region: h.region,
-    ageClass: line.targetAgeClass,
-    accident: line.accident,
-    subgroup: line.subgroup,
-  }).filter((o) => allowedFranchises.includes(o.franchiseChf));
+  const c = lineContext(db, lineId, opts.healthCostsRp);
+  const { line, review: r, person: p, policy, ctx, allowedFranchises } = c;
+  const params = ctx.params;
+  const healthCostsRp = ctx.healthCostsRp;
+  const all = c.offers;
 
   const renewal =
     line.renewalMonthlyRp === null
       ? null
       : {
           monthlyRp: line.renewalMonthlyRp,
-          totalRp: costOf({ monthlyPremiumRp: line.renewalMonthlyRp, franchiseChf: line.renewalFranchiseChf }, ctx).totalRp,
+          totalRp: c.renewalTotalRp!,
           label: line.renewalLabel,
           franchiseChf: line.renewalFranchiseChf,
         };
 
+  const needs = effectiveNeeds(c);
+  const models = opts.models ?? (opts.all ? [] : needs.models);
+  const franchises = opts.franchises ?? (needs.franchiseChf === null ? [] : [needs.franchiseChf]);
   const filtered = filterOffers(all, {
-    models: opts.models?.length ? opts.models : opts.all ? [] : (p.allowedModels as ModelType[]),
-    franchises: opts.franchises,
+    models,
+    franchises,
     excludedInsurerIds: opts.all ? [] : p.excludedInsurerIds,
   });
-  const rankedAll = rankOffers(filtered, { ...ctx, referenceTotalRp: renewal?.totalRp ?? null }, opts.sort ?? "total");
+  const sort = opts.sort ?? (r.strategy ? "strategy" : "total");
+  const byCost = rankOffers(filtered, { ...ctx, referenceTotalRp: renewal?.totalRp ?? null }, sort === "premium" ? "premium" : "total");
+  const rankedAll = sort === "strategy" && r.strategy ? rankForStrategy(byCost, r.strategy, c.quality) : byCost;
   const ranked = opts.everyOffer ? rankedAll : bestPerInsurer(rankedAll);
 
-  const profiles = insurerProfiles(db, {
-    canton: h.canton,
-    region: h.region,
-    ageClass: line.targetAgeClass,
-    accident: line.accident,
-    subgroup: line.subgroup,
-    targetYear: r.targetYear,
-  });
+  const profiles = c.profiles;
   const insurers: Record<number, InsurerCard> = {};
   for (const row of db.select({ id: insurer.id, website: insurer.website, phone: insurer.phone, email: insurer.email }).from(insurer).all()) {
     insurers[row.id] = { website: row.website, phone: row.phone, email: row.email, profile: profiles.get(row.id) ?? null };
@@ -145,7 +136,7 @@ export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}
   const cheapest = cheapestPerFranchise(filterOffers(all, { models: opts.models }));
   const base = {
     coinsuranceRateBp: params.coinsuranceRateBp,
-    coinsuranceMaxRp: coinsuranceMaxFor(params, line.targetAgeClass),
+    coinsuranceMaxRp,
     co2AnnualRp: params.co2AnnualRp,
   };
   const maxH = line.targetAgeClass === "KID" ? 400_000 : 1_000_000;
@@ -176,5 +167,10 @@ export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}
     ).values()],
     renewalStatus: line.renewalStatus,
     market: marketStats(all.filter((o) => o.franchiseChf === (renewal?.franchiseChf ?? policy.franchiseChf)).map((o) => o.monthlyPremiumRp)),
+    strategy: r.strategy,
+    sort,
+    effective: { models, franchiseChf: franchises.length === 1 ? franchises[0]! : null },
+    quality: c.qualityById,
+    picks: picksFor(c),
   };
 }

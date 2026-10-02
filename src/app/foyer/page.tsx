@@ -1,5 +1,6 @@
 import { ChevronRight, FileUp, Plus, UserRound, Users } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getHousehold, listLca, listPersons, listPolicies } from "@/application/household";
 import { ageClassForYear } from "@/domain/age";
 import { AGE_CLASS_LABEL } from "@/domain/lamal";
@@ -19,6 +20,7 @@ export const metadata = { title: "Foyer" };
 
 export default function FoyerPage() {
   const h = getHousehold(db());
+  if (!h) redirect("/bienvenue");
   const year = Number(today().slice(0, 4));
   const persons = h ? listPersons(db(), h.id) : [];
 

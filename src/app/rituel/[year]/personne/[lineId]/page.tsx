@@ -1,11 +1,12 @@
-import { BadgeCheck, CircleAlert, Stethoscope, TrendingDown } from "lucide-react";
+import { BadgeCheck, Check, CircleAlert, ShieldCheck, Stethoscope, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/review";
 import { compareForLine, offerKey, type CompareView, type DetailedOffer } from "@/application/compare";
 import { insurerLabel } from "@/infrastructure/db/queries";
-import { insurer, lamalPolicy, reviewLine } from "@/infrastructure/db/schema";
+import { insurer, lamalPolicy, person, reviewLine } from "@/infrastructure/db/schema";
+import { STRATEGY_INFO } from "@/domain/strategy";
 import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { db } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
@@ -37,16 +38,27 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
   const policy = db().select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
   const currentInsurer = db().select().from(insurer).where(eq(insurer.id, policy.insurerId)).get()!;
 
-  const models = (sp.m ?? "").split(",").filter((m): m is ModelType => (MODEL_TYPES as readonly string[]).includes(m));
+  // Sans paramètre, les besoins de la personne s'appliquent ; « all » lève le filtre.
+  const models = sp.m === undefined ? undefined : sp.m.split(",").filter((m): m is ModelType => (MODEL_TYPES as readonly string[]).includes(m));
   const view = compareForLine(db(), lineId, {
     models,
-    franchises: sp.f ? [Number(sp.f)] : undefined,
-    sort: sp.sort === "premium" ? "premium" : "total",
+    franchises: sp.f === undefined ? undefined : sp.f === "all" ? [] : [Number(sp.f)],
+    sort: sp.sort === "premium" || sp.sort === "total" || sp.sort === "strategy" ? sp.sort : undefined,
     all: sp.all === "1",
     everyOffer: sp.every === "1",
   });
   const every = sp.every === "1";
   const limit = sp.n === "all" ? view.offers.length : 30;
+  const members = db()
+    .select({ id: reviewLine.id, decision: reviewLine.decision, firstName: person.firstName })
+    .from(reviewLine)
+    .innerJoin(person, eq(person.id, reviewLine.personId))
+    .where(eq(reviewLine.reviewId, line.reviewId))
+    .orderBy(asc(reviewLine.id))
+    .all();
+  const strategyLabel = view.strategy ? STRATEGY_INFO[view.strategy].label : null;
+  const top = view.offers.slice(0, 3);
+  const rest = view.offers.slice(3, limit);
 
   return (
     <Page wide>
@@ -55,6 +67,24 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
         subtitle={`${AGE_CLASS_LABEL[line.targetAgeClass]} en ${year} · ${line.accident ? "avec" : "sans"} accident`}
         back={`/rituel/${year}#ligne-${lineId}`}
       />
+      {members.length > 1 && (
+        <nav aria-label="Personnes du foyer" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0">
+          {members.map((m) => (
+            <Link
+              key={m.id}
+              href={`/rituel/${year}/personne/${m.id}`}
+              aria-current={m.id === lineId ? "page" : undefined}
+              className={cn(
+                "flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-medium",
+                m.id === lineId ? "border-primary bg-primary text-on-primary" : "border-border bg-surface hover:bg-surface-2",
+              )}
+            >
+              {m.decision !== "UNDECIDED" && <Check aria-label="choix fait" className="size-4" />}
+              {m.firstName}
+            </Link>
+          ))}
+        </nav>
+      )}
 
       <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-8 lg:space-y-0">
       <aside className="space-y-6 lg:sticky lg:top-8">
@@ -76,7 +106,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
       </Card>
 
       <Section title="Filtrer les offres">
-        <FilterBar franchises={view.allowedFranchises} />
+        <FilterBar franchises={view.allowedFranchises} activeFranchise={view.effective.franchiseChf} activeModels={view.effective.models} sort={view.sort} strategyLabel={strategyLabel} />
         <p className="text-sm text-muted">
           Le coût total compte la prime et ce que vous paieriez de votre poche (franchise, 10 % de quote-part) pour des frais de santé de{" "}
           <Chf rp={view.healthCostsRp} whole /> par an.
@@ -85,7 +115,8 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
       </Section>
       </aside>
 
-      <Section title={every ? `${view.offers.length} offre(s) ${year}, les moins chères d'abord` : `${view.offers.length} caisse(s) en ${year}, la moins chère d'abord`}>
+      <div className="space-y-6">
+      <Section title={view.sort === "strategy" && strategyLabel ? `Top ${top.length} · ${strategyLabel}` : `Top ${top.length} en ${year}`}>
         <BestSummary view={view} every={every} />
         {view.offers.length === 0 ? (
           <Alert tone="info" title="Aucune offre avec ces filtres">
@@ -93,14 +124,24 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
           </Alert>
         ) : (
           <ol className="space-y-2">
-            {view.offers.slice(0, limit).map((o) => (
+            {top.map((o) => (
               <li key={`${o.tariffId}-${o.franchiseChf}`}>
                 <OfferCard offer={o} view={view} year={year} lineId={lineId} />
               </li>
             ))}
           </ol>
         )}
-        <CompareBar />
+        <Picks view={view} />
+      </Section>
+      {rest.length > 0 && (
+      <Section title={every ? `Toutes les offres (${view.offers.length})` : `Les autres caisses (${view.offers.length - top.length})`}>
+        <ol className="space-y-2">
+          {rest.map((o) => (
+            <li key={`${o.tariffId}-${o.franchiseChf}`}>
+              <OfferCard offer={o} view={view} year={year} lineId={lineId} />
+            </li>
+          ))}
+        </ol>
         {view.offers.length > limit && (
           <Button asChild variant="secondary" block>
             <Link href={`?${new URLSearchParams({ ...sp, n: "all" } as Record<string, string>).toString()}`} scroll={false}>
@@ -109,8 +150,36 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
           </Button>
         )}
       </Section>
+      )}
+      <CompareBar />
+      </div>
       </div>
     </Page>
+  );
+}
+
+/** La meilleure offre selon chacune des trois stratégies, pour voir ce qu'on gagne ou perd. */
+function Picks({ view }: { view: CompareView }) {
+  return (
+    <Card className="space-y-2">
+      <p className="text-sm font-medium">Selon chaque stratégie</p>
+      <ul className="divide-y divide-border text-sm">
+        {view.picks.map(({ strategy, offer }) => (
+          <li key={strategy} className="flex items-center justify-between gap-3 py-2">
+            <span className="min-w-0">
+              <span className={cn("block font-medium", strategy === view.strategy && "text-primary")}>
+                {STRATEGY_INFO[strategy].label}
+                {strategy === view.strategy && " (la vôtre)"}
+              </span>
+              <span className="block text-muted">
+                {offer ? `${offer.insurerName} · ${MODEL_LABEL[offer.modelType]} · franchise ${offer.franchiseChf}` : "aucune offre"}
+              </span>
+            </span>
+            {offer && <Saving rp={offer.savingsRp} className="shrink-0" />}
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -217,6 +286,11 @@ function OfferCard({ offer: o, view, year, lineId }: { offer: DetailedOffer; vie
             {o.doctorCheck && (
               <Badge tone="info" className="text-xs">
                 <Stethoscope aria-hidden className="size-3" /> Médecin à vérifier
+              </Badge>
+            )}
+            {(view.quality[o.insurerId] ?? 0) >= 2 && (
+              <Badge tone="saving" className="text-xs">
+                <ShieldCheck aria-hidden className="size-3" /> Caisse solide
               </Badge>
             )}
           </span>

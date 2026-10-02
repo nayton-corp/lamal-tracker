@@ -25,7 +25,7 @@ interface Household {
  * (table officielle BAG + swisstopo). Si le code postal couvre plusieurs communes, on propose
  * la plus probable et on laisse choisir. Saisie manuelle possible en dernier recours.
  */
-export function HouseholdForm({ household, onDone }: { household: Household | null; onDone?: () => void }) {
+export function HouseholdForm({ household, onDone, solo, submitLabel }: { household: Household | null; onDone?: () => void; solo?: boolean; submitLabel?: string }) {
   const [state, action] = useActionState(saveHouseholdAction, null);
   const [npa, setNpa] = useState(household?.postalCode ?? "");
   const [city, setCity] = useState(household?.city ?? "");
@@ -64,8 +64,8 @@ export function HouseholdForm({ household, onDone }: { household: Household | nu
       <input type="hidden" name="commune" value={useManual ? "" : chosen?.commune ?? household?.commune ?? ""} />
       <input type="hidden" name="bfsNumber" value={useManual ? "" : chosen?.bfs ?? ""} />
 
-      <Field label="Nom du foyer" htmlFor="name" error={fe.name}>
-        <Input id="name" name="name" required defaultValue={household?.name ?? ""} placeholder="Famille Dupont" autoComplete="family-name" />
+      <Field label={solo ? "Votre nom" : "Nom du foyer"} htmlFor="name" error={fe.name} hint={solo ? "Expéditeur des courriers." : undefined}>
+        <Input id="name" name="name" required defaultValue={household?.name ?? ""} placeholder={solo ? "Alex Dupont" : "Famille Dupont"} autoComplete={solo ? "name" : "family-name"} />
       </Field>
       <Field label="Rue et numéro" htmlFor="street" hint="Expéditeur des lettres de résiliation.">
         <Input id="street" name="street" defaultValue={household?.street ?? ""} autoComplete="street-address" />
@@ -144,7 +144,7 @@ export function HouseholdForm({ household, onDone }: { household: Household | nu
 
       <FormError message={state?.error} />
       <SubmitButton block disabled={!canton}>
-        Enregistrer le foyer
+        {submitLabel ?? "Enregistrer le foyer"}
       </SubmitButton>
     </form>
   );

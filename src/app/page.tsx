@@ -1,16 +1,17 @@
-import { ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Database, FileSpreadsheet, Sparkles, Users } from "lucide-react";
+import { CalendarClock, CheckCircle2, CircleAlert, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { getHousehold, listPersons, listPolicies } from "@/application/household";
-import { getReviewByYear, getReviewView } from "@/application/review";
+import { redirect } from "next/navigation";
+import { Awareness } from "@/app/rituel/_parts/awareness";
+import { getHousehold, getHouseholdMode, listPersons, listPolicies } from "@/application/household";
+import { ensureReview, getReviewView } from "@/application/review";
 import { daysBetween, formatDateLong } from "@/domain/dates";
-import { reviewDeadlines } from "@/domain/deadlines";
+import { reviewDeadlines, ritualWindowOpen } from "@/domain/deadlines";
 import { activeDataset, insurerLabel, parametersFor } from "@/infrastructure/db/queries";
 import { db, ritualYear, today } from "@/server/context";
-import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
 import { Chf, Delta } from "@/ui/money";
-import { EmptyState, Page } from "@/ui/page";
+import { Page } from "@/ui/page";
 
 export const dynamic = "force-dynamic";
 
@@ -20,40 +21,9 @@ export default function Home() {
   const year = Number(t.slice(0, 4));
   const target = ritualYear();
 
-  if (!h) {
-    return (
-      <Page>
-        <header className="space-y-2 pt-6 lg:pt-0">
-          <p className="text-sm font-semibold uppercase tracking-wide text-primary">Primes LAMal</p>
-          <h1 className="text-3xl font-bold leading-tight text-balance">Payez le juste prix pour votre assurance de base.</h1>
-          <p className="text-muted">Chaque automne, les primes changent. L&apos;app vous montre la hausse pour votre foyer, trouve la caisse la moins chère et prépare la lettre de résiliation, prête à signer.</p>
-        </header>
-        <ol className="space-y-3">
-          {[
-            { Icon: Users, title: "Décrire le foyer", text: "Adresse, région de primes et membres." },
-            { Icon: FileSpreadsheet, title: "Indiquer les contrats actuels", text: "Choisissez la caisse et la franchise : la prime est retrouvée toute seule." },
-            { Icon: Database, title: "Comparer chaque automne", text: "Dès la publication des primes, l'app compare toutes les caisses et prépare la lettre." },
-          ].map(({ Icon, title, text }, i) => (
-            <li key={title}>
-              <Card className="flex items-center gap-4">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-soft font-semibold text-primary">{i + 1}</span>
-                <div className="flex-1">
-                  <p className="font-semibold">{title}</p>
-                  <p className="text-sm text-muted">{text}</p>
-                </div>
-                <Icon aria-hidden className="size-5 text-muted" />
-              </Card>
-            </li>
-          ))}
-        </ol>
-        <Button asChild size="lg" block>
-          <Link href="/foyer">
-            Commencer <ArrowRight aria-hidden className="size-5" />
-          </Link>
-        </Button>
-      </Page>
-    );
-  }
+  // Première connexion : l'accueil guide la configuration (pour qui, adresse, personnes, contrats).
+  if (!h) redirect("/bienvenue");
+  const solo = getHouseholdMode(db()) === "SOLO";
 
   const persons = listPersons(db(), h.id);
   const params = parametersFor(db(), year);
@@ -68,60 +38,45 @@ export default function Home() {
   const totalPrev = rows.every((r) => r.previous) ? rows.reduce((a, r) => a + r.previous!.policy.billedMonthlyRp, 0) : null;
   const missing = rows.filter((r) => !r.current);
 
-  const dataset = activeDataset(db(), target);
-  const reviewRow = getReviewByYear(db(), target);
-  const reviewView = reviewRow ? getReviewView(db(), reviewRow.id, t) : null;
-  const deadlines = reviewDeadlines(target);
+  if (persons.length === 0) redirect("/bienvenue?etape=membres");
 
-  if (persons.length === 0) {
-    return (
-      <Page>
-        <header className="pt-4">
-          <p className="text-sm text-muted">{h.name}</p>
-          <h1 className="text-2xl font-bold">Bonjour</h1>
-        </header>
-        <EmptyState icon={<Users aria-hidden />} title="Qui est assuré dans votre foyer ?" action={<Button asChild><Link href="/foyer/personne/nouvelle">Ajouter une personne</Link></Button>}>
-          Ajoutez chaque personne, puis sa caisse et sa franchise actuelles. C&apos;est tout.
-        </EmptyState>
-      </Page>
-    );
-  }
+  const dataset = activeDataset(db(), target);
+  const deadlines = reviewDeadlines(target);
+  const windowOpen = ritualWindowOpen(t, target, Boolean(dataset));
+  // Pendant la fenêtre du rituel, l'analyse s'ouvre d'elle-même : l'accueil montre tout de suite
+  // ce que coûtera l'année prochaine sans rien faire.
+  const reviewId = windowOpen ? ensureReview(db(), target) : null;
+  const reviewView = reviewId ? getReviewView(db(), reviewId, t) : null;
 
   return (
     <Page wide>
       <header className="pt-4 lg:pt-0">
         <p className="text-sm text-muted">{h.name}</p>
-        <h1 className="text-2xl font-bold">Bonjour</h1>
+        <h1 className="text-2xl font-bold">Bonjour{solo ? ` ${persons[0]!.firstName}` : ""}</h1>
       </header>
       <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-8 lg:space-y-0">
       <div className="space-y-6">
 
-      {reviewView ? (
+      {reviewView && reviewView.review.status !== "CLOSED" ? (
+        <Awareness view={reviewView} detailed={!reviewView.review.strategy} />
+      ) : reviewView ? (
         <Link href={`/rituel/${target}`} className="block">
-          <Card className="space-y-3 border-primary/30 bg-primary-soft/40 transition-colors hover:bg-primary-soft/70">
-            <div className="flex items-center justify-between gap-2">
-              <p className="flex items-center gap-2 font-semibold text-primary">
-                <Sparkles aria-hidden className="size-5" /> Rituel {target}
-              </p>
-              {reviewView.review.status === "CLOSED" ? <Badge tone="saving">Clôturé</Badge> : <Badge tone={reviewView.urgency === "calm" ? "info" : "increase"}>J-{reviewView.daysToDeadline}</Badge>}
-            </div>
-            <p className="text-sm">
-              {reviewView.steps.filter((s) => s.done).length}/{reviewView.steps.length} étapes · hausse sans changement :{" "}
-              <Delta rp={reviewView.totals.renewalMonthlyRp === null ? null : reviewView.totals.renewalMonthlyRp - reviewView.totals.currentMonthlyRp} suffix="/mois" />
-            </p>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={reviewView.steps.length} aria-valuenow={reviewView.steps.filter((s) => s.done).length} aria-label="Avancement du rituel">
-              <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${(reviewView.steps.filter((s) => s.done).length / reviewView.steps.length) * 100}%` }} />
+          <Card className="flex items-center gap-3 border-saving/30 transition-colors hover:bg-surface-2">
+            <CheckCircle2 aria-hidden className="size-6 shrink-0 text-saving" />
+            <div className="text-sm">
+              <p className="font-medium">Rituel {target} clôturé</p>
+              <p className="text-muted">Vos contrats {target} sont enregistrés.</p>
             </div>
           </Card>
         </Link>
-      ) : dataset ? (
+      ) : dataset && windowOpen ? (
         <Card className="space-y-3 border-primary/30">
           <p className="flex items-center gap-2 font-semibold text-primary">
             <Sparkles aria-hidden className="size-5" /> Les primes {target} sont publiées
           </p>
-          <p className="text-sm text-muted">Découvrez la hausse pour votre foyer et les meilleures offres. Échéance : {formatDateLong(deadlines.receiptDeadline)}.</p>
+          <p className="text-sm text-muted">Indiquez {solo ? "votre contrat" : "les contrats"} {year} pour voir la hausse. Échéance : {formatDateLong(deadlines.receiptDeadline)}.</p>
           <Button asChild block>
-            <Link href={`/rituel/${target}`}>Ouvrir le rituel {target}</Link>
+            <Link href="/bienvenue?etape=contrats">Indiquer {solo ? "mon contrat" : "les contrats"} {year}</Link>
           </Button>
         </Card>
       ) : (
@@ -130,18 +85,18 @@ export default function Home() {
           <div className="text-sm">
             <p className="font-medium">Prochaines primes ({target}) attendues fin septembre</p>
             <p className="text-muted">
-              {daysBetween(t, `${year}-09-25`) > 0 ? `Dans environ ${daysBetween(t, `${year}-09-25`)} jours. ` : ""}L&apos;app les importe toute seule.{" "}
+              {daysBetween(t, `${year}-09-25`) > 0 ? `Dans environ ${daysBetween(t, `${year}-09-25`)} jours. ` : ""}L&apos;app les importe toute seule et vous prévient.{" "}
               <Link href="/donnees" className="text-primary underline">Vérifier maintenant</Link>
             </p>
           </div>
         </Card>
       )}
 
-      <Section title={`Primes ${year}`}>
+      <Section title={solo ? `Votre prime ${year}` : `Primes ${year}`}>
         <Card className="space-y-4">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <p className="text-sm text-muted">Foyer, par mois</p>
+              <p className="text-sm text-muted">{solo ? "Par mois" : "Foyer, par mois"}</p>
               <p className="text-3xl font-bold">
                 <Chf rp={totalCurrent} />
               </p>
@@ -192,6 +147,10 @@ export default function Home() {
           </ul>
         </Section>
       )}
+      <p className="flex items-start gap-2 rounded-xl bg-surface p-3 text-xs text-muted shadow-card">
+        <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-saving" />
+        <span>Données officielles de l&apos;OFSP (primes, comptes des caisses) et de l&apos;OFEV (CO2). Toutes les caisses, aucune commission, rien ne quitte votre Raspberry Pi.</span>
+      </p>
       </div>
       </div>
     </Page>
