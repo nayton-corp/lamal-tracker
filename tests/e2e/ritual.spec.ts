@@ -101,7 +101,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   // Garde-fou LCA : case + appui long
   await page.getByRole("link", { name: "Contrôle des complémentaires LCA" }).click();
   await expect(page.getByText("Ne résiliez jamais votre LCA par erreur")).toBeVisible();
-  await expect(page.getByText("Hospitalisation demi-privée", { exact: true })).toBeVisible();
+  await expect(page.getByText("Hospitalisation demi-privée", { exact: true }).first()).toBeVisible();
   await shot(page, "08-lca");
   const hold = page.getByRole("button", { name: "Maintenir pour confirmer" });
   await expect(hold).toBeDisabled();
@@ -112,24 +112,36 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.mouse.up();
   await expect(page.getByText(/Confirmé le/)).toBeVisible();
 
-  // Lettres : bloquées sans adresse, puis générées
-  await page.goto("/rituel/2027/lettres");
-  await page.getByRole("button", { name: "Générer les lettres" }).click();
-  await expect(page.getByText(/Adresse de la caisse actuelle manquante/)).toBeVisible();
-
+  // Adresse officielle de l'annuaire OFSP, modifiable au besoin
   await page.goto("/donnees/caisses");
   const helsana = page.locator("details").filter({ has: page.getByText("Helsana", { exact: true }) });
   await helsana.locator("summary").click();
+  await expect(helsana.getByText("8081 Zürich")).toBeVisible();
+  await helsana.getByRole("button", { name: "Modifier" }).click();
   await helsana.getByLabel("Adresse de résiliation").fill("Case postale\n8081 Zurich");
   await helsana.getByRole("button", { name: "Enregistrer" }).click();
   await expect(helsana.getByText("Caisse enregistrée.")).toBeVisible();
+  await helsana.getByRole("button", { name: "Revenir à l'adresse officielle" }).click();
+  await expect(helsana.getByText("Adresse officielle rétablie.")).toBeVisible();
+
+  // Demande d'offre à la nouvelle caisse, avec la complémentaire en cours
+  await page.goto("/rituel/2027/lettres");
+  await page.getByRole("button", { name: "Préparer les demandes d'offre" }).click();
+  await expect(page.getByText("1 demande(s) prête(s).")).toBeVisible();
+  await expect(page.getByText("Avec offre de complémentaires")).toBeVisible();
+  const offerHref = await page.getByRole("link", { name: "Ouvrir le PDF" }).first().getAttribute("href");
+  expect(offerHref).toMatch(/\/api\/offers\/\d+\/pdf/);
+  const offerPdf = await page.request.get(offerHref!);
+  expect((await offerPdf.body()).subarray(0, 4).toString()).toBe("%PDF");
+  await page.getByRole("button", { name: "Marquer comme envoyée" }).click();
+  await expect(page.getByRole("button", { name: "Réponse reçue" })).toBeVisible();
 
   await page.goto("/rituel/2027/lettres");
   await page.getByRole("button", { name: "Générer les lettres" }).click();
   await expect(page.getByText("1 lettre(s) prête(s).")).toBeVisible();
   await expect(page.getByText("Résiliation LAMal")).toBeVisible();
 
-  const href = await page.getByRole("link", { name: "Ouvrir le PDF" }).getAttribute("href");
+  const href = await page.getByRole("link", { name: "Ouvrir le PDF" }).last().getAttribute("href");
   const pdf = await page.request.get(href!);
   expect(pdf.headers()["content-type"]).toBe("application/pdf");
   expect((await pdf.body()).subarray(0, 4).toString()).toBe("%PDF");

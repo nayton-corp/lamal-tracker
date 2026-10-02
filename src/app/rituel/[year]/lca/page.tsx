@@ -2,7 +2,9 @@ import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
-import { lineFlagsAction } from "@/app/actions/review";
+import { lcaWishesAction, lineFlagsAction } from "@/app/actions/review";
+import { lcaWishesFor } from "@/application/offers";
+import { LCA_GUARANTEES } from "@/domain/lca";
 import { getReviewByYear, getReviewView } from "@/application/review";
 import { requiresDoctorCheck, type ModelType } from "@/domain/lamal";
 import { lcaPolicy } from "@/infrastructure/db/schema";
@@ -79,6 +81,18 @@ export default async function LcaPage({ params }: { params: Promise<{ year: stri
                 Aucune complémentaire enregistrée pour {pr.person.firstName}. <Link className="text-primary underline" href={`/foyer/personne/${pr.person.id}`}>En ajouter</Link> si sa police en mentionne.
               </p>
             )}
+            <ActionForm action={lcaWishesAction} hidden={{ lineId: pr.line.id }} className="space-y-2 rounded-xl border border-border p-3">
+              <p className="text-sm font-medium">Complémentaires à demander à {pr.chosenInsurer}</p>
+              <p className="text-sm text-muted">Elles figureront dans la demande d&apos;offre. Gardez les actuelles jusqu&apos;à l&apos;acceptation écrite des nouvelles.</p>
+              {(() => {
+                const wishes = new Set<string>(lcaWishesFor(db(), pr.line));
+                return LCA_GUARANTEES.map((g) => (
+                  <Checkbox key={g.key} name="wish" value={g.key} defaultChecked={wishes.has(g.key)} label={g.label} />
+                ));
+              })()}
+              <SubmitButton size="sm" variant="secondary">Enregistrer</SubmitButton>
+            </ActionForm>
+
             <ul className="space-y-1 text-sm">
               {pr.lcaWarnings.map((w) => (
                 <li key={w.text} className={w.level === "danger" ? "font-medium text-lca" : "text-muted"}>

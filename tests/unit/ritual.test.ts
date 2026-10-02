@@ -5,6 +5,7 @@ import { compareForLine } from "@/application/compare";
 import { householdHistory } from "@/application/history";
 import { listInsurers, saveHousehold, saveInsurer, saveLca, savePerson, savePolicy } from "@/application/household";
 import { generateLetters, getLetter } from "@/application/letters";
+import { generateOfferRequests, lcaWishesFor, listOfferRequests, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
   acknowledgeLca,
   closeReview,
@@ -121,6 +122,29 @@ describe("rituel annuel", () => {
     const teenCmp = compareForLine(db, lines.teen, { all: true, everyOffer: true });
     const sameInsurerOther = teenCmp.offers.find((o) => o.insurerId === insurerId(8) && o.tariffCode === "CSS-TEL")!;
     expect(decide(db, lines.teen, { tariffId: sameInsurerOther.tariffId, franchiseChf: sameInsurerOther.franchiseChf }, NOW)).toBe("ADJUST");
+  });
+
+  it("prépare la demande d'offre à la nouvelle caisse, complémentaires comprises", () => {
+    const ids = generateOfferRequests(db, 1, TODAY);
+    expect(ids).toHaveLength(1);
+    const [req] = listOfferRequests(db, 1);
+    expect(req!.content.subject).toMatch(/Demande d'offre et d'affiliation .* 1er janvier 2027/);
+    expect(req!.content.personRows[0]).toMatch(/^Alex Test, né·e le .*franchise CHF \d+, (avec|sans) couverture accident/);
+    expect(req!.content.extraRows).toEqual(["Alex Test : hospitalisation demi-privée"]);
+    expect(req!.content.mailing).toBeNull();
+
+    // Complémentaires modifiées : la demande non envoyée est refaite.
+    setLcaWishes(db, lines.adult, ["HOSPITAL_SEMI_PRIVATE", "DENTAL", "bidon"]);
+    expect(lcaWishesFor(db, { personId: 0, lcaWishes: ["DENTAL", "bidon"] })).toEqual(["DENTAL"]);
+    generateOfferRequests(db, 1, TODAY);
+    const [again] = listOfferRequests(db, 1);
+    expect(listOfferRequests(db, 1)).toHaveLength(1);
+    expect(again!.content.extraRows).toEqual(["Alex Test : hospitalisation demi-privée, soins dentaires"]);
+
+    // Envoyée : vaut demande d'affiliation, et n'est plus régénérée.
+    markOfferRequestSent(db, again!.id, TODAY);
+    expect(getReviewView(db, 1, TODAY).persons[0]!.line.affiliationRequestedAt).toBe(TODAY);
+    expect(generateOfferRequests(db, 1, TODAY)).toEqual([]);
   });
 
   it("refuse la résiliation sans contrôle LCA ; l'adresse officielle suffit", () => {

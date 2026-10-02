@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { resetInsurerAddressAction, saveInsurerAction } from "@/app/actions/data";
 import { Button } from "@/ui/button";
 import { Field, FormError, Input, Textarea } from "@/ui/form";
@@ -13,12 +13,13 @@ interface InsurerFormProps {
 /** Correction ponctuelle : nom affiché, adresse de résiliation propre, site. Fermé par défaut. */
 export function InsurerForm({ insurer }: InsurerFormProps) {
   const [open, setOpen] = useState(false);
-  const [state, action] = useActionState(saveInsurerAction, null);
+  const [state, action] = useActionState(async (prev: Awaited<ReturnType<typeof saveInsurerAction>>, form: FormData) => {
+    const res = await saveInsurerAction(prev, form);
+    if (res?.ok) setOpen(false);
+    return res;
+  }, null);
   const [resetState, reset] = useActionState(resetInsurerAddressAction, null);
   const custom = Boolean(insurer.terminationAddress?.trim());
-  useEffect(() => {
-    if (state?.ok) setOpen(false);
-  }, [state]);
   if (!open) {
     return (
       <div className="flex flex-wrap gap-2">
@@ -33,7 +34,7 @@ export function InsurerForm({ insurer }: InsurerFormProps) {
             </SubmitButton>
           </form>
         )}
-        {(state?.ok || resetState?.ok) && <p className="w-full text-sm text-saving">{state?.ok ?? resetState?.ok}</p>}
+        {(custom ? state?.ok : (resetState?.ok ?? state?.ok)) && <p className="w-full text-sm text-saving">{custom ? state?.ok : (resetState?.ok ?? state?.ok)}</p>}
         <FormError message={resetState?.error} />
       </div>
     );

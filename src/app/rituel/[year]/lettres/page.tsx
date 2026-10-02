@@ -1,6 +1,8 @@
-import { CheckCircle2, FileText, Mail, Printer, Trash2 } from "lucide-react";
+import { CheckCircle2, FileText, Mail, Printer, Send, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { deleteLetterAction, generateLettersAction, letterAckAction, letterSentAction } from "@/app/actions/review";
+import { deleteLetterAction, deleteOfferAction, generateLettersAction, generateOffersAction, letterAckAction, letterSentAction, offerAnsweredAction, offerSentAction } from "@/app/actions/review";
+import { listOfferRequests } from "@/application/offers";
 import { getReviewByYear, getReviewView } from "@/application/review";
 import { formatDateLong, formatDateShort } from "@/domain/dates";
 import type { LetterContent } from "@/domain/letter";
@@ -25,6 +27,8 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
   if (!r) redirect(`/rituel/${year}`);
   const view = getReviewView(db(), r.id, today());
   const concerned = view.persons.filter((p) => p.line.decision === "SWITCH" || p.line.decision === "ADJUST");
+  const switching = view.persons.filter((p) => p.line.decision === "SWITCH");
+  const offers = listOfferRequests(db(), r.id);
   const warnings = concerned.flatMap((p) => p.letterCheck.warnings.map((w) => `${p.person.firstName} : ${w}`));
 
   return (
@@ -53,7 +57,99 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
         </ActionForm>
       </Card>
 
-      <Section title="Courriers">
+      {switching.length > 0 && (
+        <Section title="Demandes aux nouvelles caisses">
+          <Card className="space-y-3">
+            <p className="text-sm">
+              Demandez l&apos;offre et l&apos;affiliation à la nouvelle caisse, par e-mail ou par courrier. L&apos;assurance de base ne peut pas vous être refusée ; les
+              complémentaires demandées passent par un questionnaire de santé.{" "}
+              <Link href={`/rituel/${year}/lca`} className="text-primary underline">
+                Choisir les complémentaires à demander
+              </Link>
+            </p>
+            <ActionForm action={generateOffersAction} hidden={{ reviewId: r.id }}>
+              <SubmitButton block variant={offers.length ? "secondary" : "primary"} pendingLabel="Préparation…">
+                {offers.length ? "Refaire les demandes pas encore envoyées" : "Préparer les demandes d'offre"}
+              </SubmitButton>
+            </ActionForm>
+          </Card>
+          {offers.length > 0 && (
+            <ul className="space-y-3">
+              {offers.map((o) => {
+                const url = `/api/offers/${o.id}/pdf`;
+                return (
+                  <li key={o.id}>
+                    <Card className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold">{o.insurerName}</p>
+                          <p className="text-sm text-muted">{o.content.personRows.map((p) => p.split(",")[0]).join(", ")}</p>
+                          {(o.content.extraRows?.length ?? 0) > 0 && <p className="text-sm text-muted">Avec offre de complémentaires</p>}
+                        </div>
+                        <Badge tone="saving">Demande d&apos;offre</Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {o.mailto && (
+                          <Button asChild size="sm">
+                            <a href={o.mailto}>
+                              <Send aria-hidden className="size-4" /> Envoyer par e-mail
+                            </a>
+                          </Button>
+                        )}
+                        <Button asChild size="sm" variant={o.mailto ? "secondary" : "primary"}>
+                          <a href={url} target="_blank" rel="noopener">
+                            <FileText aria-hidden className="size-4" /> Ouvrir le PDF
+                          </a>
+                        </Button>
+                        <ShareButton url={url} filename={`demande-offre-${o.id}.pdf`} />
+                        {!o.sentAt && (
+                          <form action={deleteOfferAction}>
+                            <input type="hidden" name="offerId" value={o.id} />
+                            <Button size="sm" variant="ghost" className="text-increase" aria-label="Supprimer la demande">
+                              <Trash2 aria-hidden className="size-4" />
+                            </Button>
+                          </form>
+                        )}
+                      </div>
+                      {o.email && <p className="text-xs text-muted">E-mail de la caisse selon l&apos;annuaire officiel : {o.email}. Beaucoup de caisses proposent aussi un formulaire en ligne{o.website ? ` sur ${o.website.replace(/^https?:\/\//, "")}` : ""}.</p>}
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 p-3 text-sm">
+                        {o.sentAt ? (
+                          <>
+                            <span className="flex items-center gap-2 font-medium text-saving">
+                              <CheckCircle2 aria-hidden className="size-4 shrink-0" /> Envoyée le {formatDateShort(o.sentAt)}
+                            </span>
+                            <form action={offerAnsweredAction} className="flex items-center gap-2">
+                              <input type="hidden" name="offerId" value={o.id} />
+                              {o.answeredAt ? (
+                                <>
+                                  <span>Réponse reçue le {formatDateShort(o.answeredAt)}</span>
+                                  <input type="hidden" name="undo" value="1" />
+                                  <Button size="sm" variant="ghost">Annuler</Button>
+                                </>
+                              ) : (
+                                <Button size="sm" variant="secondary">Réponse reçue</Button>
+                              )}
+                            </form>
+                          </>
+                        ) : (
+                          <form action={offerSentAction} className="w-full">
+                            <input type="hidden" name="offerId" value={o.id} />
+                            <Button size="sm" variant="secondary" block>
+                              Marquer comme envoyée
+                            </Button>
+                          </form>
+                        )}
+                      </div>
+                    </Card>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+      )}
+
+      <Section title="Résiliations et changements">
         {view.letters.length === 0 ? (
           <p className="px-1 text-muted">Aucune lettre pour l&apos;instant.</p>
         ) : (

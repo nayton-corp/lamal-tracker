@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { resetCo2Action, saveCo2Action } from "@/app/actions/data";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/form";
@@ -14,11 +14,12 @@ const chf = (rp: number) => (rp / 100).toFixed(2);
  */
 export function Co2Form({ year, amountRp, source, officialRp }: { year: number; amountRp: number | null; source: "OFFICIAL" | "USER"; officialRp: number | null }) {
   const [editing, setEditing] = useState(false);
-  const [state, action] = useActionState(saveCo2Action, null);
+  const [state, action] = useActionState(async (prev: Awaited<ReturnType<typeof saveCo2Action>>, form: FormData) => {
+    const res = await saveCo2Action(prev, form);
+    if (res?.ok) setEditing(false);
+    return res;
+  }, null);
   const [, reset] = useActionState(resetCo2Action, null);
-  useEffect(() => {
-    if (state?.ok) setEditing(false);
-  }, [state]);
 
   if (editing) {
     return (
