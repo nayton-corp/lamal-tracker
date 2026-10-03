@@ -61,6 +61,18 @@ Variables utiles (dans `docker-compose.yml`, ou dans un fichier `.env` en `chmod
 | `VAPID_SUBJECT` | `mailto:` de contact pour les notifications push. |
 | `OFSP_AUTO_CHECK=false` | Désactive le contrôle automatique des nouvelles primes. |
 | `OFSP_PREMIUMS_URL` | Force l'URL du fichier de primes si l'OFSP la change. |
+| `PINGEN_CLIENT_ID`, `PINGEN_CLIENT_SECRET`, `PINGEN_ORGANISATION_ID` | Facultatif : envoi des lettres en recommandé par [Pingen](https://www.pingen.ch) (voir ci-dessous). Sans ces trois variables, l'option n'apparaît pas. |
+| `PINGEN_STAGING=true` | Utilise l'environnement de test de Pingen : rien n'est imprimé ni posté. |
+
+#### Envoi en recommandé par Pingen (facultatif)
+
+Dans *Démarches*, chaque lettre peut être imprimée et postée par soi-même, ou confiée à Pingen, qui l'imprime avec la signature dessinée à l'écran et la remet à la Poste en recommandé (facturé sur votre compte Pingen ; le n° de suivi et le prix remontent seuls dans l'app, vérifiés toutes les heures).
+
+1. Créer un compte sur [app.pingen.com](https://app.pingen.com) (et, pour essayer, un compte sur l'environnement de test).
+2. Dans l'organisation : *Réglages › API*, créer un client OAuth de type `client_credentials`, noter l'identifiant et le secret (affiché une seule fois), ainsi que l'UUID de l'organisation.
+3. Les placer dans le fichier `.env` (en `chmod 600`) puis `docker compose up -d`.
+
+Une signature imprimée n'est pas une signature manuscrite (art. 14 CO) : les caisses l'acceptent en général, mais pour une résiliation sans aucun risque, signez à la main. Une lettre refusée par Pingen (adresse illisible, par exemple) est signalée par une notification et peut être reprise.
 
 ### 4. HTTPS pour l'installation sur le téléphone et les notifications
 

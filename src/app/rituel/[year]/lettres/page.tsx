@@ -10,6 +10,7 @@ import { getReviewByYear, getReviewView } from "@/application/review";
 import { formatDateLong, formatDateShort } from "@/domain/dates";
 import { displayTariffLabel, type ModelType } from "@/domain/lamal";
 import type { LetterContent } from "@/domain/letter";
+import { pingenFailed } from "@/domain/pingen";
 import { db, today } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
 import { Alert } from "@/ui/alert";
@@ -21,6 +22,9 @@ import { ConfirmButton } from "@/ui/confirm-button";
 import { Input } from "@/ui/form";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
+import { pingenReadiness } from "@/application/pingen";
+import { pingenClient } from "@/server/pingen";
+import { PingenOffer, PingenTracking } from "./pingen-panel";
 import { ShareButton } from "./share-button";
 import { SignaturePad } from "./signature-pad";
 
@@ -86,10 +90,14 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
   const nothing = switching.length === 0 && adjusting.length === 0;
 
   const requestsDone = switching.length > 0 && switching.every((p) => p.line.affiliationRequestedAt);
-  const lettersDone = [...switching, ...adjusting].length > 0 && [...terminations, ...changes].length > 0 && [...terminations, ...changes].every((l) => l.sentAt);
+  // Une lettre refusée par Pingen reste à reprendre : elle ne compte pas comme envoyée.
+  const failedAtPingen = (l: { pingenStatus: string | null }) => pingenFailed(l.pingenStatus);
+  const lettersDone =
+    [...switching, ...adjusting].length > 0 && [...terminations, ...changes].length > 0 && [...terminations, ...changes].every((l) => l.sentAt && !failedAtPingen(l));
   const confirmDone = offers.every((o) => o.answeredAt) && terminations.every((l) => l.acknowledgedAt) && offers.length + terminations.length > 0;
   const involved = new Set([...switching, ...adjusting].map((p) => p.person.id));
   const signers = listSignatures(db()).filter((s) => involved.has(s.personId) && year - 1 - Number(s.birthDate.slice(0, 4)) >= 18);
+  const pingen = pingenClient();
   let n = 0;
 
   return (
@@ -242,7 +250,8 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
           done={lettersDone}
           hint={
             <>
-              Imprimez, signez (chaque adulte ; un parent pour les mineurs) et envoyez en <strong>recommandé</strong> avant le {formatDateLong(view.deadlines.sendBy, true)}.
+              Imprimez, signez (chaque adulte ; un parent pour les mineurs) et envoyez en <strong>recommandé</strong> avant le {formatDateLong(view.deadlines.sendBy, true)}
+              {pingen ? ", ou confiez l'envoi à Pingen." : "."}
             </>
           }
         >
@@ -256,11 +265,18 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
                     <p className="font-semibold">{l.insurerName}</p>
                     <p className="text-sm text-muted">{content.personRows.map((p) => p.split(",")[0]).join(", ")}</p>
                   </div>
-                  <Badge tone={l.sentAt ? "saving" : l.kind === "TERMINATION" ? "increase" : "primary"}>
-                    {l.sentAt ? `Envoyée le ${formatDateShort(l.sentAt)}` : l.kind === "TERMINATION" ? "Résiliation LAMal" : "Changement"}
+                  <Badge tone={failedAtPingen(l) ? "increase" : l.sentAt ? "saving" : l.kind === "TERMINATION" ? "increase" : "primary"}>
+                    {failedAtPingen(l)
+                      ? "À reprendre"
+                      : l.sentAt
+                        ? `${l.pingenStatus ? "Confiée à Pingen" : "Envoyée"} le ${formatDateShort(l.sentAt)}`
+                        : l.kind === "TERMINATION"
+                          ? "Résiliation LAMal"
+                          : "Changement"}
                   </Badge>
                 </div>
                 <PdfButtons url={`/api/letters/${l.id}/pdf`} filename={`lettre-${l.id}.pdf`} primary={!l.sentAt} />
+                {l.pingenStatus && <PingenTracking letterId={l.id} status={l.pingenStatus} priceRp={l.pingenPriceRp} checkedAt={l.pingenCheckedAt} />}
                 {l.sentAt ? (
                   l.trackingNumber && (
                     <p className="text-sm break-all text-muted">
@@ -284,6 +300,9 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
                       Marquer comme envoyée
                     </SubmitButton>
                   </ActionForm>
+                )}
+                {pingen && !l.sentAt && (
+                  <PingenOffer letterId={l.id} termination={l.kind === "TERMINATION"} blockers={pingenReadiness(db(), content)} sendBy={view.deadlines.sendBy} staging={pingen.staging} />
                 )}
                 {!l.sentAt && (
                   <form action={deleteLetterAction}>
