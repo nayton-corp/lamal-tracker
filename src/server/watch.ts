@@ -8,6 +8,7 @@ import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/inf
 import { yearAttemptKey, yearRetryDue } from "@/infrastructure/ofsp/retry";
 import { activeDataset } from "@/infrastructure/db/queries";
 import { db, ritualYear, today } from "./context";
+import { pingenTick } from "./pingen";
 import { referenceTick } from "./reference";
 import { importJob, startBootstrapImport, startImport, startYearImport } from "./jobs";
 import { latestActiveYear } from "@/infrastructure/db/queries";
@@ -122,5 +123,10 @@ export async function schedulerTick(): Promise<void> {
     await sendDeadlineReminders();
   } catch (error) {
     console.error("[watch] rappels", error);
+  }
+  try {
+    await pingenTick();
+  } catch (error) {
+    console.error("[watch] suivi Pingen", error);
   }
 }

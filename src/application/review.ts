@@ -6,6 +6,7 @@ import { reviewDeadlines, urgency } from "@/domain/deadlines";
 import { defaultSubgroup, type ModelType } from "@/domain/lamal";
 import { changePermille } from "@/domain/money";
 import { franchisesFor } from "@/domain/parameters";
+import { pingenFailed } from "@/domain/pingen";
 import { findRenewal } from "@/domain/renewal";
 import { checkLetter, lcaWarnings, type LetterCheck, type LcaWarning } from "@/domain/review";
 import type { Db } from "@/infrastructure/db/client";
@@ -392,7 +393,8 @@ export function getReviewView(db: Db, reviewId: number, today: IsoDate): ReviewV
 
   const needsLetter = persons.filter((x) => x.line.decision === "SWITCH" || x.line.decision === "ADJUST");
   const switching = persons.filter((x) => x.line.decision === "SWITCH");
-  const sentLineIds = new Set(letters.filter((l) => l.sentAt).flatMap((l) => l.lineIds));
+  // Une lettre refusée par Pingen reste à reprendre : la démarche n'est pas faite.
+  const sentLineIds = new Set(letters.filter((l) => l.sentAt && !pingenFailed(l.pingenStatus)).flatMap((l) => l.lineIds));
   const allDecided = persons.length > 0 && persons.every((x) => x.line.decision !== "UNDECIDED");
 
   return {

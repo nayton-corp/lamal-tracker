@@ -264,6 +264,13 @@ export const letter = sqliteTable("letter", {
   sentAt: text("sent_at"),
   trackingNumber: text("tracking_number"),
   acknowledgedAt: text("acknowledged_at"),
+  /** Envoi confié à Pingen (impression et recommandé) : identifiant de la lettre chez Pingen. */
+  pingenLetterId: text("pingen_letter_id"),
+  /** Dernier statut connu chez Pingen ; « unknown » si la création n'a pas été confirmée. */
+  pingenStatus: text("pingen_status"),
+  /** Prix facturé par Pingen, en centimes. */
+  pingenPriceRp: integer("pingen_price_rp"),
+  pingenCheckedAt: text("pingen_checked_at"),
 });
 
 /** Demande d'offre adressée à une nouvelle caisse (contenu figé, comme une lettre). */

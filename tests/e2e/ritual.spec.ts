@@ -221,6 +221,24 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   expect(pdf.headers()["content-type"]).toBe("application/pdf");
   expect((await pdf.body()).subarray(0, 4).toString()).toBe("%PDF");
 
+  // Envoi par Pingen (doublure locale, configurée seulement pour le serveur lancé par les tests) :
+  // transmission, refus constaté au suivi, puis reprise de la lettre pour l'envoyer soi-même.
+  if (!process.env.E2E_BASE_URL) {
+    await page.getByRole("button", { name: "Envoyer en recommandé via Pingen" }).click();
+    await expect(page.getByText(/Une signature imprimée n'est pas une signature manuscrite/)).toBeVisible();
+    await page.getByRole("button", { name: "Envoyer (test)" }).click();
+    await expect(page.getByText(/En préparation chez Pingen/)).toBeVisible();
+    await expect(page.getByText(/Confiée à Pingen le/)).toBeVisible();
+    await page.getByRole("button", { name: "Actualiser le suivi" }).click();
+    await expect(page.getByText("Pingen n'a pas envoyé cette lettre")).toBeVisible();
+    await expect(page.getByText("À reprendre")).toBeVisible();
+    await shot(page, "09a-pingen-refus");
+    await page.getByRole("button", { name: "Reprendre la lettre" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Reprendre la lettre" }).click();
+    await expect(page.getByRole("button", { name: "Envoyer en recommandé via Pingen" })).toBeVisible();
+    await shot(page, "09b-pingen-option");
+  }
+
   await page.getByLabel("N° de suivi").fill("98.00.123456.12345678");
   await page.getByRole("button", { name: "Marquer comme envoyée" }).click();
   await expect(page.getByText("Suivi : 98.00.123456.12345678")).toBeVisible();

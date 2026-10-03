@@ -28,3 +28,5 @@ services:
       # IMPORT_CANTONS: "VD"
       # Adresse de contact transmise aux services de notification push :
       # VAPID_SUBJECT: "mailto:vous@example.ch"
+      # Envoi en recommandé par Pingen (facultatif) : PINGEN_CLIENT_ID, PINGEN_CLIENT_SECRET et
+      # PINGEN_ORGANISATION_ID, à mettre dans le fichier `.env` ci-dessus plutôt qu'ici.

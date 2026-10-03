@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { generateLetters } from "@/application/letters";
+import { abandonPingen, sendLetterViaPingen, syncPingenLetters } from "@/application/pingen";
 import { deleteOfferRequest, generateOfferRequests, markOfferRequestAnswered, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
   acknowledgeLca,
@@ -26,6 +27,7 @@ import { person, reviewLine } from "@/infrastructure/db/schema";
 import { toActionError, chfField, rethrowForeignKey, type ActionState } from "@/server/action";
 import { db, nowIso, today } from "@/server/context";
 import { requireSession } from "@/server/auth";
+import { pingenClient, pingenDeps } from "@/server/pingen";
 
 /** Après un choix : la personne suivante sans choix, sinon l'étape suivante du rituel (LCA, démarches…). */
 function afterDecision(year: number, lineId: number) {
@@ -294,4 +296,39 @@ export async function prepareAllAction(_: ActionState, form: FormData): Promise<
   } catch (e) {
     return toActionError(e);
   }
+}
+
+export async function pingenSendAction(_: ActionState, form: FormData): Promise<ActionState> {
+  await requireSession();
+  const client = pingenClient();
+  if (!client) return { error: "L'envoi par Pingen n'est pas configuré." };
+  try {
+    await sendLetterViaPingen(db(), Number(form.get("letterId")), today(), nowIso(), pingenDeps(client));
+  } catch (e) {
+    revalidatePath("/", "layout");
+    return toActionError(e);
+  }
+  revalidatePath("/", "layout");
+  return { ok: client.staging ? "Lettre transmise à Pingen (environnement de test : rien n'est posté)." : "Lettre transmise à Pingen : elle part en recommandé." };
+}
+
+export async function pingenRefreshAction(_: ActionState, form: FormData): Promise<ActionState> {
+  await requireSession();
+  const client = pingenClient();
+  if (!client) return { error: "L'envoi par Pingen n'est pas configuré." };
+  const result = await syncPingenLetters(db(), client, nowIso(), Number(form.get("letterId")));
+  revalidatePath("/", "layout");
+  if (result.errors.length) return { error: `Pingen n'a pas pu être consulté : ${result.errors[0]}` };
+  return { ok: "Suivi mis à jour." };
+}
+
+export async function pingenAbandonAction(_: ActionState, form: FormData): Promise<ActionState> {
+  await requireSession();
+  try {
+    abandonPingen(db(), Number(form.get("letterId")));
+  } catch (e) {
+    return toActionError(e);
+  }
+  revalidatePath("/", "layout");
+  return { ok: "La lettre est de nouveau à envoyer." };
 }

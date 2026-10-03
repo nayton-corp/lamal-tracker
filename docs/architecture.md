@@ -11,6 +11,7 @@ src/
     comparison.ts    filtres, classement déterministe, statistiques de marché
     renewal.ts       retrouve le tarif de renouvellement (code, lignée confirmée, modèle)
     review.ts        garde-fous des lettres et du contrôle LCA
+    pingen.ts        envoi par Pingen : avancement d'un statut, conditions (signatures, adresse)
     letter.ts        contenu des lettres et des demandes d'offre (indépendant du rendu)
     lca.ts           familles de garanties complémentaires
     policy-import.ts lecture d'une police (texte du PDF) : personnes, franchise, modèle, montants, complémentaires
@@ -19,7 +20,7 @@ src/
                      profils de consommation
     ofsp/            lecture d'une ligne OFSP (formats ≤2026 et ≥2027), rapport d'import
   application/     Cas d'usage : foyer, revue annuelle, comparateur, lettres, historique
-  infrastructure/  SQLite (Drizzle), import OFSP en flux, rendu PDF, notifications push,
+  infrastructure/  SQLite (Drizzle), import OFSP en flux, rendu PDF, notifications push, client Pingen,
                    référentiels officiels (reference/ : annuaire OFSP, surveillance OFSP, CO2 OFEV)
   server/          Contexte serveur (horloge Europe/Zurich, tâches d'import, planificateur)
   app/             Pages Next.js (App Router) et server actions
@@ -66,7 +67,17 @@ Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `p
 `src/instrumentation.ts` lance un planificateur horaire : contrôle de la signature HTTP du
 fichier OFSP (quotidien du 15.09 au 30.11, hebdomadaire sinon), import en arrière-plan si
 le fichier a changé, notification ; rappels J-30, J-14, J-7, J-3, J-1 avant la date d'envoi ; vérification hebdomadaire des
-référentiels officiels (`server/reference.ts`).
+référentiels officiels (`server/reference.ts`) ; suivi des lettres confiées à Pingen (statut, n° de suivi, prix ; notification
+en cas de refus).
+
+## Envoi par Pingen
+
+Facultatif, actif seulement si `PINGEN_CLIENT_ID`, `PINGEN_CLIENT_SECRET` et `PINGEN_ORGANISATION_ID` sont définis.
+La lettre est rendue dans une mise en page dédiée (`letter-pdf.tsx`, `layout="pingen"` : adresse dans la zone lue par
+Pingen, zone d'affranchissement vide, mention du recommandé déplacée au-dessus de l'objet), déposée puis créée avec
+`delivery_product: "registered"` et envoi automatique. La lettre est réservée en base avant l'appel (jamais deux envois) ;
+un refus de Pingen la remet « à envoyer », une absence de réponse la laisse « non confirmée » jusqu'à ce que le suivi la
+retrouve par son nom de fichier. Les tests utilisent une doublure locale de l'API (`tests/pingen-mock.ts`).
 
 ## Parcours
 

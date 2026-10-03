@@ -13,10 +13,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!letter) return new Response("Lettre introuvable", { status: 404 });
   const ins = db().select().from(insurer).where(eq(insurer.id, letter.insurerId)).get()!;
   const r = db().select().from(review).where(eq(review.id, letter.reviewId)).get()!;
-  const pdf = await renderLetterPdf(letter.content, signaturesByName(db()));
+  const search = new URL(request.url).searchParams;
+  // ?layout=pingen : la mise en page transmise à Pingen (aperçu, contrôle).
+  const pdf = await renderLetterPdf(letter.content, signaturesByName(db()), search.get("layout") === "pingen" ? "pingen" : "print");
   const slug = insurerLabel(ins).toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
   const name = `${letter.kind === "TERMINATION" ? "resiliation-lamal" : "changement-lamal"}-${slug}-${r.targetYear}.pdf`;
-  const download = new URL(request.url).searchParams.has("download");
+  const download = search.has("download");
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
