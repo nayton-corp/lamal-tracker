@@ -16,13 +16,15 @@ import { Page, PageHeader } from "@/ui/page";
 import { LcaSheet, PolicySheet } from "../../editors";
 import { ProfileCard } from "../../profile-card";
 import { guaranteeInfo, suggestedLcaInsurer } from "@/domain/lca";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function PersonPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ retour?: string }> }) {
+  const scope = await pageScope();
   const { id } = await params;
   const back = (await searchParams).retour === "bienvenue" ? "/bienvenue?etape=membres" : "/foyer";
-  const p = getPerson(db(), Number(id));
+  const p = getPerson(db(), scope, Number(id));
   if (!p) notFound();
   const year = Number(today().slice(0, 4));
   const allInsurers = listInsurers(db());
@@ -34,7 +36,7 @@ export default async function PersonPage({ params, searchParams }: { params: Pro
   const years = Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i);
   const lamalInsurerId = policies[0]?.policy.insurerId ?? null;
   const hasCurrent = policies.some((x) => x.policy.coverageYear === year);
-  const openReview = activeReview(db());
+  const openReview = activeReview(db(), scope);
 
   return (
     <Page wide>

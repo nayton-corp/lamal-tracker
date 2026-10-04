@@ -11,6 +11,7 @@ import { ActionForm } from "@/ui/action-form";
 import { cn } from "@/ui/cn";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Stratégie" };
@@ -18,10 +19,11 @@ export const metadata = { title: "Stratégie" };
 const ICONS: Record<Strategy, typeof PiggyBank> = { ECONOMY: PiggyBank, KEEP: Repeat, BALANCE: Scale };
 
 export default async function StrategyPage({ params }: { params: Promise<{ year: string }> }) {
+  const scope = await pageScope();
   const year = Number((await params).year);
-  const r = getReviewByYear(db(), year);
+  const r = getReviewByYear(db(), scope, year);
   if (!r || r.status === "CLOSED") redirect(`/rituel/${year}`);
-  const overview = strategyOverview(db(), r.id);
+  const overview = strategyOverview(db(), scope, r.id);
   const several = overview[0]!.persons.length > 1;
 
   return (

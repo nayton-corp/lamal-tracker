@@ -21,6 +21,17 @@ const config = [
       "no-restricted-imports": ["error", { patterns: [{ group: ["@/app/*", "@/ui/*", "@/server/*", "next", "next/*", "react"], message: "L'application ne dépend pas de l'interface." }] }],
     },
   },
+  {
+    // Pages et actions passent par la couche application, qui cloisonne les foyers : pas de requête
+    // directe vers la base depuis l'interface.
+    files: ["src/app/**/*.{ts,tsx}", "src/ui/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ group: ["drizzle-orm", "drizzle-orm/*", "@/infrastructure/db/schema", "@/infrastructure/db/client"], message: "Passez par src/application (cloisonnement des foyers)." }] },
+      ],
+    },
+  },
 ];
 
 export default config;

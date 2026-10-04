@@ -1,11 +1,10 @@
 import { BadgeCheck, Check, CircleAlert, ShieldCheck, Stethoscope, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
 import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/review";
 import { compareForLine, offerKey, type CompareView, type DetailedOffer } from "@/application/compare";
 import { insurerLabel } from "@/infrastructure/db/queries";
-import { insurer, lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
+import { lineOverview, reviewMembers } from "@/application/review";
 import { STRATEGY_INFO } from "@/domain/strategy";
 import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { db } from "@/server/context";
@@ -22,6 +21,7 @@ import { CompareBar, CompareToggle } from "./compare-select";
 import { FilterBar } from "./filter-bar";
 import { InsurerFacts, ModelBlock, OfferCosts } from "./offer-details";
 import { FranchiseSimulator } from "./simulator";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Comparateur" };
@@ -29,19 +29,19 @@ export const metadata = { title: "Comparateur" };
 type Search = { m?: string; f?: string; sort?: string; all?: string; n?: string; every?: string };
 
 export default async function ComparePage({ params, searchParams }: { params: Promise<{ year: string; lineId: string }>; searchParams: Promise<Search> }) {
+  const scope = await pageScope();
   const { year: y, lineId: l } = await params;
   const sp = await searchParams;
   const year = Number(y);
   const lineId = Number(l);
-  const line = db().select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
-  if (!line) notFound();
-  if (db().select({ status: review.status }).from(review).where(eq(review.id, line.reviewId)).get()?.status === "CLOSED") redirect(`/rituel/${year}`);
-  const policy = db().select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
-  const currentInsurer = db().select().from(insurer).where(eq(insurer.id, policy.insurerId)).get()!;
+  const overview = lineOverview(db(), scope, lineId);
+  if (!overview) notFound();
+  if (overview.review.status === "CLOSED") redirect(`/rituel/${year}`);
+  const { line, policy, currentInsurer } = overview;
 
   // Sans paramètre, les besoins de la personne s'appliquent ; « all » lève le filtre.
   const models = sp.m === undefined ? undefined : sp.m.split(",").filter((m): m is ModelType => (MODEL_TYPES as readonly string[]).includes(m));
-  const view = compareForLine(db(), lineId, {
+  const view = compareForLine(db(), scope, lineId, {
     models,
     franchises: sp.f === undefined ? undefined : sp.f === "all" ? [] : [Number(sp.f)],
     sort: sp.sort === "premium" || sp.sort === "total" || sp.sort === "strategy" ? sp.sort : undefined,
@@ -50,13 +50,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
   });
   const every = sp.every === "1";
   const limit = sp.n === "all" ? view.offers.length : 30;
-  const members = db()
-    .select({ id: reviewLine.id, decision: reviewLine.decision, firstName: person.firstName })
-    .from(reviewLine)
-    .innerJoin(person, eq(person.id, reviewLine.personId))
-    .where(eq(reviewLine.reviewId, line.reviewId))
-    .orderBy(asc(reviewLine.id))
-    .all();
+  const members = reviewMembers(db(), scope, line.reviewId);
   const strategyLabel = view.strategy ? STRATEGY_INFO[view.strategy].label : null;
   const top = view.offers.slice(0, 3);
   const rest = view.offers.slice(3, limit);

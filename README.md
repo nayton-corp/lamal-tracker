@@ -100,10 +100,10 @@ cd ~/lamal-tracker && docker compose pull && docker compose up -d
 - Les migrations du schéma s'appliquent seules au démarrage.
 - **Sécurité** (*Réglages › Sécurité*) : changer le mot de passe, voir et fermer les sessions ouvertes sur les autres appareils (cinq échecs de connexion verrouillent l'accès quelques minutes).
 - **Recommencer à zéro** (*Réglages › Sécurité › Recommencer à zéro*, mot de passe demandé) : efface personnes, contrats, rituels, lettres et signatures ; les primes officielles et le mot de passe restent.
-- **Mot de passe oublié** : cette commande efface le mot de passe et les sessions ; l'app en redemande un au prochain chargement.
+- **Mot de passe oublié** : cette commande efface le mot de passe du compte administrateur et ferme ses sessions ; l'app en redemande un au prochain chargement. Le foyer et ses données restent.
 
   ```sh
-  docker exec lamal-tracker node -e "const {DatabaseSync}=require('node:sqlite');new DatabaseSync('/data/lamal.db').exec(\"DELETE FROM settings WHERE key IN ('auth.password','auth.failures'); DELETE FROM session\")"
+  docker exec lamal-tracker node -e "const {DatabaseSync}=require('node:sqlite');new DatabaseSync('/data/lamal.db').exec(\"UPDATE app_user SET password='{\\\"salt\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"cost\\\":0}', failed_logins=0, locked_until=NULL WHERE role='ADMIN'; DELETE FROM session\")"
   ```
 
 - Les journaux du conteneur sont limités (3 × 10 Mo) pour ne pas remplir la carte SD.

@@ -22,7 +22,9 @@ import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/p
 import { UserError } from "@/application/review";
 import { chfField, rethrowForeignKey, toActionError, type ActionState } from "@/server/action";
 import { db, today } from "@/server/context";
-import { requireSession } from "@/server/auth";
+import { requireScope } from "@/server/auth";
+import { chosenMode } from "@/server/onboarding";
+import { withHousehold, type Scope } from "@/application/scope";
 
 const str = (f: FormData, k: string) => {
   const v = f.get(k);
@@ -34,9 +36,9 @@ const opt = (f: FormData, k: string) => {
 };
 
 export async function saveHouseholdAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    saveHousehold(db(), {
+    const id = saveHousehold(db(), scope, {
       name: str(form, "name") ?? "",
       street: str(form, "street"),
       postalCode: str(form, "postalCode"),
@@ -46,6 +48,8 @@ export async function saveHouseholdAction(_: ActionState, form: FormData): Promi
       canton: (str(form, "canton") ?? "") as never,
       region: Number(str(form, "region")),
     });
+    const mine = withHousehold(scope, id);
+    if (!getHouseholdMode(db(), mine)) setHouseholdMode(db(), mine, (await chosenMode(scope)) ?? "FAMILY");
   } catch (e) {
     return toActionError(e);
   }
@@ -56,15 +60,15 @@ export async function saveHouseholdAction(_: ActionState, form: FormData): Promi
 }
 
 export async function savePersonAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   let id: number;
   try {
-    const h = getHousehold(db());
+    const h = getHousehold(db(), scope);
     if (!h) throw new UserError("Enregistrez d'abord l'adresse.");
     // Les préférences du comparateur (frais, modèles, médecin, caisses exclues) viennent du
     // questionnaire des besoins : on les conserve telles quelles à la modification.
     const existing = opt(form, "id") ? listPersons(db(), h.id).find((p) => p.id === Number(form.get("id"))) : undefined;
-    id = savePerson(db(), h.id, {
+    id = savePerson(db(), scope, {
       id: existing?.id,
       firstName: str(form, "firstName") ?? "",
       lastName: str(form, "lastName") ?? "",
@@ -76,7 +80,7 @@ export async function savePersonAction(_: ActionState, form: FormData): Promise<
       excludedInsurerIds: existing?.excludedInsurerIds ?? [],
       doctorName: existing?.doctorName ?? null,
     });
-    afterPersonSaved(h.id);
+    afterPersonSaved(scope);
   } catch (e) {
     return toActionError(e);
   }
@@ -88,24 +92,24 @@ export async function savePersonAction(_: ActionState, form: FormData): Promise<
 }
 
 /** Une 2e personne fait passer en mode foyer ; le nom du foyer se déduit de la première personne. */
-function afterPersonSaved(householdId: number) {
-  const persons = listPersons(db(), householdId);
-  const h = getHousehold(db())!;
-  if (persons.length > 1 && getHouseholdMode(db()) !== "FAMILY") setHouseholdMode(db(), "FAMILY");
+function afterPersonSaved(scope: Scope) {
+  const h = getHousehold(db(), scope)!;
+  const persons = listPersons(db(), h.id);
+  if (persons.length > 1 && getHouseholdMode(db(), scope) !== "FAMILY") setHouseholdMode(db(), scope, "FAMILY");
   if (!h.name.trim() && persons[0]) {
     const first = persons[0];
-    saveHousehold(db(), { ...h, canton: h.canton as never, name: persons.length === 1 ? `${first.firstName} ${first.lastName}` : `Famille ${first.lastName}` });
+    saveHousehold(db(), scope, { ...h, canton: h.canton as never, name: persons.length === 1 ? `${first.firstName} ${first.lastName}` : `Famille ${first.lastName}` });
   }
 }
 
 /** Accueil « pour moi seul » : identité et adresse en une seule fois. */
 export async function saveSoloAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
     const firstName = str(form, "firstName") ?? "";
     const lastName = str(form, "lastName") ?? "";
-    const h = getHousehold(db());
-    const id = saveHousehold(db(), {
+    const h = getHousehold(db(), scope);
+    const id = saveHousehold(db(), scope, {
       name: `${firstName} ${lastName}`.trim(),
       street: str(form, "street"),
       postalCode: str(form, "postalCode"),
@@ -116,7 +120,8 @@ export async function saveSoloAction(_: ActionState, form: FormData): Promise<Ac
       region: Number(str(form, "region")),
     });
     const existing = h ? listPersons(db(), h.id)[0] : undefined;
-    savePerson(db(), id, {
+    const mine = withHousehold(scope, id);
+    savePerson(db(), mine, {
       id: existing?.id,
       firstName,
       lastName,
@@ -128,7 +133,7 @@ export async function saveSoloAction(_: ActionState, form: FormData): Promise<Ac
       excludedInsurerIds: existing?.excludedInsurerIds ?? [],
       doctorName: existing?.doctorName ?? null,
     });
-    if (!getHouseholdMode(db())) setHouseholdMode(db(), "SOLO");
+    if (!getHouseholdMode(db(), mine)) setHouseholdMode(db(), mine, "SOLO");
   } catch (e) {
     return toActionError(e);
   }
@@ -139,9 +144,9 @@ export async function saveSoloAction(_: ActionState, form: FormData): Promise<Ac
 }
 
 export async function deletePersonAction(form: FormData) {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    deletePerson(db(), Number(form.get("id")));
+    deletePerson(db(), scope, Number(form.get("id")));
   } catch (e) {
     rethrowForeignKey(e, "Cette personne participe à un rituel en cours : supprimez d'abord le rituel.");
   }
@@ -150,11 +155,11 @@ export async function deletePersonAction(form: FormData) {
 }
 
 export async function savePolicyAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
     const billed = chfField(form.get("billedMonthly"));
     if (billed === null) throw new UserError("Indiquez la prime mensuelle facturée.");
-    savePolicy(db(), {
+    savePolicy(db(), scope, {
       id: opt(form, "id") ? Number(form.get("id")) : undefined,
       personId: Number(form.get("personId")),
       coverageYear: Number(form.get("coverageYear")),
@@ -175,9 +180,9 @@ export async function savePolicyAction(_: ActionState, form: FormData): Promise<
 }
 
 export async function deletePolicyAction(form: FormData) {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    deletePolicy(db(), Number(form.get("id")));
+    deletePolicy(db(), scope, Number(form.get("id")));
   } catch (e) {
     rethrowForeignKey(e, "Ce contrat sert à un rituel en cours : supprimez d'abord le rituel.");
   }
@@ -185,9 +190,9 @@ export async function deletePolicyAction(form: FormData) {
 }
 
 export async function saveLcaAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    saveLca(db(), {
+    saveLca(db(), scope, {
       id: opt(form, "id") ? Number(form.get("id")) : undefined,
       personId: Number(form.get("personId")),
       insurerName: str(form, "insurerName") ?? "",
@@ -208,9 +213,9 @@ export async function saveLcaAction(_: ActionState, form: FormData): Promise<Act
 }
 
 export async function deleteLcaAction(form: FormData) {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    deleteLca(db(), Number(form.get("id")));
+    deleteLca(db(), scope, Number(form.get("id")));
   } catch (e) {
     rethrowForeignKey(e, "Cette complémentaire est encore référencée : supprimez d'abord ce qui s'y rapporte.");
   }
@@ -218,13 +223,13 @@ export async function deleteLcaAction(form: FormData) {
 }
 
 export async function postalCodeAction(npa: string): Promise<CommuneOption[]> {
-  await requireSession();
+  await requireScope();
   return lookupPostalCode(npa);
 }
 
 export async function tariffOptionsAction(personId: number, year: number, insurerId: number): Promise<TariffOptions> {
-  await requireSession();
-  return tariffOptions(db(), personId, year, insurerId);
+  const scope = await requireScope();
+  return tariffOptions(db(), scope, Number(personId), Number(year), Number(insurerId));
 }
 
 const MAX_PDF = 20 * 1024 * 1024;
@@ -244,11 +249,11 @@ async function pdfText(form: FormData): Promise<{ text: string } | { error: stri
 }
 
 export async function analyzePolicyAction(form: FormData): Promise<{ result?: PolicyImport; error?: string }> {
-  await requireSession();
+  const scope = await requireScope();
   const read = await pdfText(form);
   if ("error" in read) return read;
   try {
-    return { result: analyzePolicyText(db(), read.text, Number(today().slice(0, 4))) };
+    return { result: analyzePolicyText(db(), scope, read.text, Number(today().slice(0, 4))) };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     return { error: "Lecture impossible." };
@@ -257,7 +262,7 @@ export async function analyzePolicyAction(form: FormData): Promise<{ result?: Po
 
 /** Accueil depuis la police : personnes et adresse lues, avant tout foyer. Le texte est renvoyé pour l'étape suivante. */
 export async function analyzePolicyStartAction(form: FormData): Promise<{ preview?: PolicyHolderPreview; text?: string; error?: string }> {
-  await requireSession();
+  await requireScope();
   const read = await pdfText(form);
   if ("error" in read) return read;
   try {
@@ -270,24 +275,26 @@ export async function analyzePolicyStartAction(form: FormData): Promise<{ previe
 
 /** Crée le foyer confirmé, puis lit les contrats dans le même texte de police. */
 export async function createFromPolicyAction(input: HouseholdFromPolicy, text: string): Promise<{ result?: PolicyImport; error?: string }> {
-  await requireSession();
+  const scope = await requireScope();
+  let mine: Scope;
   try {
-    createHouseholdFromPolicy(db(), input);
+    mine = withHousehold(scope, createHouseholdFromPolicy(db(), scope, input));
   } catch (e) {
     const state = toActionError(e);
     return { error: state?.error ?? "Enregistrement impossible." };
   }
   // Pas de revalidation ici : l'écran reste monté pour vérifier les contrats ; l'enregistrement final rafraîchit.
   try {
-    return { result: analyzePolicyText(db(), String(text).slice(0, 200_000), Number(today().slice(0, 4))) };
+    return { result: analyzePolicyText(db(), mine, String(text).slice(0, 200_000), Number(today().slice(0, 4))) };
   } catch (e) {
     return { error: e instanceof UserError ? e.message : "Lecture impossible." };
   }
 }
 
 export async function applyPolicyImportAction(input: ConfirmedImport): Promise<{ ok?: string; error?: string }> {
+  const scope = await requireScope();
   try {
-    const n = applyPolicyImport(db(), input);
+    const n = applyPolicyImport(db(), scope, input);
     revalidatePath("/", "layout");
     return { ok: `${n} contrat(s) ${input.year} enregistré(s).` };
   } catch (e) {

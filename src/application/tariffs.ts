@@ -6,6 +6,7 @@ import type { Db } from "@/infrastructure/db/client";
 import { activeDataset, parametersFor } from "@/infrastructure/db/queries";
 import { premium, tariff } from "@/infrastructure/db/schema";
 import { getHousehold, getPerson } from "./household";
+import type { Scope } from "./scope";
 
 export interface TariffOption {
   code: string;
@@ -22,9 +23,9 @@ export interface TariffOptions {
 }
 
 /** Tarifs d'un assureur pour une personne et une année, pour pré-remplir un contrat. */
-export function tariffOptions(db: Db, personId: number, year: number, insurerId: number): TariffOptions {
-  const p = getPerson(db, personId);
-  const h = getHousehold(db);
+export function tariffOptions(db: Db, scope: Scope, personId: number, year: number, insurerId: number): TariffOptions {
+  const p = getPerson(db, scope, personId);
+  const h = getHousehold(db, scope);
   const ageClass = p ? ageClassForYear(p.birthDate, year) : "ADULT";
   const franchises = franchisesFor(parametersFor(db, year), ageClass);
   const ds = activeDataset(db, year);

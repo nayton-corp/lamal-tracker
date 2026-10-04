@@ -9,15 +9,17 @@ import { parametersFor } from "@/infrastructure/db/queries";
 import { db, today } from "@/server/context";
 import { Page, PageHeader } from "@/ui/page";
 import { NeedsForm, type NeedsPerson } from "./needs-form";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Vos besoins" };
 
 export default async function NeedsPage({ params }: { params: Promise<{ year: string }> }) {
+  const scope = await pageScope();
   const year = Number((await params).year);
-  const r = getReviewByYear(db(), year);
+  const r = getReviewByYear(db(), scope, year);
   if (!r || r.status === "CLOSED") redirect(`/rituel/${year}`);
-  const view = getReviewView(db(), r.id, today());
+  const view = getReviewView(db(), scope, r.id, today());
   const params_ = parametersFor(db(), year);
   const open = view.persons.filter((p) => p.line.decision === "UNDECIDED");
   const persons: NeedsPerson[] = (open.length ? open : view.persons).map((p) => {

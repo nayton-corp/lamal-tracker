@@ -1,9 +1,8 @@
 import { CheckCircle2, ChevronRight, Download, Landmark } from "lucide-react";
 import Link from "next/link";
-import { desc } from "drizzle-orm";
 import { listInsurers } from "@/application/household";
 import type { ValidationReport } from "@/domain/ofsp/report";
-import { lamalParameters, tariffDataset } from "@/infrastructure/db/schema";
+import { listDatasets, listParameters } from "@/application/reference-data";
 import { getSetting } from "@/infrastructure/db/settings";
 import { subscriptionCount } from "@/infrastructure/push/push";
 import { db, today } from "@/server/context";
@@ -23,7 +22,7 @@ import { ImportPanel } from "./import-panel";
 import { PushPanel } from "./push-panel";
 import { SecurityPanel } from "./security-panel";
 import { listSessions } from "@/application/auth";
-import { currentSession } from "@/server/auth";
+import { pageScope } from "@/server/auth";
 import { nowIso } from "@/server/context";
 
 export const dynamic = "force-dynamic";
@@ -37,16 +36,12 @@ const STATUS = {
 } as const;
 
 export default async function DataPage() {
-  const me = await currentSession();
-  const datasets = db().select().from(tariffDataset).orderBy(desc(tariffDataset.id)).all();
+  const scope = await pageScope();
+  const datasets = listDatasets(db());
   const currentYear = Number(today().slice(0, 4));
   const activeYears = new Set(datasets.filter((d) => d.status === "ACTIVE").map((d) => d.year));
   // CO2 : années utiles seulement (primes importées, année en cours et suivante).
-  const params = db()
-    .select()
-    .from(lamalParameters)
-    .orderBy(desc(lamalParameters.year))
-    .all()
+  const params = listParameters(db())
     .filter((p) => activeYears.has(p.year) || p.year >= currentYear);
   const visibleDatasets = datasets.filter((d) => d.status !== "SUPERSEDED");
   const insurers = listInsurers(db());
@@ -60,6 +55,7 @@ export default async function DataPage() {
       <PageHeader title="Réglages" subtitle="Tout se met à jour tout seul : vous n'avez en principe rien à faire ici." />
 
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+        {scope.admin && (
         <div className="space-y-6">
           <Section title="Primes officielles">
             <Card className="space-y-4">
@@ -116,8 +112,11 @@ export default async function DataPage() {
             </Card>
           </Section>
         </div>
+        )}
 
         <div className="space-y-6">
+          {scope.admin && (
+            <>
           <Section title="Caisses-maladie">
             <Link href="/donnees/caisses" className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
               <Landmark aria-hidden className="size-5 text-primary" />
@@ -145,19 +144,22 @@ export default async function DataPage() {
               </ActionForm>
             </Card>
           </Section>
+            </>
+          )}
 
           <Section title="Rappels">
             <Card>
-              <PushPanel devices={subscriptionCount(db())} />
+              <PushPanel devices={subscriptionCount(db(), scope.userId)} />
             </Card>
           </Section>
 
           <Section title="Sécurité">
             <Card>
-              <SecurityPanel sessions={listSessions(db(), nowIso())} currentId={me?.id ?? ""} />
+              <SecurityPanel sessions={listSessions(db(), scope.userId, nowIso())} currentId={scope.sessionId} />
             </Card>
           </Section>
 
+          {scope.admin && (
           <Section title="Sauvegarde">
             <Card className="space-y-3">
               <p className="text-sm text-muted">Une copie de tout ce que vous avez saisi (foyer, contrats, choix). Gardez-la ailleurs, par exemple sur une clé USB, au cas où.</p>
@@ -168,6 +170,7 @@ export default async function DataPage() {
               </Button>
             </Card>
           </Section>
+          )}
         </div>
       </div>
     </Page>

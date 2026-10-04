@@ -5,10 +5,10 @@ import { reviewDeadlines } from "@/domain/deadlines";
 import { buildLetter, type LetterContent } from "@/domain/letter";
 import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
-import { insurerRecipient } from "@/infrastructure/db/queries";
-import { insurer, letter } from "@/infrastructure/db/schema";
-import { getHousehold } from "./household";
+import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
+import { household, insurer, letter, review } from "@/infrastructure/db/schema";
 import { getReviewView, UserError } from "./review";
+import { findLetter, type Scope } from "./scope";
 
 export interface GenerateResult {
   created: number[];
@@ -19,9 +19,9 @@ export interface GenerateResult {
  * Génère une lettre par caisse actuelle et par type (résiliation / changement), pour toutes
  * les personnes concernées. Les lettres non envoyées sont régénérées ; les envoyées sont figées.
  */
-export function generateLetters(db: Db, reviewId: number, today: IsoDate): GenerateResult {
-  const view = getReviewView(db, reviewId, today);
-  const h = getHousehold(db);
+export function generateLetters(db: Db, scope: Scope, reviewId: number, today: IsoDate): GenerateResult {
+  const view = getReviewView(db, scope, reviewId, today);
+  const h = db.select().from(household).where(eq(household.id, view.review.householdId)).get();
   if (!h) throw new UserError("Foyer non configuré.");
   const deadlines = reviewDeadlines(view.review.targetYear);
 
@@ -83,8 +83,17 @@ export function generateLetters(db: Db, reviewId: number, today: IsoDate): Gener
   return { created, blocked };
 }
 
-export function getLetter(db: Db, id: number) {
-  const row = db.select().from(letter).where(eq(letter.id, id)).get();
+export function getLetter(db: Db, scope: Scope, id: number) {
+  const row = findLetter(db, scope, id);
   if (!row) return null;
   return { ...row, content: row.content as LetterContent };
+}
+
+/** Lettre du foyer prête à rendre en PDF : contenu, caisse destinataire et année visée. */
+export function letterDocument(db: Db, scope: Scope, id: number) {
+  const row = getLetter(db, scope, id);
+  if (!row) return null;
+  const ins = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
+  const r = db.select({ targetYear: review.targetYear }).from(review).where(eq(review.id, row.reviewId)).get()!;
+  return { ...row, insurerName: insurerLabel(ins), targetYear: r.targetYear };
 }

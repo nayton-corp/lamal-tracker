@@ -1,13 +1,12 @@
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
 import { lcaWishesAction, lineFlagsAction } from "@/app/actions/review";
 import { lcaWishesFor } from "@/application/offers";
 import { LCA_GUARANTEES } from "@/domain/lca";
 import { getReviewByYear, getReviewView } from "@/application/review";
 import { requiresDoctorCheck, type ModelType } from "@/domain/lamal";
-import { lcaPolicy } from "@/infrastructure/db/schema";
+import { listLca } from "@/application/household";
 import { db, today } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
 import { Button } from "@/ui/button";
@@ -17,15 +16,17 @@ import { Chf } from "@/ui/money";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
 import { LcaConfirm } from "./lca-confirm";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Contrôle LCA" };
 
 export default async function LcaPage({ params }: { params: Promise<{ year: string }> }) {
+  const scope = await pageScope();
   const year = Number((await params).year);
-  const r = getReviewByYear(db(), year);
+  const r = getReviewByYear(db(), scope, year);
   if (!r || r.status === "CLOSED") redirect(`/rituel/${year}`);
-  const view = getReviewView(db(), r.id, today());
+  const view = getReviewView(db(), scope, r.id, today());
   const switching = view.persons.filter((p) => p.line.decision === "SWITCH");
   // Rien à vérifier tant que personne ne change de caisse.
   if (switching.length === 0) redirect(`/rituel/${year}`);
@@ -49,11 +50,7 @@ export default async function LcaPage({ params }: { params: Promise<{ year: stri
       {switching.length === 0 && <p className="text-muted">Personne ne change de caisse : rien à contrôler.</p>}
 
       {switching.map((pr) => {
-        const contracts = db()
-          .select()
-          .from(lcaPolicy)
-          .where(and(eq(lcaPolicy.personId, pr.person.id), eq(lcaPolicy.active, true)))
-          .all();
+        const contracts = listLca(db(), pr.person.id).filter((c) => c.active);
         return (
           <Card key={pr.line.id} className="space-y-4">
             <div>

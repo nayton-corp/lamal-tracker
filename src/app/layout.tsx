@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getHouseholdMode } from "@/application/household";
 import { db } from "@/server/context";
+import { currentScope } from "@/server/auth";
 import { AppNav } from "@/ui/app-nav";
 import { ServiceWorker } from "@/ui/service-worker";
 
@@ -25,8 +26,9 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const solo = getHouseholdMode(db()) === "SOLO";
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const scope = await currentScope();
+  const solo = scope !== null && getHouseholdMode(db(), scope) === "SOLO";
   return (
     <html lang="fr-CH">
       <body className="antialiased">

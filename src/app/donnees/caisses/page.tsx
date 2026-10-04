@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { BadgeCheck, Globe, Mail, Phone } from "lucide-react";
 import { getHousehold, listInsurers, listPersons, listPolicies } from "@/application/household";
 import { formatDateLong } from "@/domain/dates";
@@ -6,17 +7,21 @@ import { db } from "@/server/context";
 import { Section } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
 import { InsurerForm } from "./insurer-form";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Caisses" };
 
 type InsurerRow = ReturnType<typeof listInsurers>[number];
 
-export default function InsurersPage() {
+export default async function InsurersPage() {
+  const scope = await pageScope();
+  // Coordonnées des caisses : partagées par tous les foyers, modifiables par l'administrateur seul.
+  if (!scope.admin) notFound();
   const insurers = listInsurers(db())
     .filter((i) => i.officialAddress || i.terminationAddress)
     .sort((a, b) => insurerLabel(a).localeCompare(insurerLabel(b), "fr"));
-  const h = getHousehold(db());
+  const h = getHousehold(db(), scope);
   const mine = new Set(h ? listPersons(db(), h.id).flatMap((p) => listPolicies(db(), p.id).map((x) => x.policy.insurerId)) : []);
   const yours = insurers.filter((i) => mine.has(i.id));
   const others = insurers.filter((i) => !mine.has(i.id));

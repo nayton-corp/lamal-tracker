@@ -14,6 +14,7 @@ import { coinsuranceMaxFor } from "@/domain/parameters";
 import { rankForStrategy, type Strategy } from "@/domain/strategy";
 import type { Db } from "@/infrastructure/db/client";
 import { insurer } from "@/infrastructure/db/schema";
+import type { Scope } from "./scope";
 import { effectiveNeeds, lineContext, picksFor, type StrategyPick } from "./strategy";
 
 export interface CompareOptions {
@@ -77,8 +78,8 @@ export interface CompareView {
   picks: StrategyPick[];
 }
 
-export function compareForLine(db: Db, lineId: number, opts: CompareOptions = {}): CompareView {
-  const c = lineContext(db, lineId, opts.healthCostsRp);
+export function compareForLine(db: Db, scope: Scope, lineId: number, opts: CompareOptions = {}): CompareView {
+  const c = lineContext(db, scope, lineId, opts.healthCostsRp);
   const { line, review: r, person: p, policy, ctx, allowedFranchises } = c;
   const params = ctx.params;
   const healthCostsRp = ctx.healthCostsRp;

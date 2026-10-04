@@ -1,6 +1,6 @@
 import { LockKeyhole } from "lucide-react";
 import { redirect } from "next/navigation";
-import { passwordDefined } from "@/server/auth";
+import { accountExists } from "@/server/auth";
 import { Card } from "@/ui/card";
 import { Page } from "@/ui/page";
 import { CreatePasswordForm } from "../login-form";
@@ -10,7 +10,7 @@ export const metadata = { title: "Mot de passe" };
 
 /** Premier démarrage : l'app n'est utilisable qu'après le choix d'un mot de passe. */
 export default function CreatePasswordPage() {
-  if (passwordDefined()) redirect("/login");
+  if (accountExists()) redirect("/login");
   return (
     <Page className="flex min-h-[80dvh] flex-col justify-center">
       <Card className="space-y-4">

@@ -12,18 +12,20 @@ import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
 import { Chf, Delta } from "@/ui/money";
 import { Page } from "@/ui/page";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
-  const h = getHousehold(db());
+export default async function Home() {
+  const scope = await pageScope();
+  const h = getHousehold(db(), scope);
   const t = today();
   const year = Number(t.slice(0, 4));
   const target = ritualYear();
 
   // Première connexion : l'accueil guide la configuration (pour qui, adresse, personnes, contrats).
   if (!h) redirect("/bienvenue");
-  const solo = getHouseholdMode(db()) === "SOLO";
+  const solo = getHouseholdMode(db(), scope) === "SOLO";
 
   const persons = listPersons(db(), h.id);
   const params = parametersFor(db(), year);
@@ -45,8 +47,8 @@ export default function Home() {
   const windowOpen = ritualWindowOpen(t, target, Boolean(dataset));
   // Pendant la fenêtre du rituel, l'analyse s'ouvre d'elle-même : l'accueil montre tout de suite
   // ce que coûtera l'année prochaine sans rien faire.
-  const reviewId = windowOpen ? ensureReview(db(), target) : null;
-  const reviewView = reviewId ? getReviewView(db(), reviewId, t) : null;
+  const reviewId = windowOpen ? ensureReview(db(), scope, target) : null;
+  const reviewView = reviewId ? getReviewView(db(), scope, reviewId, t) : null;
 
   return (
     <Page wide>

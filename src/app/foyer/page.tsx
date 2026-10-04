@@ -13,16 +13,18 @@ import { Section } from "@/ui/card";
 import { Chf } from "@/ui/money";
 import { EmptyState, Page, PageHeader } from "@/ui/page";
 import { HouseholdCard } from "./household-card";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Foyer" };
 
-export default function FoyerPage() {
-  const h = getHousehold(db());
+export default async function FoyerPage() {
+  const scope = await pageScope();
+  const h = getHousehold(db(), scope);
   if (!h) redirect("/bienvenue");
   const year = Number(today().slice(0, 4));
   const persons = listPersons(db(), h.id);
-  const solo = getHouseholdMode(db()) === "SOLO" && persons.length <= 1;
+  const solo = getHouseholdMode(db(), scope) === "SOLO" && persons.length <= 1;
   const first = persons[0];
 
   return (

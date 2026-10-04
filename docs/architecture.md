@@ -19,7 +19,7 @@ src/
     strategy.ts      stratégies du rituel (économie max, maintien, équilibre), points de solidité d'une caisse,
                      profils de consommation
     ofsp/            lecture d'une ligne OFSP (formats ≤2026 et ≥2027), rapport d'import
-  application/     Cas d'usage : foyer, revue annuelle, comparateur, lettres, historique
+  application/     Cas d'usage : foyer, revue annuelle, comparateur, lettres, historique ; scope.ts cloisonne les foyers
   infrastructure/  SQLite (Drizzle), import OFSP en flux, rendu PDF, notifications push, client Pingen,
                    référentiels officiels (reference/ : annuaire OFSP, surveillance OFSP, CO2 OFEV)
   server/          Contexte serveur (horloge Europe/Zurich, tâches d'import, planificateur)
@@ -49,15 +49,34 @@ d'extérieur ; l'application ne dépend pas de l'interface.
   (canton, région, classe d'âge, sous-groupe, accident, franchise, prime mensuelle) ; `insurer`
   (n° OFSP, nom, coordonnées officielles de l'annuaire, adresse propre facultative) ;
   `insurer_indicator` (comptes publiés par caisse et par année) ; `lamal_parameters` (par année,
-  CO2 officiel ou saisi) ; `tariff_lineage`
-  (correspondance confirmée d'un code tarif d'une année à l'autre).
-- Foyer : `household`, `person`, `lamal_policy` (un contrat par personne et par année, prime
-  réellement facturée), `lca_policy`.
+  CO2 officiel ou saisi). Partagé par tous les foyers ; seul l'administrateur le modifie.
+- Comptes : `app_user` (mot de passe haché scrypt, rôle `ADMIN` ou `USER`, verrouillage après
+  échecs), `household_member` (un compte appartient à un foyer, propriétaire ou membre),
+  `session` (par compte et par appareil).
+- Foyer : `household`, `household_setting` (dont le mode « une personne / foyer »), `person`,
+  `lamal_policy` (un contrat par personne et par année, prime réellement facturée), `lca_policy`,
+  `tariff_lineage` (correspondance d'un code tarif d'une année à l'autre, confirmée par le foyer).
 - Rituel : `review` (une par année cible, stratégie choisie, besoins confirmés), `review_line`
   (franchise et modèles souhaités), (une par personne, complémentaires à
   demander), `letter`, `offer_request` (demande d'offre à une nouvelle caisse, contenu figé).
 - Signature dessinée par personne (`signature`, PNG), apposée sur les PDF au rendu.
-- Divers : `settings` (dont le mode « une personne / foyer »), `push_subscription`, `notification_log` (rappels dédoublonnés).
+- Divers : `settings` (réglages globaux : signature du fichier OFSP, clés VAPID…), `push_subscription`
+  (par compte), `notification_log` (rappels dédoublonnés ; clé préfixée `h<foyer>:` pour un rappel de foyer).
+
+## Cloisonnement des foyers
+
+Plusieurs foyers partagent la base. Le foyer d'une requête vient toujours de la session
+(`server/auth.ts` : `pageScope`, `requireScope`), jamais d'un paramètre envoyé par le navigateur.
+
+- Chaque cas d'usage de `src/application` reçoit un `Scope` (compte, foyer, administrateur ou non).
+- Un objet désigné par son identifiant passe par `application/scope.ts` (`owned*`, `find*`) :
+  un objet d'un autre foyer est « introuvable », la réponse est la même que s'il n'existait pas.
+- Les pages et actions n'importent ni Drizzle ni le schéma (règle ESLint) : pas de requête
+  directe qui contournerait ces contrôles.
+- Le référentiel (primes, caisses, CO2) et la sauvegarde complète de la base sont réservés à
+  l'administrateur ; l'import des primes d'une année (données publiques) reste ouvert à tous.
+- `tests/unit/isolation.test.ts` appelle chaque cas d'usage du foyer A avec les identifiants du
+  foyer B et exige un refus, sans aucune modification.
 
 Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `pnpm db:generate`
 (migration SQL dans `drizzle/`, appliquée au démarrage).

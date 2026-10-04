@@ -3,21 +3,19 @@
 import fs from "node:fs";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
 import { saveInsurer } from "@/application/household";
 import { UserError } from "@/application/review";
-import { insurer, lamalParameters } from "@/infrastructure/db/schema";
-import { officialCo2 } from "@/infrastructure/reference/apply";
+import { resetCo2, resetInsurerAddress, saveCo2 } from "@/application/reference-data";
 import { refreshReference } from "@/server/reference";
-import { saveSubscription, removeSubscription, notifyAll, pushSubscriptionSchema } from "@/infrastructure/push/push";
+import { saveSubscription, removeSubscription, notify, pushSubscriptionSchema } from "@/infrastructure/push/push";
 import { chfField, toActionError, type ActionState } from "@/server/action";
-import { db, nowIso } from "@/server/context";
+import { db, nowIso, today } from "@/server/context";
 import { dataDir, importJob, startArchivesImport, startImport, startYearImport } from "@/server/jobs";
 import { checkForNewPremiums } from "@/server/watch";
-import { requireSession } from "@/server/auth";
+import { requireAdminScope, requireScope } from "@/server/auth";
 
 export async function checkPremiumsAction(): Promise<ActionState> {
-  await requireSession();
+  await requireAdminScope();
   try {
     return { ok: await checkForNewPremiums(true) };
   } catch (e) {
@@ -25,14 +23,19 @@ export async function checkPremiumsAction(): Promise<ActionState> {
   }
 }
 
-/** Importe les primes d'une année précise (fichier courant ou archive). */
+/**
+ * Importe les primes officielles d'une année précise (fichier courant ou archive), pour pré-remplir
+ * un contrat. Ouvert à tout compte : ce sont des données publiques, un seul import tourne à la fois.
+ */
 export async function importYearAction(year: number): Promise<ActionState> {
-  await requireSession();
+  await requireScope();
+  const current = Number(today().slice(0, 4));
+  if (!Number.isInteger(year) || year < 2010 || year > current + 1) return { error: "Année invalide." };
   return startYearImport(year) ? { ok: `Import des primes ${year} lancé.` } : { error: "Un import est déjà en cours." };
 }
 
 export async function importArchivesAction(): Promise<ActionState> {
-  await requireSession();
+  await requireAdminScope();
   return startArchivesImport() ? { ok: "Import des archives lancé." } : { error: "Un import est déjà en cours." };
 }
 
@@ -40,7 +43,7 @@ export async function importArchivesAction(): Promise<ActionState> {
 const MAX_UPLOAD_BYTES = 60 * 1024 * 1024;
 
 export async function uploadPremiumsAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  await requireAdminScope();
   try {
     const file = form.get("file");
     if (!(file instanceof File) || file.size === 0) throw new UserError("Choisissez un fichier .xlsx ou .csv.");
@@ -63,11 +66,9 @@ export async function uploadPremiumsAction(_: ActionState, form: FormData): Prom
 }
 
 export async function saveCo2Action(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireAdminScope();
   try {
-    const year = Number(form.get("year"));
-    const amount = chfField(form.get("co2Annual"));
-    db().update(lamalParameters).set({ co2AnnualRp: amount, co2Source: "USER", sourceNote: "Saisi manuellement" }).where(eq(lamalParameters.year, year)).run();
+    saveCo2(db(), scope, Number(form.get("year")), chfField(form.get("co2Annual")));
   } catch (e) {
     return toActionError(e);
   }
@@ -77,26 +78,21 @@ export async function saveCo2Action(_: ActionState, form: FormData): Promise<Act
 
 /** Abandonne la saisie : le montant officiel (OFEV) reprend la main et suivra ses mises à jour. */
 export async function resetCo2Action(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
-  const year = Number(form.get("year"));
-  db()
-    .update(lamalParameters)
-    .set({ co2AnnualRp: officialCo2(year), co2Source: "OFFICIAL", sourceNote: "Office fédéral de l'environnement (OFEV)" })
-    .where(eq(lamalParameters.year, year))
-    .run();
+  const scope = await requireAdminScope();
+  resetCo2(db(), scope, Number(form.get("year")));
   revalidatePath("/", "layout");
   return { ok: "Montant officiel rétabli." };
 }
 
 export async function resetInsurerAddressAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
-  db().update(insurer).set({ terminationAddress: null, addressVerifiedAt: null }).where(eq(insurer.id, Number(form.get("id")))).run();
+  const scope = await requireAdminScope();
+  resetInsurerAddress(db(), scope, Number(form.get("id")));
   revalidatePath("/", "layout");
   return { ok: "Adresse officielle rétablie." };
 }
 
 export async function refreshReferenceAction(): Promise<ActionState> {
-  await requireSession();
+  await requireAdminScope();
   try {
     const check = await refreshReference();
     return check.ok ? { ok: check.results.join(" ") } : { error: check.results.join(" ") };
@@ -106,10 +102,11 @@ export async function refreshReferenceAction(): Promise<ActionState> {
 }
 
 export async function saveInsurerAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireAdminScope();
   try {
     saveInsurer(
       db(),
+      scope,
       {
         id: Number(form.get("id")),
         displayName: String(form.get("displayName") ?? "") || null,
@@ -126,12 +123,12 @@ export async function saveInsurerAction(_: ActionState, form: FormData): Promise
 }
 
 export async function subscribePushAction(sub: unknown) {
-  await requireSession();
+  const scope = await requireScope();
   // Données fournies par le navigateur : schéma strict et hôte de push reconnu (sinon SSRF possible).
   const parsed = pushSubscriptionSchema.safeParse(sub);
   if (!parsed.success) throw new UserError("Abonnement aux notifications invalide.");
   try {
-    saveSubscription(db(), parsed.data);
+    saveSubscription(db(), scope.userId, parsed.data);
   } catch (e) {
     throw new UserError(e instanceof Error ? e.message : String(e));
   }
@@ -139,14 +136,14 @@ export async function subscribePushAction(sub: unknown) {
 }
 
 export async function unsubscribePushAction(endpoint: string) {
-  await requireSession();
+  const scope = await requireScope();
   if (typeof endpoint !== "string" || endpoint.length > 2000) return;
-  removeSubscription(db(), endpoint);
+  removeSubscription(db(), scope.userId, endpoint);
   revalidatePath("/donnees");
 }
 
 export async function testPushAction(): Promise<ActionState> {
-  await requireSession();
-  const n = await notifyAll(db(), { title: "Primes LAMal", body: "Les notifications fonctionnent.", url: "/" });
+  const scope = await requireScope();
+  const n = await notify(db(), { userId: scope.userId }, { title: "Primes LAMal", body: "Les notifications fonctionnent.", url: "/" });
   return n > 0 ? { ok: `Notification envoyée à ${n} appareil(s).` } : { error: "Aucun appareil abonné." };
 }

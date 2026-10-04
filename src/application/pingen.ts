@@ -6,7 +6,8 @@ import type { Db } from "@/infrastructure/db/client";
 import { letter } from "@/infrastructure/db/schema";
 import { PingenError, PingenNoAnswerError, type PingenClient, type PingenLetter } from "@/infrastructure/pingen/client";
 import { getLetter } from "./letters";
-import { UserError } from "./review";
+import { UserError } from "./errors";
+import { ownedLetter, type Scope } from "./scope";
 import { signaturesByName } from "./signatures";
 
 export interface PingenDeps {
@@ -21,8 +22,8 @@ export function pingenFileName(row: { id: number; generatedAt: string }): string
 }
 
 /** Conditions avant de proposer l'envoi par Pingen (signatures, adresse). */
-export function pingenReadiness(db: Db, content: LetterContent): string[] {
-  return pingenBlockers(content, Object.keys(signaturesByName(db)));
+export function pingenReadiness(db: Db, scope: Scope, content: LetterContent): string[] {
+  return pingenBlockers(content, Object.keys(signaturesByName(db, scope)));
 }
 
 function applyPingen(db: Db, letterId: number, found: PingenLetter, nowIso: string) {
@@ -43,13 +44,13 @@ function applyPingen(db: Db, letterId: number, found: PingenLetter, nowIso: stri
  * deux demandes simultanées ne peuvent pas l'envoyer deux fois. Si Pingen refuse, elle redevient
  * « à envoyer » ; si Pingen ne répond pas, elle reste « non confirmée » jusqu'à vérification.
  */
-export async function sendLetterViaPingen(db: Db, letterId: number, today: IsoDate, nowIso: string, deps: PingenDeps): Promise<PingenLetter> {
-  const row = getLetter(db, letterId);
+export async function sendLetterViaPingen(db: Db, scope: Scope, letterId: number, today: IsoDate, nowIso: string, deps: PingenDeps): Promise<PingenLetter> {
+  const row = getLetter(db, scope, letterId);
   if (!row) throw new UserError("Lettre introuvable.");
   if (row.sentAt || row.pingenStatus) throw new UserError("Cette lettre est déjà envoyée.");
-  const blockers = pingenReadiness(db, row.content);
+  const blockers = pingenReadiness(db, scope, row.content);
   if (blockers.length) throw new UserError(blockers.join("\n"));
-  const pdf = await deps.render(row.content, signaturesByName(db));
+  const pdf = await deps.render(row.content, signaturesByName(db, scope));
 
   const claimed = db
     .update(letter)
@@ -79,7 +80,10 @@ export interface PingenSyncResult {
   errors: string[];
 }
 
-/** Met à jour le statut, le n° de suivi et le prix des lettres confiées à Pingen. */
+/**
+ * Met à jour le statut, le n° de suivi et le prix des lettres confiées à Pingen (tous foyers : tâche de
+ * fond). Pour une seule lettre demandée par un utilisateur, l'appelant vérifie d'abord qu'elle est à lui.
+ */
 export async function syncPingenLetters(db: Db, client: PingenClient, nowIso: string, onlyLetterId?: number): Promise<PingenSyncResult> {
   const rows = db
     .select()
@@ -109,9 +113,9 @@ export async function syncPingenLetters(db: Db, client: PingenClient, nowIso: st
  * Renonce à l'envoi par Pingen d'une lettre refusée ou non confirmée : elle redevient « à envoyer »
  * (impression et recommandé par soi-même, ou nouvel essai).
  */
-export function abandonPingen(db: Db, letterId: number) {
-  const row = db.select().from(letter).where(eq(letter.id, letterId)).get();
-  if (!row?.pingenStatus) throw new UserError("Cette lettre n'a pas été confiée à Pingen.");
+export function abandonPingen(db: Db, scope: Scope, letterId: number) {
+  const row = ownedLetter(db, scope, letterId);
+  if (!row.pingenStatus) throw new UserError("Cette lettre n'a pas été confiée à Pingen.");
   const phase = pingenPhase(row.pingenStatus);
   if (phase !== "FAILED" && phase !== "UNCONFIRMED") throw new UserError("Pingen traite cette lettre : elle ne peut plus être reprise.");
   db.update(letter)
