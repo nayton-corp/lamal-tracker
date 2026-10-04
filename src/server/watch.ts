@@ -11,6 +11,8 @@ import { yearAttemptKey, yearRetryDue } from "@/infrastructure/ofsp/retry";
 import { activeDataset } from "@/infrastructure/db/queries";
 import { purgeAudit } from "@/application/audit";
 import { purgeExpiredTokens } from "@/application/tokens";
+import { inactivityTick } from "@/application/data-rights";
+import { mailDeps } from "./accounts";
 import { db, nowIso, ritualYear, today } from "./context";
 import { pingenTick } from "./pingen";
 import { referenceTick } from "./reference";
@@ -144,6 +146,12 @@ export async function schedulerTick(): Promise<void> {
     await pingenTick();
   } catch (error) {
     console.error("[watch] suivi Pingen", error);
+  }
+  try {
+    const { notified, deleted } = await inactivityTick(db(), mailDeps(), nowIso());
+    if (notified || deleted) console.log(`[watch] comptes inactifs : ${notified} rappel(s), ${deleted} suppression(s)`);
+  } catch (error) {
+    console.error("[watch] comptes inactifs", error instanceof Error ? error.message : error);
   }
   // Ménage : jetons expirés, journal de sécurité de plus de 12 mois.
   purgeExpiredTokens(db(), nowIso());

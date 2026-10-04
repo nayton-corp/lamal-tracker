@@ -289,7 +289,7 @@ export const offerRequest = sqliteTable("offer_request", {
   answeredAt: text("answered_at"),
 });
 
-/** Signature dessinée à l'écran (PNG en data URL), apposée sur les courriers de la personne. */
+/** Signature dessinée à l'écran (PNG en data URL), apposée sur les courriers ; chiffrée par la clé du foyer. */
 export const signature = sqliteTable("signature", {
   personId: integer("person_id").primaryKey().references(() => person.id, { onDelete: "cascade" }),
   dataUrl: text("data_url").notNull(),
@@ -317,6 +317,11 @@ export const appUser = sqliteTable("app_user", {
   consentAt: text("consent_at"),
   /** Compte suspendu par l'administrateur : plus aucune connexion. */
   disabledAt: text("disabled_at"),
+  /** Dernière activité (connexion ou visite, au plus une mise à jour par heure). */
+  lastActiveAt: text("last_active_at"),
+  /** Rappels envoyés avant la suppression d'un compte inactif depuis 24 mois (0, 1 ou 2). */
+  inactivityNotices: integer("inactivity_notices").notNull().default(0),
+  inactivityNoticeAt: text("inactivity_notice_at"),
   createdAt: createdAt(),
 });
 
@@ -353,6 +358,8 @@ export const session = sqliteTable("session", {
   createdAt: createdAt(),
   lastSeenAt: text("last_seen_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
   expiresAt: text("expires_at").notNull(),
+  /** Identité confirmée (mot de passe ou passkey) pour les actions sensibles : export, suppression. */
+  confirmedAt: text("confirmed_at"),
 });
 
 /** Appareil abonné aux notifications, rattaché au compte qui l'a abonné. */
@@ -459,3 +466,13 @@ export const auditEvent = sqliteTable(
   },
   (t) => [index("audit_event_user").on(t.userId, t.createdAt)],
 );
+
+/**
+ * Clé de chiffrement d'un foyer (signatures), elle-même chiffrée par la clé maître qui ne vit
+ * jamais dans la base. Supprimée avec le foyer.
+ */
+export const householdKey = sqliteTable("household_key", {
+  householdId: integer("household_id").primaryKey().references(() => household.id, { onDelete: "cascade" }),
+  wrappedKey: text("wrapped_key").notNull(),
+  createdAt: createdAt(),
+});

@@ -2,7 +2,8 @@ import { and, asc, eq, like } from "drizzle-orm";
 import { z } from "zod";
 import { MODEL_TYPES, CANTONS } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
-import { household, householdSetting, insurer, lamalPolicy, lcaPolicy, notificationLog, person } from "@/infrastructure/db/schema";
+import { household, householdMember, householdSetting, insurer, lamalPolicy, lcaPolicy, notificationLog, person } from "@/infrastructure/db/schema";
+import { audit } from "./audit";
 import { LCA_GUARANTEE_KEYS, guaranteeInfo } from "@/domain/lca";
 import { UserError } from "./errors";
 import { createHouseholdFor, householdIdOf, requireAdmin, requireOwner, ownedLca, ownedPerson, ownedPolicy, findPerson, type Scope } from "./scope";
@@ -83,16 +84,26 @@ export const lcaInput = z.object({
 });
 
 /**
- * Remise à zéro : efface tout ce que le foyer a saisi (foyer, personnes, contrats, rituels,
- * lettres, signatures, réglages). Les autres foyers, les primes officielles et les caisses restent.
+ * Efface un foyer et tout ce qui en dépend (personnes, contrats, rituels, lettres, signatures,
+ * réglages, clé de chiffrement). Les comptes de ses membres restent, sans foyer.
  */
-export function resetHousehold(db: Db, scope: Scope) {
-  requireOwner(scope);
-  const householdId = householdIdOf(scope);
+export function eraseHousehold(db: Db, householdId: number) {
   db.transaction((tx) => {
     tx.delete(household).where(eq(household.id, householdId)).run();
     tx.delete(notificationLog).where(like(notificationLog.key, `h${householdId}:%`)).run();
   });
+}
+
+/**
+ * Remise à zéro (suppression du foyer) : efface tout ce que le foyer a saisi. Les autres foyers,
+ * les primes officielles et les caisses restent. Chaque membre en garde la trace dans son journal.
+ */
+export function resetHousehold(db: Db, scope: Scope, nowIso = new Date().toISOString()) {
+  requireOwner(scope);
+  const householdId = householdIdOf(scope);
+  const members = db.select({ userId: householdMember.userId }).from(householdMember).where(eq(householdMember.householdId, householdId)).all();
+  eraseHousehold(db, householdId);
+  for (const m of members) audit(db, m.userId, "HOUSEHOLD_DELETED", { nowIso });
 }
 
 export function getHousehold(db: Db, scope: Scope) {

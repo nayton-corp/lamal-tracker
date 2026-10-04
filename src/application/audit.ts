@@ -1,10 +1,11 @@
-import { desc, eq, lt } from "drizzle-orm";
+import { desc, eq, lt, type SQL } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
 import { auditEvent } from "@/infrastructure/db/schema";
 
 /*
- * Journal de sécurité d'un compte. Il ne contient que le type d'événement, la date et au plus un
- * libellé d'appareil : ni donnée de santé, ni adresse IP, ni mot de passe. Conservé 12 mois.
+ * Journal de sécurité d'un compte et de son foyer. Il ne contient que le type d'événement, la
+ * date et au plus un libellé d'appareil : ni donnée de santé, ni adresse IP, ni mot de passe.
+ * Conservé 12 mois.
  */
 
 export const AUDIT_LABELS = {
@@ -30,6 +31,12 @@ export const AUDIT_LABELS = {
   MEMBER_LEFT: "Départ du foyer",
   ACCOUNT_DISABLED: "Compte suspendu par l'administrateur",
   ACCOUNT_ENABLED: "Compte réactivé par l'administrateur",
+  DATA_EXPORTED: "Données téléchargées",
+  ACCOUNT_DELETED: "Compte supprimé",
+  HOUSEHOLD_DELETED: "Foyer supprimé",
+  OWNER_TRANSFERRED: "Vous êtes désormais propriétaire du foyer",
+  INACTIVITY_NOTICE: "Rappel avant suppression pour inactivité",
+  LETTER_SENT: "Lettre confiée à Pingen",
 } as const;
 
 export type AuditKind = keyof typeof AUDIT_LABELS;
@@ -55,15 +62,25 @@ export interface AuditEntry {
   createdAt: string;
 }
 
-export function recentAudit(db: Db, userId: number, limit = 20): AuditEntry[] {
+function entries(db: Db, where: SQL | undefined, limit: number): AuditEntry[] {
   return db
     .select({ kind: auditEvent.kind, detail: auditEvent.detail, createdAt: auditEvent.createdAt })
     .from(auditEvent)
-    .where(eq(auditEvent.userId, userId))
+    .where(where)
     .orderBy(desc(auditEvent.createdAt), desc(auditEvent.id))
     .limit(limit)
     .all()
     .map((e) => ({ ...e, kind: e.kind as AuditKind, label: AUDIT_LABELS[e.kind as AuditKind] ?? e.kind }));
+}
+
+/** Événements d'un compte, les plus récents d'abord. */
+export function recentAudit(db: Db, userId: number, limit = 20): AuditEntry[] {
+  return entries(db, eq(auditEvent.userId, userId), limit);
+}
+
+/** Événements du foyer (membres, envois, suppressions), pour son propriétaire. */
+export function householdAudit(db: Db, householdId: number, limit = 20): AuditEntry[] {
+  return entries(db, eq(auditEvent.householdId, householdId), limit);
 }
 
 export function purgeAudit(db: Db, nowIso: string) {

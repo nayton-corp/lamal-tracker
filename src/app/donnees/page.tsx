@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, Download, Landmark, ShieldCheck, UserRoundCog } from "lucide-react";
+import { CheckCircle2, ChevronRight, Download, FolderLock, Landmark, ShieldCheck, UserRoundCog } from "lucide-react";
 import Link from "next/link";
 import { listInsurers } from "@/application/household";
 import type { ValidationReport } from "@/domain/ofsp/report";
@@ -20,7 +20,6 @@ import { ActionForm } from "@/ui/action-form";
 import { SubmitButton } from "@/ui/submit";
 import { ImportPanel } from "./import-panel";
 import { PushPanel } from "./push-panel";
-import { ResetAll } from "./security-panel";
 import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
@@ -154,22 +153,15 @@ export default async function DataPage() {
           <Section title="Compte">
             <div className="space-y-3">
               <SettingsLink href="/compte" icon={<UserRoundCog aria-hidden className="size-5 text-primary" />} title="Mon compte" text="Courriel, mot de passe, passkeys, double facteur, appareils connectés." />
+              <SettingsLink href="/compte/donnees" icon={<FolderLock aria-hidden className="size-5 text-primary" />} title="Mes données" text={scope.householdRole === "OWNER" ? "Télécharger une copie, supprimer le foyer ou le compte." : "Télécharger une copie, supprimer le compte."} />
               {scope.admin && <SettingsLink href="/admin" icon={<ShieldCheck aria-hidden className="size-5 text-primary" />} title="Administration" text="Invitations, comptes, envoi Pingen par foyer." />}
             </div>
           </Section>
 
-          {scope.householdRole === "OWNER" && (
-            <Section title="Foyer">
-              <Card>
-                <ResetAll />
-              </Card>
-            </Section>
-          )}
-
           {scope.admin && (
           <Section title="Sauvegarde">
             <Card className="space-y-3">
-              <p className="text-sm text-muted">Une copie de tout ce que vous avez saisi (foyer, contrats, choix). Gardez-la ailleurs, par exemple sur une clé USB, au cas où.</p>
+              <p className="text-sm text-muted">Une copie de toute la base, tous foyers compris. Gardez-la ailleurs, par exemple sur une clé USB. Les signatures y sont chiffrées : pour les relire après une restauration, il faut aussi la clé maître (voir le README).</p>
               <Button asChild variant="secondary" block>
                 <a href="/api/backup" download={`primes-lamal-${today()}.db`}>
                   <Download aria-hidden className="size-4" /> Télécharger une sauvegarde

@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { and, count, eq, isNull } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
 import { appUser, passkey, recoveryCode } from "@/infrastructure/db/schema";
+import { totpContext } from "@/infrastructure/crypto/legacy";
+import { openSecret, sealSecret } from "@/infrastructure/crypto/vault";
 import { audit } from "./audit";
 import { verifyPassword } from "./auth";
 import { UserError } from "./errors";
@@ -11,8 +13,16 @@ import { newTotpSecret, totpUri, verifyTotp } from "./totp";
 /*
  * Double facteur : code à 6 chiffres d'une application d'authentification (TOTP), et dix codes de
  * secours à usage unique remis à l'activation. À la connexion, le mot de passe correct ouvre une
- * étape d'attente de 5 minutes, limitée à 5 essais, avant la session.
+ * étape d'attente de 5 minutes, limitée à 5 essais, avant la session. Le secret TOTP est gardé
+ * chiffré par la clé maître, y compris pendant l'activation.
  */
+
+const setupContext = (userId: number) => `totp-setup:${userId}`;
+
+/** Secret provisoire d'un jeton d'activation, déchiffré ; vide s'il est illisible. */
+function setupSecret(db: Db, userId: number, data: Record<string, unknown> | null): string {
+  return openSecret(db, String(data?.secret ?? ""), setupContext(userId)) ?? "";
+}
 
 export const RECOVERY_CODE_COUNT = 10;
 const SETUP_MINUTES = 15;
@@ -54,7 +64,7 @@ export function startTotpSetup(db: Db, userId: number, password: string, nowIso:
   if (user.totpEnabledAt) throw new UserError("Le double facteur est déjà actif.");
   if (!verifyPassword(db, userId, password)) throw new UserError("Mot de passe incorrect.");
   const secret = newTotpSecret();
-  const token = issueToken(db, { userId, kind: "TOTP_SETUP", ttlMs: SETUP_MINUTES * 60_000, data: { secret } }, nowIso);
+  const token = issueToken(db, { userId, kind: "TOTP_SETUP", ttlMs: SETUP_MINUTES * 60_000, data: { secret: sealSecret(db, secret, setupContext(userId)) } }, nowIso);
   return { token, secret, uri: totpUri(secret, user.email ?? "administrateur") };
 }
 
@@ -62,22 +72,23 @@ export function startTotpSetup(db: Db, userId: number, password: string, nowIso:
 export function pendingTotpSetup(db: Db, userId: number, token: string | undefined, nowIso: string): { secret: string; uri: string } | null {
   const row = peekToken(db, "TOTP_SETUP", token, nowIso);
   if (!row || row.userId !== userId) return null;
-  const secret = String(row.data?.secret ?? "");
+  const secret = setupSecret(db, userId, row.data);
+  if (!secret) return null;
   return { secret, uri: totpUri(secret, userRow(db, userId).email ?? "administrateur") };
 }
 
 /** Le premier code juste active le double facteur ; renvoie les codes de secours à noter. */
 export function confirmTotpSetup(db: Db, userId: number, token: string | undefined, code: string, nowMs: number, nowIso: string): string[] {
   const row = peekToken(db, "TOTP_SETUP", token, nowIso);
-  if (!row || row.userId !== userId) throw new UserError("Activation expirée : recommencez.");
-  const secret = String(row.data?.secret ?? "");
+  const secret = row && row.userId === userId ? setupSecret(db, userId, row.data) : "";
+  if (!row || !secret) throw new UserError("Activation expirée : recommencez.");
   const step = verifyTotp(secret, code, nowMs, null);
   if (step === null) {
     if (!countAttempt(db, row.id, MAX_CODE_ATTEMPTS)) throw new UserError("Trop d'essais : recommencez l'activation.");
     throw new UserError("Code incorrect. Vérifiez l'heure du téléphone et saisissez le code affiché.");
   }
   consumeToken(db, "TOTP_SETUP", token, nowIso);
-  db.update(appUser).set({ totpSecret: secret, totpEnabledAt: nowIso, totpLastStep: step }).where(eq(appUser.id, userId)).run();
+  db.update(appUser).set({ totpSecret: sealSecret(db, secret, totpContext(userId)), totpEnabledAt: nowIso, totpLastStep: step }).where(eq(appUser.id, userId)).run();
   audit(db, userId, "TOTP_ENABLED", { nowIso });
   return replaceRecoveryCodes(db, userId);
 }
@@ -106,7 +117,9 @@ export function disableTotp(db: Db, userId: number, password: string, nowIso: st
 export function verifySecondFactor(db: Db, userId: number, code: string, nowMs: number, nowIso: string): boolean {
   const user = userRow(db, userId);
   if (!user.totpEnabledAt || !user.totpSecret) return false;
-  const step = verifyTotp(user.totpSecret, code, nowMs, user.totpLastStep);
+  // Secret illisible (clé maître changée) : seuls les codes de secours restent utilisables.
+  const secret = openSecret(db, user.totpSecret, totpContext(userId));
+  const step = secret ? verifyTotp(secret, code, nowMs, user.totpLastStep) : null;
   if (step !== null) {
     db.update(appUser).set({ totpLastStep: step }).where(eq(appUser.id, userId)).run();
     return true;

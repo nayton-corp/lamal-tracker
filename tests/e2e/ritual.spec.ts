@@ -338,12 +338,12 @@ test.describe("sur ordinateur", () => {
 test("recommencer à zéro, puis une personne seule depuis sa police PDF", async ({ page }) => {
   await login(page);
 
-  // Réglages › Sécurité : tout effacer, mot de passe à l'appui.
+  // Réglages › Mes données : supprimer le foyer (la session vient d'être ouverte : identité confirmée).
   await page.goto("/donnees");
-  await page.getByRole("button", { name: "Recommencer à zéro" }).click();
-  const sheet = page.getByRole("dialog");
-  await sheet.getByLabel("Votre mot de passe, pour confirmer").fill(PASSWORD);
-  await sheet.getByRole("button", { name: "Tout effacer" }).click();
+  await page.getByRole("link", { name: /Mes données/ }).click();
+  await expect(page.getByText("Identité confirmée")).toBeVisible();
+  await page.getByRole("button", { name: "Supprimer le foyer" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Supprimer le foyer" }).click();
   await expect(page).toHaveURL(/\/bienvenue/);
   await expect(page.getByRole("heading", { name: /juste prix/ })).toBeVisible();
 

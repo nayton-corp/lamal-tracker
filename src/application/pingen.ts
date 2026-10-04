@@ -9,6 +9,7 @@ import { getLetter } from "./letters";
 import { UserError } from "./errors";
 import { ownedLetter, type Scope } from "./scope";
 import { signaturesByName } from "./signatures";
+import { audit } from "./audit";
 
 export interface PingenDeps {
   client: PingenClient;
@@ -62,6 +63,7 @@ export async function sendLetterViaPingen(db: Db, scope: Scope, letterId: number
   try {
     const created = await deps.client.sendRegistered(pdf, pingenFileName(row));
     applyPingen(db, letterId, created, nowIso);
+    audit(db, scope.userId, "LETTER_SENT", { householdId: scope.householdId, nowIso });
     return created;
   } catch (error) {
     if (error instanceof PingenNoAnswerError) {

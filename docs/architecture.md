@@ -55,14 +55,17 @@ d'extérieur ; l'application ne dépend pas de l'interface.
   un foyer, propriétaire ou membre), `session` (par compte et par appareil), `passkey` (WebAuthn),
   `recovery_code`, `invitation` (inscription ou foyer, code haché), `auth_token` (jetons à usage
   unique hachés : confirmation, réinitialisation, étape du double facteur, défi WebAuthn),
-  `known_device` (alerte de nouvel appareil), `audit_event` (journal de sécurité, 12 mois).
+  `known_device` (alerte de nouvel appareil), `audit_event` (journal de sécurité du compte et du
+  foyer, 12 mois). `app_user` garde aussi la dernière activité et les rappels d'inactivité ;
+  `session.confirmed_at`, la dernière confirmation d'identité.
 - Foyer : `household`, `household_setting` (dont le mode « une personne / foyer »), `person`,
   `lamal_policy` (un contrat par personne et par année, prime réellement facturée), `lca_policy`,
   `tariff_lineage` (correspondance d'un code tarif d'une année à l'autre, confirmée par le foyer).
 - Rituel : `review` (une par année cible, stratégie choisie, besoins confirmés), `review_line`
   (franchise et modèles souhaités), (une par personne, complémentaires à
   demander), `letter`, `offer_request` (demande d'offre à une nouvelle caisse, contenu figé).
-- Signature dessinée par personne (`signature`, PNG), apposée sur les PDF au rendu.
+- Signature dessinée par personne (`signature`, PNG chiffré par la clé du foyer), apposée sur les
+  PDF au rendu ; `household_key` (clé du foyer, chiffrée par la clé maître).
 - Divers : `settings` (réglages globaux : signature du fichier OFSP, clés VAPID…), `push_subscription`
   (par compte), `notification_log` (rappels dédoublonnés ; clé préfixée `h<foyer>:` pour un rappel de foyer).
 
@@ -107,6 +110,27 @@ Le module est isolé dans `src/application` (`auth.ts`, `account.ts`, `mfa.ts`, 
 - **Pingen** n'est proposé qu'aux foyers autorisés par l'administrateur (`household_setting`
   `pingen.enabled`), puisqu'il est facturé à l'exploitant.
 
+## Protection des données
+
+- **Chiffrement** (`infrastructure/crypto/vault.ts`) : AES-256-GCM, une clé par foyer
+  (`household_key`), chiffrée par la clé maître (`MASTER_KEY`, `MASTER_KEY_FILE` ou
+  `master.key` à côté de la base, jamais dans la base). Le contexte (foyer, personne, compte) est
+  authentifié : une valeur recopiée ailleurs ne s'ouvre pas. Sont chiffrés les signatures et les
+  secrets TOTP (ceux-ci directement par la clé maître). Les valeurs enregistrées en clair avant
+  le chiffrement le sont au démarrage (`crypto/legacy.ts`). Une valeur illisible (clé changée)
+  compte comme absente : signature à refaire, codes de secours pour le double facteur.
+- **Suppression** : `PRAGMA secure_delete` efface réellement les lignes supprimées du fichier.
+  Supprimer un foyer supprime sa clé (`household.eraseHousehold`) ; supprimer un compte
+  (`data-rights.deleteAccountData`) supprime le foyer s'il y était seul, sinon le transmet.
+- **Droits** (`application/data-rights.ts`) : export JSON complet et récapitulatif PDF
+  (`export-report.ts`, `infrastructure/pdf/report-pdf.tsx`), sans mot de passe, secret ni clé ;
+  export et suppressions exigent une identité confirmée depuis moins de 10 minutes
+  (`requireConfirmed` : connexion récente, mot de passe ou passkey du compte).
+- **Inactivité** : passe quotidienne du planificateur (`inactivityTick`) ; deux rappels, puis
+  suppression à 24 mois ; jamais sans courriel possible, jamais pour un administrateur.
+- **Minimisation** : une police PDF importée n'est lue qu'en mémoire, jamais enregistrée ; les
+  courriels et le journal ne contiennent aucune donnée de santé.
+
 Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `pnpm db:generate`
 (migration SQL dans `drizzle/`, appliquée au démarrage).
 
@@ -116,7 +140,7 @@ Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `p
 fichier OFSP (quotidien du 15.09 au 30.11, hebdomadaire sinon), import en arrière-plan si
 le fichier a changé, notification ; rappels J-30, J-14, J-7, J-3, J-1 avant la date d'envoi ; vérification hebdomadaire des
 référentiels officiels (`server/reference.ts`) ; suivi des lettres confiées à Pingen (statut, n° de suivi, prix ; notification
-en cas de refus).
+en cas de refus) ; rappels et suppression des comptes inactifs.
 
 ## Envoi par Pingen
 

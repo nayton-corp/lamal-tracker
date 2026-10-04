@@ -103,6 +103,28 @@ export async function passkeyLoginOptions(db: Db, rp: RelyingParty, nowIso: stri
 
 export type PasskeyLogin = { ok: true; userId: number } | { ok: false; error: string; unverifiedUserId?: number };
 
+/** Vérifie la signature de l'appareil pour un défi donné ; renvoie la passkey utilisée, ou null. */
+async function verifyAssertion(db: Db, response: AuthenticationResponseJSON, challenge: string, rp: RelyingParty, nowIso: string) {
+  const key = db.select().from(passkey).where(eq(passkey.id, String(response.id ?? ""))).get();
+  if (!key) return null;
+  let verified;
+  try {
+    verified = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: challenge,
+      expectedOrigin: rp.origin,
+      expectedRPID: rp.id,
+      credential: { id: key.id, publicKey: fromBase64Url(key.publicKey), counter: key.counter, transports: (key.transports ?? undefined) as never },
+      requireUserVerification: true,
+    });
+  } catch {
+    return null;
+  }
+  if (!verified.verified) return null;
+  db.update(passkey).set({ counter: verified.authenticationInfo.newCounter, lastUsedAt: nowIso }).where(eq(passkey.id, key.id)).run();
+  return key;
+}
+
 /** Vérifie la réponse de l'appareil ; renvoie le compte à connecter. */
 export async function finishPasskeyLogin(
   db: Db,
@@ -114,27 +136,33 @@ export async function finishPasskeyLogin(
   const refused = { ok: false as const, error: "Passkey non reconnue." };
   const row = consumeToken(db, "WEBAUTHN", token, options.nowIso);
   if (!row || row.data?.purpose !== "login") return { ok: false, error: "Demande expirée : recommencez." };
-  const key = db.select().from(passkey).where(eq(passkey.id, String(response.id ?? ""))).get();
+  const key = await verifyAssertion(db, response, String(row.data.challenge), rp, options.nowIso);
   if (!key) return refused;
   const user = db.select().from(appUser).where(eq(appUser.id, key.userId)).get();
   if (!user || user.disabledAt) return refused;
-  let verified;
-  try {
-    verified = await verifyAuthenticationResponse({
-      response,
-      expectedChallenge: String(row.data.challenge),
-      expectedOrigin: rp.origin,
-      expectedRPID: rp.id,
-      credential: { id: key.id, publicKey: fromBase64Url(key.publicKey), counter: key.counter, transports: (key.transports ?? undefined) as never },
-      requireUserVerification: true,
-    });
-  } catch {
-    return refused;
-  }
-  if (!verified.verified) return refused;
-  db.update(passkey).set({ counter: verified.authenticationInfo.newCounter, lastUsedAt: options.nowIso }).where(eq(passkey.id, key.id)).run();
   if (options.mailEnabled && user.email && !user.emailVerifiedAt) return { ok: false, error: "Confirmez d'abord votre adresse : un nouveau lien vous a été envoyé.", unverifiedUserId: user.id };
   return { ok: true, userId: user.id };
+}
+
+/** Confirmation d'identité avant une action sensible : seules les passkeys du compte sont proposées. */
+export async function passkeyConfirmOptions(db: Db, userId: number, rp: RelyingParty, nowIso: string): Promise<{ options: PublicKeyCredentialRequestOptionsJSON; token: string }> {
+  const keys = db.select({ id: passkey.id, transports: passkey.transports }).from(passkey).where(eq(passkey.userId, userId)).all();
+  if (keys.length === 0) throw new UserError("Aucune passkey sur ce compte : confirmez avec votre mot de passe.");
+  const options = await generateAuthenticationOptions({
+    rpID: rp.id,
+    userVerification: "required",
+    allowCredentials: keys.map((k) => ({ id: k.id, transports: (k.transports ?? undefined) as never })),
+  });
+  const token = issueToken(db, { userId, kind: "WEBAUTHN", ttlMs: CHALLENGE_MINUTES * 60_000, data: { challenge: options.challenge, purpose: "confirm" } }, nowIso);
+  return { options, token };
+}
+
+/** Vrai si l'appareil a signé le défi avec une passkey de ce compte. */
+export async function finishPasskeyConfirm(db: Db, userId: number, token: string | undefined, response: AuthenticationResponseJSON, rp: RelyingParty, nowIso: string): Promise<boolean> {
+  const row = consumeToken(db, "WEBAUTHN", token, nowIso);
+  if (!row || row.userId !== userId || row.data?.purpose !== "confirm") return false;
+  const key = await verifyAssertion(db, response, String(row.data.challenge), rp, nowIso);
+  return key !== null && key.userId === userId;
 }
 
 export function renamePasskey(db: Db, userId: number, id: string, name: string) {
