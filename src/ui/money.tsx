@@ -19,7 +19,7 @@ export function Delta({ rp, permille, whole, className, suffix }: { rp: number |
         {formatChf(rp, { signed: true, whole })}
         {suffix}
       </span>
-      {permille !== undefined && permille !== null && <span className="whitespace-nowrap text-sm opacity-80">({formatPermille(permille)})</span>}
+      {permille !== undefined && permille !== null && <span className="whitespace-nowrap text-sm font-normal">({formatPermille(permille)})</span>}
     </span>
   );
 }

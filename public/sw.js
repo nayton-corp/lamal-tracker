@@ -1,5 +1,5 @@
 /* Service worker : application consultable hors ligne (dernières pages vues), notifications. */
-const VERSION = "v3";
+const VERSION = "v4";
 const PAGES = `pages-${VERSION}`;
 const STATIC = `static-${VERSION}`;
 const OFFLINE = "/offline.html";

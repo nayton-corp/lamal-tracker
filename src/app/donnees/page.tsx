@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, Download, FolderLock, Landmark, ShieldCheck, UserRoundCog } from "lucide-react";
+import { CheckCircle2, ChevronRight, Download, FolderLock, Landmark, MessageSquareText, ShieldCheck, UserRoundCog } from "lucide-react";
 import Link from "next/link";
 import { listInsurers } from "@/application/household";
 import type { ValidationReport } from "@/domain/ofsp/report";
@@ -20,6 +20,8 @@ import { ActionForm } from "@/ui/action-form";
 import { SubmitButton } from "@/ui/submit";
 import { ImportPanel } from "./import-panel";
 import { PushPanel } from "./push-panel";
+import { InstallHelp } from "@/ui/install-help";
+import { LegalLinks } from "@/ui/legal-links";
 import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
@@ -154,7 +156,18 @@ export default async function DataPage() {
             <div className="space-y-3">
               <SettingsLink href="/compte" icon={<UserRoundCog aria-hidden className="size-5 text-primary" />} title="Mon compte" text="Courriel, mot de passe, passkeys, double facteur, appareils connectés." />
               <SettingsLink href="/compte/donnees" icon={<FolderLock aria-hidden className="size-5 text-primary" />} title="Mes données" text={scope.householdRole === "OWNER" ? "Télécharger une copie, supprimer le foyer ou le compte." : "Télécharger une copie, supprimer le compte."} />
-              {scope.admin && <SettingsLink href="/admin" icon={<ShieldCheck aria-hidden className="size-5 text-primary" />} title="Administration" text="Invitations, comptes, envoi Pingen par foyer." />}
+              {scope.admin && <SettingsLink href="/admin" icon={<ShieldCheck aria-hidden className="size-5 text-primary" />} title="Administration" text="Invitations, comptes, avis reçus, chiffres d'usage." />}
+            </div>
+          </Section>
+
+          <Section title="L'app">
+            <div className="space-y-3">
+              <Card>
+                <p className="mb-2 font-medium">Installer sur l&apos;écran d&apos;accueil</p>
+                <InstallHelp />
+              </Card>
+              <SettingsLink href="/avis?depuis=/donnees" icon={<MessageSquareText aria-hidden className="size-5 text-primary" />} title="Donner un avis" text="Un problème, une idée, une phrase pas claire." />
+              <LegalLinks />
             </div>
           </Section>
 

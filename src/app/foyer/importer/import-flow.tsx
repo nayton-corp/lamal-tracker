@@ -22,7 +22,7 @@ const toRp = (s: string) => {
 };
 
 /**
- * Import d'une police PDF : le texte est lu sur le Raspberry Pi, les contrats proposés sont
+ * Import d'une police PDF : le texte est lu sur le serveur, les contrats proposés sont
  * vérifiés puis enregistrés. `initial` : analyse déjà faite (accueil depuis la police).
  */
 export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
@@ -125,7 +125,7 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
             </p>
           )}
           <p className="flex items-start gap-2 text-xs text-muted">
-            <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" /> Lu sur votre Raspberry Pi, rien n&apos;est envoyé ailleurs.
+            <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" /> Lu par l&apos;app sans intermédiaire ; le PDF n&apos;est pas gardé, seules les valeurs retenues le sont.
           </p>
           <FormError message={error} />
           {done && (

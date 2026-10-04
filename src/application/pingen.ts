@@ -9,6 +9,7 @@ import { getLetter } from "./letters";
 import { UserError } from "./errors";
 import { ownedLetter, type Scope } from "./scope";
 import { signaturesByName } from "./signatures";
+import { bumpUsage } from "./usage";
 import { audit } from "./audit";
 
 export interface PingenDeps {
@@ -59,6 +60,7 @@ export async function sendLetterViaPingen(db: Db, scope: Scope, letterId: number
     .where(and(eq(letter.id, letterId), isNull(letter.sentAt), isNull(letter.pingenStatus)))
     .run();
   if (claimed.changes !== 1) throw new UserError("Cette lettre est déjà envoyée.");
+  bumpUsage(db, "letters.sent");
 
   try {
     const created = await deps.client.sendRegistered(pdf, pingenFileName(row));

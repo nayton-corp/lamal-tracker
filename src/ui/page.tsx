@@ -35,11 +35,13 @@ export function PageHeader({ title, subtitle, back, action }: { title: string; s
   );
 }
 
-export function EmptyState({ icon, title, children, action }: { icon: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
+/** État vide ou page d'erreur ; `level` 1 quand l'état est toute la page (introuvable, erreur). */
+export function EmptyState({ icon, title, children, action, level = 2 }: { icon: ReactNode; title: string; children?: ReactNode; action?: ReactNode; level?: 1 | 2 }) {
+  const Heading = level === 1 ? "h1" : "h2";
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-surface px-6 py-10 text-center">
       <div className="flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">{icon}</div>
-      <p className="text-lg font-semibold">{title}</p>
+      <Heading className="text-lg font-semibold">{title}</Heading>
       {children && <div className="max-w-sm text-muted">{children}</div>}
       {action}
     </div>

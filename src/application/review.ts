@@ -24,6 +24,7 @@ import {
 } from "@/infrastructure/db/schema";
 import { UserError } from "./errors";
 import { listPersons } from "./household";
+import { bumpUsage } from "./usage";
 import { findLetter, findLine, findReview, householdIdOf, ownedLetter, ownedLine, ownedReview, type Scope } from "./scope";
 
 export { UserError } from "./errors";
@@ -537,8 +538,11 @@ export function deleteLetter(db: Db, scope: Scope, letterId: number) {
 }
 
 export function markLetterSent(db: Db, scope: Scope, letterId: number, sentAt: string, trackingNumber: string | null) {
-  ownedLetter(db, scope, letterId);
-  db.update(letter).set({ sentAt, trackingNumber }).where(eq(letter.id, letterId)).run();
+  const row = ownedLetter(db, scope, letterId);
+  db.transaction((tx) => {
+    tx.update(letter).set({ sentAt, trackingNumber }).where(eq(letter.id, letterId)).run();
+    if (!row.sentAt) bumpUsage(tx, "letters.sent");
+  });
 }
 
 export function markLetterAcknowledged(db: Db, scope: Scope, letterId: number, at: string | null) {

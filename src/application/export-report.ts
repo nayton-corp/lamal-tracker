@@ -130,6 +130,10 @@ export function exportReport(data: DataExport): Report {
     .slice(0, 60);
   if (journal.length) sections.push({ heading: "Journal de sécurité (12 derniers mois)", blocks: [{ kind: "table", head: ["Date", "Événement"], rows: journal.map((e) => [day(e.date), e.detail ? `${e.evenement} · ${e.detail}` : e.evenement]) }] });
 
+  if (c.avisEnvoyes.length) {
+    sections.push({ heading: "Avis envoyés", blocks: [{ kind: "table", head: ["Date", "Avis"], rows: c.avisEnvoyes.map((a) => [day(a.envoyeLe), a.message]) }] });
+  }
+
   sections.push({
     heading: "À propos de ce document",
     blocks: [

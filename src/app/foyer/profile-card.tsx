@@ -23,33 +23,35 @@ export function ProfileCard({ person, needs, needsHref, year, ageLabel }: { pers
       <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
         <UserRound aria-hidden className="size-5" />
       </div>
-      <dl className="min-w-0 flex-1 space-y-1 text-sm">
-        <div>
-          <dt className="sr-only">Naissance</dt>
-          <dd className="text-base font-semibold">
-            Né·e le {formatDateShort(person.birthDate)} <span className="font-normal text-muted">· {ageLabel}</span>
-          </dd>
-        </div>
-        <div className="flex flex-wrap gap-x-1">
-          <dt className="text-muted">Frais de santé :</dt>
-          <dd>{formatChf(needs.healthCostsRp, { whole: true })}/an</dd>
-        </div>
-        <div className="flex flex-wrap gap-x-1">
-          <dt className="text-muted">Modèles comparés :</dt>
-          <dd>{models}</dd>
-        </div>
-        {needs.doctorName && (
-          <div className="flex flex-wrap gap-x-1">
-            <dt className="text-muted">Médecin :</dt>
-            <dd>{needs.doctorName}</dd>
+      <div className="min-w-0 flex-1 space-y-1 text-sm">
+        <dl className="space-y-1">
+          <div>
+            <dt className="sr-only">Naissance</dt>
+            <dd className="text-base font-semibold">
+              Né·e le {formatDateShort(person.birthDate)} <span className="font-normal text-muted">· {ageLabel}</span>
+            </dd>
           </div>
-        )}
+          <div className="flex flex-wrap gap-x-1">
+            <dt className="text-muted">Frais de santé :</dt>
+            <dd>{formatChf(needs.healthCostsRp, { whole: true })}/an</dd>
+          </div>
+          <div className="flex flex-wrap gap-x-1">
+            <dt className="text-muted">Modèles comparés :</dt>
+            <dd>{models}</dd>
+          </div>
+          {needs.doctorName && (
+            <div className="flex flex-wrap gap-x-1">
+              <dt className="text-muted">Médecin :</dt>
+              <dd>{needs.doctorName}</dd>
+            </div>
+          )}
+        </dl>
         {needsHref && (
-          <dd>
+          <p>
             <Link href={needsHref} className="text-primary underline">Ajuster les besoins</Link>
-          </dd>
+          </p>
         )}
-      </dl>
+      </div>
       <EditSheet title={`${person.firstName} ${person.lastName}`} label="Modifier">
         {(close) => <PersonForm person={person} year={year} onDone={close} />}
       </EditSheet>

@@ -151,7 +151,7 @@ export default async function Home() {
       )}
       <p className="flex items-start gap-2 rounded-xl bg-surface p-3 text-xs text-muted shadow-card">
         <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-saving" />
-        <span>Données officielles OFSP et OFEV. Toutes les caisses, aucune commission, rien ne quitte votre Raspberry Pi.</span>
+        <span>Données officielles OFSP et OFEV. Toutes les caisses, aucune commission, données hébergées en Suisse et jamais revendues.</span>
       </p>
       </div>
       </div>

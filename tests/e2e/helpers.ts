@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
@@ -37,7 +38,7 @@ export const currentTotp = (secret: string) => totpCode(secret, totpStep(Date.no
 
 /** Connexion de l'administrateur : courriel, mot de passe, puis code de secours. */
 export async function login(page: Page) {
-  await page.goto("/");
+  await page.goto("/login");
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel("Courriel").fill(ADMIN_EMAIL);
   await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
@@ -72,4 +73,14 @@ export async function addVirtualAuthenticator(context: BrowserContext, page: Pag
   await cdp.send("WebAuthn.addVirtualAuthenticator", {
     options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
   });
+}
+
+/**
+ * Accessibilité (WCAG 2.1 A et AA) de la page affichée : contrastes, noms des boutons et champs,
+ * titres, rôles. Une violation fait échouer le test avec la liste des éléments en cause.
+ */
+export async function expectAccessible(page: Page) {
+  const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  const summary = violations.map((v) => `${v.id} (${v.impact}) : ${v.help}\n${v.nodes.slice(0, 5).map((n) => `   ${n.target.join(" ")} ${n.failureSummary?.split("\n")[1] ?? ""}`).join("\n")}`);
+  expect.soft(summary, `Accessibilité de ${page.url()}`).toEqual([]);
 }

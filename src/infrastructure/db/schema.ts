@@ -476,3 +476,25 @@ export const householdKey = sqliteTable("household_key", {
   wrappedKey: text("wrapped_key").notNull(),
   createdAt: createdAt(),
 });
+
+/** Avis envoyé depuis l'app (problème, idée, autre), lu dans l'administration ; supprimé avec le compte. */
+export const feedback = sqliteTable(
+  "feedback",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => appUser.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["PROBLEM", "IDEA", "OTHER"] }).notNull(),
+    message: text("message").notNull(),
+    /** Page d'où l'avis a été écrit, pour situer un problème. */
+    page: text("page"),
+    readAt: text("read_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("feedback_user").on(t.userId, t.createdAt)],
+);
+
+/** Compteurs d'usage agrégés de l'instance (comptes créés, courriers préparés) : jamais par compte ni par foyer. */
+export const usageCounter = sqliteTable("usage_counter", {
+  key: text("key").primaryKey(),
+  value: integer("value").notNull().default(0),
+});

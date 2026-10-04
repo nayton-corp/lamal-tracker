@@ -5,9 +5,10 @@ import { db, nowIso } from "@/server/context";
 /**
  * Contrôle d'accès de chaque requête : aucun compte → création du premier ; pas de session →
  * connexion. L'administrateur sans second facteur est conduit à son compte pour en ajouter un.
- * Seuls les fichiers statiques de la PWA, /api/health et les pages d'accès passent sans session.
+ * Seuls les fichiers statiques de la PWA, /api/health, la présentation et les pages d'accès ou
+ * légales passent sans session. Sans session, « / » affiche la présentation publique.
  */
-const PUBLIC = /^\/(login|inscription|verifier|confidentialite)(\/|$)/;
+const PUBLIC = /^\/(login|inscription|verifier|presentation|confidentialite|conditions|mentions-legales)(\/|$)/;
 const SESSION_COOKIES = ["__Host-lamal_session", "lamal_session"];
 
 export function proxy(request: NextRequest) {
@@ -28,11 +29,12 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
   if (pathname.startsWith("/api/")) return new NextResponse("Non autorisé", { status: 401 });
+  if (pathname === "/") return NextResponse.rewrite(new URL("/presentation", request.url));
   const login = new URL("/login", request.url);
-  if (pathname !== "/") login.searchParams.set("next", pathname + search);
+  login.searchParams.set("next", pathname + search);
   return NextResponse.redirect(login);
 }
 
 export const config = {
-  matcher: ["/((?!_next/|icons/|manifest\\.webmanifest$|sw\\.js$|offline\\.html$|api/health$|favicon\\.ico$|\\.well-known/).*)"],
+  matcher: ["/((?!_next/|icons/|apercus/|manifest\\.webmanifest$|sw\\.js$|offline\\.html$|api/health$|favicon\\.ico$|\\.well-known/).*)"],
 };
