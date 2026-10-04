@@ -7,6 +7,7 @@ import path from "node:path";
 import * as schema from "./schema";
 import { premium, tariff, tariffDataset } from "./schema";
 import { seedReference } from "./seed";
+import { sealLegacyData } from "../crypto/legacy";
 
 export type Db = BetterSQLite3Database<typeof schema> & { $client: Database.Database };
 
@@ -73,6 +74,8 @@ export function openDb(file: string): Db {
   sqlite.pragma("foreign_keys = ON");
   sqlite.pragma("busy_timeout = 5000");
   sqlite.pragma("synchronous = NORMAL");
+  // Une ligne supprimée (compte, foyer) est effacée du fichier, pas seulement marquée libre.
+  sqlite.pragma("secure_delete = ON");
   const db = drizzle(sqlite, { schema }) as Db;
   const folder = migrationsFolder();
   let backup: string | null = null;
@@ -92,6 +95,14 @@ export function openDb(file: string): Db {
   }
   const recovered = recoverInterruptedImports(db);
   if (recovered > 0) console.warn(`[db] ${recovered} import(s) interrompu(s) marqué(s) FAILED et nettoyé(s).`);
+  // Base au schéma partiel (tests de migration avec un journal tronqué) : rien à chiffrer encore.
+  const encrypted = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'household_key'").get() !== undefined;
+  const sealed = encrypted ? sealLegacyData(db) : 0;
+  if (sealed > 0) {
+    // Les anciennes valeurs en clair ne doivent pas survivre dans le journal WAL.
+    sqlite.pragma("wal_checkpoint(TRUNCATE)");
+    console.log(`[chiffrement] ${sealed} donnée(s) enregistrée(s) en clair désormais chiffrée(s).`);
+  }
   seedReference(db, new Date().getFullYear());
   return db;
 }

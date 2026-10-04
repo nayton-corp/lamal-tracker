@@ -13,7 +13,7 @@ import { PasskeyLoginButton } from "./passkey-button";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Connexion" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; reinitialise?: string; confirme?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; reinitialise?: string; confirme?: string; supprime?: string }> }) {
   const params = await searchParams;
   const next = safeNext(params.next);
   await redirectIfSignedIn(next);
@@ -37,6 +37,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     >
       {params.reinitialise && <Alert tone="success">Mot de passe changé : connectez-vous avec le nouveau.</Alert>}
       {params.confirme && <Alert tone="success">Adresse confirmée : connectez-vous.</Alert>}
+      {params.supprime && <Alert tone="success">Votre compte a été supprimé, avec vos données.</Alert>}
       <PasskeyLoginButton next={next} />
       <LoginForm next={next} legacy={legacyAdminId(db()) !== null} />
       <ClearCaches />

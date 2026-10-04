@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type TestInfo } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
 import { addVirtualAuthenticator, lastMailTo, login } from "./helpers";
 
@@ -126,4 +127,47 @@ test("le conjoint rejoint le foyer avec le lien du propriétaire", async ({ brow
   await expect(page).toHaveURL(/\/bienvenue/);
   await context.close();
   await owner.context().close();
+});
+
+test("un invité télécharge ses données, puis supprime son compte", async ({ browser }, info) => {
+  const admin = await adminPage(browser, info);
+  await admin.goto("/admin");
+  await admin.getByLabel("Pour qui (note pour vous)").fill("Départ");
+  await admin.getByRole("button", { name: "Créer l'invitation" }).click();
+  const link = await admin.getByLabel("Lien d'inscription").inputValue();
+
+  const context = await newDevice(browser, info);
+  const page = await context.newPage();
+  await signUpWith(page, link, "depart@e2e.test");
+  await page.getByRole("link", { name: "Plus tard" }).click();
+
+  // Mon compte › Mes données : la session vient d'être ouverte, l'identité est confirmée.
+  await page.goto("/compte");
+  await page.getByRole("link", { name: /Mes données/ }).click();
+  await expect(page.getByText("Identité confirmée")).toBeVisible();
+  await page.screenshot({ path: path.join(shots, "a05-mes-donnees.png"), fullPage: true });
+
+  const [json] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: /Copie complète/ }).click()]);
+  expect(json.suggestedFilename()).toMatch(/^primes-lamal-mes-donnees-.*\.json$/);
+  const data = JSON.parse(fs.readFileSync((await json.path())!, "utf8"));
+  expect(data.compte.courriel).toBe("depart@e2e.test");
+  expect(JSON.stringify(data)).not.toMatch(/Alex Test|admin@e2e\.test/);
+  const [pdf] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: /Récapitulatif/ }).click()]);
+  expect(fs.readFileSync((await pdf.path())!).subarray(0, 5).toString()).toBe("%PDF-");
+
+  await page.getByRole("button", { name: "Supprimer mon compte" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Supprimer mon compte" }).click();
+  await expect(page).toHaveURL(/\/login\?supprime=1/);
+  await expect(page.getByText("Votre compte a été supprimé")).toBeVisible();
+  expect((await lastMailTo("depart@e2e.test")).subject).toBe("Votre compte a été supprimé");
+
+  // Plus de connexion possible, et l'administration ne le voit plus.
+  await page.getByLabel("Courriel").fill("depart@e2e.test");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(NEW_PASSWORD);
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await expect(page.getByText(/Courriel ou mot de passe incorrect/)).toBeVisible();
+  await admin.reload();
+  await expect(admin.getByText("depart@e2e.test")).toHaveCount(0);
+  await context.close();
+  await admin.context().close();
 });

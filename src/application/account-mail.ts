@@ -61,3 +61,20 @@ export function emailChangeMail(to: string, link: string): Mail {
     text: `Bonjour,\n\nPour utiliser cette adresse avec votre compte Primes LAMal, ouvrez ce lien (valable 24 heures) :\n\n${link}\n\nSi vous n'avez rien demandé, ignorez ce message.${SIGNATURE}`,
   };
 }
+
+export function accountDeletedMail(to: string): Mail {
+  return {
+    to,
+    subject: "Votre compte a été supprimé",
+    text: `Bonjour,\n\nVotre compte Primes LAMal a été supprimé, avec vos données. Si vous étiez seul dans votre foyer, le foyer l'a été aussi.\n\nSi vous n'êtes pas à l'origine de cette suppression, prévenez l'administrateur sans attendre.${SIGNATURE}`,
+  };
+}
+
+/** Rappel avant la suppression d'un compte resté inactif. */
+export function inactivityMail(to: string, deletionDate: string, loginUrl: string): Mail {
+  return {
+    to,
+    subject: "Votre compte sera bientôt supprimé",
+    text: `Bonjour,\n\nVous ne vous êtes pas connecté à Primes LAMal depuis près de deux ans. Sans connexion de votre part, votre compte et les données de votre foyer seront supprimés le ${deletionDate}.\n\nPour garder votre compte, il suffit de vous connecter : ${loginUrl}\n\nSi vous n'en avez plus besoin, vous n'avez rien à faire.${SIGNATURE}`,
+  };
+}

@@ -69,6 +69,7 @@ Variables utiles (dans `docker-compose.yml`, ou dans un fichier `.env` en `chmod
 | `ADMIN_REQUIRE_2FA=false` | Lève l'obligation, pour l'administrateur, d'avoir une passkey ou le double facteur (instance strictement personnelle, déconseillé). |
 | `HIBP_DISABLED=true` | Ne vérifie pas les nouveaux mots de passe auprès de Have I Been Pwned (serveur sans Internet). |
 | `CONTACT_EMAIL` | Adresse affichée dans la déclaration de confidentialité pour les demandes d'accès ou de suppression. |
+| `MASTER_KEY` ou `MASTER_KEY_FILE` | Clé maître du chiffrement (32 octets en base64, `openssl rand -base64 32`), ou chemin du fichier qui la contient (secret Docker). Sans elles, l'app crée `data/master.key` au premier démarrage (voir ci-dessous). |
 
 #### Comptes, invitations et courriels
 
@@ -101,6 +102,20 @@ sudo tailscale serve --bg 3000
 L'app est alors disponible sur `https://<nom-du-pi>.<votre-tailnet>.ts.net` depuis tout appareil connecté à Tailscale. Sur iPhone : Safari › Partager › *Sur l'écran d'accueil*, puis *Réglages › Rappels › Activer*.
 
 Sans HTTPS, l'app fonctionne normalement dans le navigateur ; seules l'installation, le hors-ligne et les notifications sont indisponibles.
+#### Chiffrement et clé maître
+
+Les signatures dessinées et les secrets du double facteur sont chiffrés dans la base (AES-256-GCM, une clé par foyer, elle-même chiffrée par la clé maître). La clé maître ne vit jamais dans la base : une copie de `lamal.db` seule ne permet pas de les lire.
+
+- **Sans réglage** (instance du Pi) : au premier démarrage, l'app crée `data/master.key` (lisible par le seul propriétaire) et chiffre les signatures existantes. **Copiez ce fichier hors du Pi**, à part des sauvegardes de la base : sans lui, une base restaurée garde tout sauf les signatures (à redessiner) et le double facteur (les codes de secours restent valables).
+- **Sur un serveur partagé**, préférez un secret hors du volume de données : `MASTER_KEY_FILE=/run/secrets/lamal_master_key` (secret Docker), ou `MASTER_KEY` dans le fichier `.env` en `chmod 600`. Pour reprendre la clé déjà créée par l'app, recopiez le contenu de `data/master.key`.
+- Ne changez jamais la clé d'une instance en service : ce qui a été chiffré avec l'ancienne devient illisible.
+- La copie automatique prise avant la migration de cette version (`data/backups/`) contient encore les signatures en clair : supprimez-la une fois la mise à jour vérifiée.
+
+#### Données des utilisateurs
+
+- **Mes données** (*Mon compte › Mes données*) : après confirmation de l'identité (mot de passe ou passkey, valable 10 minutes), chacun télécharge une copie complète de ses données (JSON) et un récapitulatif lisible (PDF), et supprime son compte. Seul dans son foyer, le foyer part avec lui ; sinon il reste aux autres membres, le plus ancien en devenant propriétaire. Le propriétaire peut aussi supprimer le foyer (tout ce qu'il contient, pour tous ses comptes ; les comptes restent).
+- **Comptes inactifs** : sans connexion depuis 24 mois, un compte reçoit deux rappels par courriel (30 et 7 jours avant), puis il est supprimé. Sans courriel configuré, rien n'est supprimé. L'administrateur n'est jamais concerné.
+- Le seul compte administrateur ne peut pas être supprimé depuis l'app.
 
 ### Mise à jour, sauvegarde
 
@@ -108,12 +123,12 @@ Sans HTTPS, l'app fonctionne normalement dans le navigateur ; seules l'installat
 cd ~/lamal-tracker && docker compose pull && docker compose up -d
 ```
 
-- **Sauvegarde** : *Réglages › Sauvegarde* télécharge une copie cohérente de la base. Ou, sur le Pi : `cp data/lamal.db* /un/autre/disque/` (app arrêtée), ou `sqlite3 data/lamal.db ".backup '/chemin/sauvegarde.db'"`.
+- **Sauvegarde** : *Réglages › Sauvegarde* télécharge une copie cohérente de la base. Ou, sur le Pi : `cp data/lamal.db* /un/autre/disque/` (app arrêtée), ou `sqlite3 data/lamal.db ".backup '/chemin/sauvegarde.db'"`. Gardez aussi la clé maître (`data/master.key`), séparément.
 - **Sauvegarde automatique avant migration** : quand une mise à jour modifie le schéma, l'app copie d'abord la base dans `data/backups/lamal-<date>.db` (les cinq dernières copies sont gardées). Si la migration échoue, le journal du conteneur (`docker logs lamal-tracker`) indique la copie à restaurer et l'app refuse de démarrer.
 - **Restauration** : arrêter le conteneur, remettre le fichier `lamal.db` dans `data/` (et supprimer `lamal.db-wal` / `lamal.db-shm`), relancer. Pour revenir à une version antérieure du code, épingler son tag `sha-…` (voir plus haut).
 - Les migrations du schéma s'appliquent seules au démarrage.
 - **Mon compte** (*Réglages › Mon compte*) : courriel, mot de passe, passkeys, double facteur et codes de secours, appareils connectés, activité récente (cinq échecs de connexion verrouillent le compte quelques minutes ; les sessions expirent après 30 jours sans visite, et au plus tard après 90 jours).
-- **Recommencer à zéro** (*Réglages › Foyer › Recommencer à zéro*, propriétaire du foyer, mot de passe demandé) : efface personnes, contrats, rituels, lettres et signatures du foyer, pour tous ses comptes ; les primes officielles et les comptes restent.
+- **Recommencer à zéro** (*Mon compte › Mes données › Supprimer le foyer*, propriétaire du foyer, identité confirmée) : efface personnes, contrats, rituels, lettres et signatures du foyer, pour tous ses comptes ; les primes officielles et les comptes restent.
 - **Mot de passe oublié** : avec les courriels configurés, *Mot de passe oublié ?* sur la page de connexion envoie un lien valable une heure (le double facteur reste exigé). Sinon, pour l'administrateur, cette commande efface son mot de passe et ferme ses sessions ; l'app en redemande un au prochain chargement. Le foyer et ses données restent.
 
   ```sh

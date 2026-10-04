@@ -1,4 +1,5 @@
-import { History } from "lucide-react";
+import { ChevronRight, FolderLock, History } from "lucide-react";
+import Link from "next/link";
 import { accountOverview } from "@/application/account";
 import { recentAudit } from "@/application/audit";
 import { adminNeedsFactor, listSessions } from "@/application/auth";
@@ -56,6 +57,14 @@ export default async function AccountPage() {
               <SessionsPanel sessions={listSessions(db(), scope.userId, nowIso())} currentId={scope.sessionId} />
             </Card>
           </Section>
+          <Link href="/compte/donnees" className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
+            <FolderLock aria-hidden className="size-5 text-primary" />
+            <div className="flex-1">
+              <p className="font-medium">Mes données</p>
+              <p className="text-sm text-muted">Télécharger une copie, supprimer le compte{scope.householdRole === "OWNER" ? " ou le foyer" : ""}.</p>
+            </div>
+            <ChevronRight aria-hidden className="size-5 text-muted" />
+          </Link>
           <Section title="Activité récente">
             <Card>
               {events.length === 0 ? (

@@ -247,6 +247,11 @@ export function rememberDevice(db: Db, userId: number, deviceToken: string, nowI
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("base64");
 
+/** Activité du compte : repousse la suppression pour inactivité et annule les rappels envoyés. */
+export function markActive(db: Db, userId: number, nowIso: string) {
+  db.update(appUser).set({ lastActiveAt: nowIso, inactivityNotices: 0, inactivityNoticeAt: null }).where(eq(appUser.id, userId)).run();
+}
+
 /** Ouvre une session et renvoie le jeton à placer dans le cookie (jamais conservé en clair). */
 export function openSession(db: Db, userId: number, device: string, nowIso: string): { id: string; token: string; expiresAt: string } {
   purgeExpiredSessions(db, nowIso);
@@ -254,6 +259,7 @@ export function openSession(db: Db, userId: number, device: string, nowIso: stri
   const id = randomBytes(8).toString("hex");
   const expiresAt = new Date(Date.parse(nowIso) + SESSION_DAYS * 86_400_000).toISOString();
   db.insert(session).values({ id, userId, tokenHash: tokenHash(token), device: device.slice(0, 200), createdAt: nowIso, lastSeenAt: nowIso, expiresAt }).run();
+  markActive(db, userId, nowIso);
   return { id, token, expiresAt };
 }
 
@@ -286,6 +292,7 @@ export function touchSession(db: Db, token: string | undefined, nowIso: string):
     const idle = new Date(Date.parse(nowIso) + SESSION_DAYS * 86_400_000).toISOString();
     const max = maxEnd(row.createdAt);
     db.update(session).set({ lastSeenAt: nowIso, expiresAt: idle < max ? idle : max }).where(eq(session.id, row.id)).run();
+    markActive(db, row.userId, nowIso);
   }
   return { id: row.id, userId: row.userId, device: row.device, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt };
 }
@@ -295,13 +302,45 @@ export function closeSession(db: Db, token: string | undefined) {
   db.delete(session).where(eq(session.tokenHash, tokenHash(token))).run();
 }
 
+/** Durée pendant laquelle une identité confirmée ouvre les actions sensibles. */
+export const CONFIRM_MINUTES = 10;
+
 /**
- * Session ouverte il y a moins de `minutes` : le mot de passe vient d'être saisi, inutile de le
- * redemander pour une action sensible (ajout d'une passkey juste après l'inscription).
+ * Fin de la période de confirmation de cette session : ouverture (le mot de passe vient d'être
+ * saisi) ou dernière confirmation par mot de passe ou passkey. Null si elle est passée.
  */
-export function isFreshSession(db: Db, sessionId: string, nowIso: string, minutes = 10): boolean {
-  const row = db.select({ createdAt: session.createdAt }).from(session).where(eq(session.id, sessionId)).get();
-  return row !== undefined && Date.parse(nowIso) - Date.parse(row.createdAt) < minutes * 60_000;
+export function confirmedUntil(db: Db, sessionId: string, nowIso: string, minutes = CONFIRM_MINUTES): string | null {
+  const row = db.select({ createdAt: session.createdAt, confirmedAt: session.confirmedAt }).from(session).where(eq(session.id, sessionId)).get();
+  if (!row) return null;
+  const last = row.confirmedAt && row.confirmedAt > row.createdAt ? row.confirmedAt : row.createdAt;
+  const until = new Date(Date.parse(last) + minutes * 60_000).toISOString();
+  return until > nowIso ? until : null;
+}
+
+/** Identité confirmée il y a moins de `minutes` : inutile de redemander le mot de passe. */
+export function isFreshSession(db: Db, sessionId: string, nowIso: string, minutes = CONFIRM_MINUTES): boolean {
+  return confirmedUntil(db, sessionId, nowIso, minutes) !== null;
+}
+
+/** Export, suppression : refusés sans confirmation récente de l'identité. */
+export function requireConfirmed(db: Db, sessionId: string, nowIso: string) {
+  if (!isFreshSession(db, sessionId, nowIso)) throw new UserError("Confirmez d'abord votre identité (mot de passe ou passkey).");
+}
+
+/** Marque la session comme confirmée (passkey vérifiée par l'appelant). */
+export function markConfirmed(db: Db, sessionId: string, nowIso: string) {
+  db.update(session).set({ confirmedAt: nowIso }).where(eq(session.id, sessionId)).run();
+}
+
+/** Confirmation par mot de passe ; les échecs comptent pour le verrouillage du compte. */
+export function confirmWithPassword(db: Db, userId: number, sessionId: string, password: string, nowIso: string) {
+  const res = attemptLogin(db, userId, password, nowIso);
+  if (!res.ok) {
+    audit(db, userId, res.lockedSeconds > 0 ? "LOCKED" : "LOGIN_FAILED", { nowIso });
+    if (res.lockedSeconds > 0) throw new UserError(`Trop d'essais : réessayez dans ${Math.ceil(res.lockedSeconds / 60)} min.`);
+    throw new UserError("Mot de passe incorrect.");
+  }
+  markConfirmed(db, sessionId, nowIso);
 }
 
 /** Ferme toutes les sessions d'un compte (réinitialisation du mot de passe, suspension). */
