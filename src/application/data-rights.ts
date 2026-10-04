@@ -24,6 +24,7 @@ import { accountDeletedMail, inactivityMail, type MailDeps } from "./account-mai
 import { AUDIT_LABELS, audit, type AuditKind } from "./audit";
 import { requireConfirmed } from "./auth";
 import { UserError } from "./errors";
+import { feedbackOf } from "./feedback";
 import { eraseHousehold } from "./household";
 import type { Scope } from "./scope";
 import { listSignatures } from "./signatures";
@@ -59,6 +60,7 @@ export function exportData(db: Db, scope: Scope, nowIso: string) {
     passkeys: db.select({ nom: passkey.name, creeeLe: passkey.createdAt, utiliseeLe: passkey.lastUsedAt }).from(passkey).where(eq(passkey.userId, user.id)).all(),
     appareilsConnectes: db.select({ appareil: session.device, ouvertLe: session.createdAt, vuLe: session.lastSeenAt }).from(session).where(eq(session.userId, user.id)).all(),
     journal: auditRows(db.select().from(auditEvent).where(eq(auditEvent.userId, user.id)).orderBy(desc(auditEvent.createdAt)).all()),
+    avisEnvoyes: feedbackOf(db, user.id),
   };
 
   const householdId = scope.householdId;

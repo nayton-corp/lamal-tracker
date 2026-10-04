@@ -1,7 +1,7 @@
 {
   "name": "Primes LAMal",
   "short_name": "LAMal",
-  "description": "Suivi des primes LAMal du foyer et comparateur annuel.",
+  "description": "Suivez les primes d'assurance maladie de votre foyer et changez de caisse chaque automne.",
   "lang": "fr-CH",
   "start_url": "/",
   "scope": "/",

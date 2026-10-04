@@ -68,7 +68,8 @@ Variables utiles (dans `docker-compose.yml`, ou dans un fichier `.env` en `chmod
 | `TRUSTED_PROXY_HOPS` | Nombre de mandataires inverses devant l'app (`1` derrière Caddy ou `tailscale serve`), pour lire la vraie adresse IP dans la limitation de débit. Défaut `0`. |
 | `ADMIN_REQUIRE_2FA=false` | Lève l'obligation, pour l'administrateur, d'avoir une passkey ou le double facteur (instance strictement personnelle, déconseillé). |
 | `HIBP_DISABLED=true` | Ne vérifie pas les nouveaux mots de passe auprès de Have I Been Pwned (serveur sans Internet). |
-| `CONTACT_EMAIL` | Adresse affichée dans la déclaration de confidentialité pour les demandes d'accès ou de suppression. |
+| `CONTACT_EMAIL` | Adresse affichée dans la déclaration de confidentialité, les conditions d'utilisation et les mentions légales. |
+| `OPERATOR_NAME`, `OPERATOR_ADDRESS` | Exploitant de l'instance, affiché dans les *Mentions légales* (adresse sur plusieurs lignes séparées par `;`, ex. `Rue du Lac 1; 1000 Lausanne`). |
 | `MASTER_KEY` ou `MASTER_KEY_FILE` | Clé maître du chiffrement (32 octets en base64, `openssl rand -base64 32`), ou chemin du fichier qui la contient (secret Docker). Sans elles, l'app crée `data/master.key` au premier démarrage (voir ci-dessous). |
 
 #### Comptes, invitations et courriels
@@ -116,6 +117,13 @@ Les signatures dessinées et les secrets du double facteur sont chiffrés dans l
 - **Mes données** (*Mon compte › Mes données*) : après confirmation de l'identité (mot de passe ou passkey, valable 10 minutes), chacun télécharge une copie complète de ses données (JSON) et un récapitulatif lisible (PDF), et supprime son compte. Seul dans son foyer, le foyer part avec lui ; sinon il reste aux autres membres, le plus ancien en devenant propriétaire. Le propriétaire peut aussi supprimer le foyer (tout ce qu'il contient, pour tous ses comptes ; les comptes restent).
 - **Comptes inactifs** : sans connexion depuis 24 mois, un compte reçoit deux rappels par courriel (30 et 7 jours avant), puis il est supprimé. Sans courriel configuré, rien n'est supprimé. L'administrateur n'est jamais concerné.
 - Le seul compte administrateur ne peut pas être supprimé depuis l'app.
+
+#### Présentation, avis et chiffres d'usage
+
+- **Sans session**, l'adresse de l'app affiche une présentation publique (ce que fait l'app, engagement sur les données, installation sur le téléphone), avec *J'ai une invitation* et *Se connecter*. Les pages *Confidentialité*, *Conditions d'utilisation* et *Mentions légales* sont lisibles sans compte ; renseignez `OPERATOR_NAME`, `OPERATOR_ADDRESS` et `CONTACT_EMAIL` avant d'inviter d'autres foyers.
+- **Avis** : *Réglages › Donner un avis* (ou le lien d'une page d'erreur). Les avis arrivent dans *Administration › Avis reçus* ; chaque administrateur est prévenu par un courriel qui n'en reprend pas le texte. Cinq avis par compte et par jour au plus.
+- **Chiffres d'usage** (*Administration › En chiffres*) : comptes, foyers, rituels et courriers par année. Des totaux seulement, rien par compte ni par foyer.
+- **Rappels d'envoi** : J-30, J-14, J-7, J-3 et J-1 avant la date d'envoi conseillée, seulement aux foyers qui ont encore un courrier à poster (ou rien préparé), puis un dernier rappel deux jours après ; une relance quand une caisse n'a pas confirmé trois semaines après l'envoi. Par notification, et par courriel pour J-7, J-1, le dernier rappel et les relances (sans nom de caisse).
 
 ### Mise à jour, sauvegarde
 

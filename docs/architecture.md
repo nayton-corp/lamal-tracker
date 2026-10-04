@@ -138,7 +138,8 @@ Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `p
 
 `src/instrumentation.ts` lance un planificateur horaire : contrôle de la signature HTTP du
 fichier OFSP (quotidien du 15.09 au 30.11, hebdomadaire sinon), import en arrière-plan si
-le fichier a changé, notification ; rappels J-30, J-14, J-7, J-3, J-1 avant la date d'envoi ; vérification hebdomadaire des
+le fichier a changé, notification ; rappels d'envoi et relances de confirmation (`application/reminders.ts`, règles pures dans
+`domain/reminders.ts` : seulement les foyers qui ont encore un courrier à poster) ; vérification hebdomadaire des
 référentiels officiels (`server/reference.ts`) ; suivi des lettres confiées à Pingen (statut, n° de suivi, prix ; notification
 en cas de refus) ; rappels et suppression des comptes inactifs.
 

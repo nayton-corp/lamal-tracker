@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Db } from "@/infrastructure/db/client";
 import { appUser, knownDevice, passkey, session } from "@/infrastructure/db/schema";
 import { audit } from "./audit";
+import { bumpUsage } from "./usage";
 import { UserError } from "./errors";
 
 /*
@@ -88,7 +89,9 @@ export function createFirstAdmin(db: Db, email: string, password: string, nowIso
   const address = normalizeEmail(email);
   return db.transaction((tx) => {
     if (tx.select({ id: appUser.id }).from(appUser).limit(1).get()) throw new UserError("Un compte existe déjà.");
-    return tx.insert(appUser).values({ email: address, emailVerifiedAt: nowIso, password: stored, role: "ADMIN" }).returning().get().id;
+    const id = tx.insert(appUser).values({ email: address, emailVerifiedAt: nowIso, password: stored, role: "ADMIN" }).returning().get().id;
+    bumpUsage(tx, "accounts.created");
+    return id;
   });
 }
 

@@ -9,6 +9,7 @@ import type { Db } from "@/infrastructure/db/client";
 import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
 import { household, insurer, lcaPolicy, offerRequest, review, reviewLine } from "@/infrastructure/db/schema";
 import { getReviewView, UserError } from "./review";
+import { bumpUsage } from "./usage";
 import { findOfferRequest, ownedLine, ownedOfferRequest, ownedReview, type Scope } from "./scope";
 
 /** Complémentaires à demander pour une ligne : celles choisies, sinon celles en cours. */
@@ -115,6 +116,7 @@ export function markOfferRequestSent(db: Db, scope: Scope, id: number, at: IsoDa
   const row = ownedOfferRequest(db, scope, id);
   db.transaction((tx) => {
     tx.update(offerRequest).set({ sentAt: at, answeredAt: at ? row.answeredAt : null }).where(eq(offerRequest.id, id)).run();
+    if (at && !row.sentAt) bumpUsage(tx, "letters.sent");
     for (const lineId of row.lineIds) {
       const line = tx.select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
       if (!line) continue;

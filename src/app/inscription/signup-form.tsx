@@ -25,7 +25,8 @@ export function SignUpForm({ code }: { code: string }) {
         label={
           <span className="text-sm">
             J&apos;accepte que l&apos;app enregistre les données de santé que je saisis (caisse, franchise, modèle d&apos;assurance), uniquement pour m&apos;aider à gérer mes primes. Détails dans la{" "}
-            <Link href="/confidentialite" className="text-primary underline" target="_blank">déclaration de confidentialité</Link>.
+            <Link href="/confidentialite" className="text-primary underline" target="_blank">déclaration de confidentialité</Link>. J&apos;accepte les{" "}
+            <Link href="/conditions" className="text-primary underline" target="_blank">conditions d&apos;utilisation</Link>.
           </span>
         }
       />

@@ -1,9 +1,5 @@
 import "server-only";
-import { getReviewByYear } from "@/application/review";
-import { eq } from "drizzle-orm";
-import { household, householdMember } from "@/infrastructure/db/schema";
-import { reviewDeadlines, dueReminder } from "@/domain/deadlines";
-import { formatDateLong } from "@/domain/dates";
+import { reminderTick } from "@/application/reminders";
 import { getSetting, setSetting } from "@/infrastructure/db/settings";
 import { householdKey, notify } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
@@ -57,35 +53,22 @@ export async function checkForNewPremiums(force = false): Promise<string> {
   return started ? "Import lancé." : "Un import est déjà en cours.";
 }
 
-/** Rappels avant la date d'envoi recommandée, foyer par foyer, tant que son rituel n'est pas clôturé. */
+/**
+ * Rappels d'envoi des courriers (seulement aux foyers qui ont encore quelque chose à poster) et
+ * relances quand une caisse tarde à confirmer.
+ */
 export async function sendDeadlineReminders(): Promise<void> {
   const year = ritualYear();
   if (!activeDataset(db(), year)) return;
-  const d = reviewDeadlines(year);
-  const left = dueReminder(today(), d);
-  if (left === null) return;
-  const households = db()
-    .selectDistinct({ id: household.id, userId: householdMember.userId })
-    .from(household)
-    .innerJoin(householdMember, eq(householdMember.householdId, household.id))
-    .all();
-  const seen = new Set<number>();
-  for (const h of households) {
-    if (seen.has(h.id)) continue;
-    seen.add(h.id);
-    const r = getReviewByYear(db(), { userId: h.userId, householdId: h.id, householdRole: "OWNER", admin: false }, year);
-    if (r?.status === "CLOSED") continue;
-    await notify(
-      db(),
-      { householdId: h.id },
-      {
-        title: `Primes ${year} : J-${left}`,
-        body: `Envoyez vos éventuelles résiliations avant le ${formatDateLong(d.sendBy)} (réception au plus tard le ${formatDateLong(d.receiptDeadline)}).`,
-        url: `/rituel/${year}`,
-      },
-      householdKey(h.id, `rappel-${year}-J${left}`),
-    );
-  }
+  await reminderTick(
+    db(),
+    {
+      push: (householdId, r) => notify(db(), { householdId }, { title: r.title, body: r.body, url: r.url }, householdKey(householdId, r.key)),
+      mail: mailDeps(),
+    },
+    today(),
+    year,
+  );
 }
 
 function inPublicationSeason(iso: string): boolean {

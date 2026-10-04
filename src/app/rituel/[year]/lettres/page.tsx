@@ -25,6 +25,7 @@ import { SubmitButton } from "@/ui/submit";
 import { pingenReadiness } from "@/application/pingen";
 import { pingenClientFor } from "@/server/pingen";
 import { PingenOffer, PingenTracking } from "./pingen-panel";
+import { PostingGuide } from "./posting-guide";
 import { ShareButton } from "./share-button";
 import { SignaturePad } from "./signature-pad";
 import { pageScope } from "@/server/auth";
@@ -258,6 +259,9 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
           }
         >
           {terminations.length + changes.length === 0 && <p className="text-sm text-muted">Préparez les courriers ci-dessus.</p>}
+          {terminations.length + changes.length > 0 && !lettersDone && (
+            <PostingGuide today={today()} deadlines={view.deadlines} signers={signers.map((s) => s.firstName)} pingen={Boolean(pingen)} />
+          )}
           {[...terminations, ...changes].map((l) => {
             const content = l.content as LetterContent;
             return (

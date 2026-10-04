@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
 import { appUser, authToken, householdMember, passkey } from "@/infrastructure/db/schema";
+import { bumpUsage } from "./usage";
 import { alreadyRegisteredMail, emailChangeMail, passwordResetDoneMail, resetPasswordMail, verifyEmailMail, type MailDeps } from "./account-mail";
 import { audit } from "./audit";
 import { checkNewPassword, closeAllSessions, findUserByEmail, normalizeEmail, setPassword, storedPassword, verifyPassword, type PwnedCheck } from "./auth";
@@ -56,6 +57,7 @@ export async function signUp(
     claimInvitation(tx, invite, nowIso);
     const created = tx.insert(appUser).values({ email, password, role: "USER", consentAt: nowIso, createdAt: nowIso }).returning().get().id;
     if (invite.kind === "HOUSEHOLD") tx.insert(householdMember).values({ householdId: invite.householdId!, userId: created, role: "MEMBER", createdAt: nowIso }).run();
+    bumpUsage(tx, "accounts.created");
     return created;
   });
   audit(db, userId, "SIGNUP", { nowIso });

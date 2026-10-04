@@ -114,7 +114,7 @@ export function PolicyStart({ insurers, years, solo }: { insurers: { id: number;
           </p>
         )}
         <p className="flex items-start gap-2 text-xs text-muted">
-          <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" /> Lu sur votre Raspberry Pi, rien n&apos;est envoyé ailleurs.
+          <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" /> Lu par l&apos;app sans intermédiaire ; le PDF n&apos;est pas gardé, seules les valeurs retenues le sont.
         </p>
         <FormError message={error} />
       </Card>

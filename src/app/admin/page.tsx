@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
 import { setAccountDisabledAction, revokeSignupInviteAction, setPingenAction } from "@/app/actions/admin";
+import { markFeedbackAction } from "@/app/actions/feedback";
+import { FEEDBACK_KINDS, listFeedback } from "@/application/feedback";
+import { usageSummary } from "@/application/usage";
+import { Button } from "@/ui/button";
 import { listAccounts } from "@/application/admin";
 import { listSignupInvitations } from "@/application/invitations";
 import { mailDeps } from "@/server/accounts";
@@ -21,8 +25,8 @@ export const metadata = { title: "Administration" };
 const dateFmt = (iso: string) => new Date(iso).toLocaleDateString("fr-CH", { timeZone: "Europe/Zurich", day: "numeric", month: "short", year: "numeric" });
 
 /**
- * Administration de l'instance : invitations, comptes, Pingen par foyer. Aucune donnée de foyer
- * n'y apparaît (ni personnes, ni contrats, ni montants).
+ * Administration de l'instance : chiffres d'usage, invitations, comptes, avis, Pingen par foyer.
+ * Aucune donnée de foyer n'y apparaît (ni personnes, ni contrats, ni montants).
  */
 export default async function AdminPage() {
   const scope = await pageScope();
@@ -32,6 +36,9 @@ export default async function AdminPage() {
   const invitations = listSignupInvitations(db(), scope);
   const mail = mailDeps() !== null;
   const pingen = pingenClient() !== null;
+  const usage = usageSummary(db(), scope);
+  const feedback = listFeedback(db(), scope);
+  const unread = feedback.filter((f) => !f.read).length;
 
   return (
     <Page wide>
@@ -41,6 +48,43 @@ export default async function AdminPage() {
           Sans SMTP_URL et APP_URL, les inscrits ne confirment pas leur adresse et ne peuvent pas réinitialiser leur mot de passe eux-mêmes. Voir le README.
         </Alert>
       )}
+
+      <Section title="En chiffres">
+        <Card className="space-y-4">
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Comptes ouverts" value={usage.accountsActive} />
+            <Stat label="Comptes créés en tout" value={usage.accountsCreated} />
+            <Stat label="Foyers" value={usage.households} />
+            <Stat label="Courriers envoyés en tout" value={usage.lettersSent} />
+          </dl>
+          {usage.years.length > 0 && (
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Rituels par année</caption>
+              <thead className="text-muted">
+                <tr>
+                  <th scope="col" className="py-1 font-medium">Année</th>
+                  <th scope="col" className="py-1 font-medium">Rituels</th>
+                  <th scope="col" className="py-1 font-medium">Clôturés</th>
+                  <th scope="col" className="py-1 font-medium">Courriers préparés</th>
+                  <th scope="col" className="py-1 font-medium">Envoyés</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {usage.years.map((y) => (
+                  <tr key={y.year}>
+                    <th scope="row" className="py-1.5 font-medium">{y.year}</th>
+                    <td>{y.reviews}</td>
+                    <td>{y.closed}</td>
+                    <td>{y.letters}</td>
+                    <td>{y.lettersSent}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="text-xs text-muted">Des totaux seulement : rien ne permet de suivre un compte. Les rituels et courriers comptent les foyers encore présents ; les cumuls survivent aux suppressions.</p>
+        </Card>
+      </Section>
 
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
         <Section title="Inviter un foyer">
@@ -117,6 +161,54 @@ export default async function AdminPage() {
           </ul>
         </Section>
       </div>
+
+      <Section title={unread ? `Avis reçus (${unread} non lu${unread > 1 ? "s" : ""})` : "Avis reçus"}>
+        <div id="avis" className="scroll-mt-4">
+          {feedback.length === 0 ? (
+            <p className="rounded-xl bg-surface p-3 text-sm text-muted shadow-card">Aucun avis pour le moment.</p>
+          ) : (
+            <ul className="space-y-3">
+              {feedback.map((f) => (
+                <li key={f.id}>
+                  <Card className={f.read ? "space-y-2 opacity-75" : "space-y-2 border-primary/40"}>
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <Badge tone={f.kind === "PROBLEM" ? "increase" : f.kind === "IDEA" ? "primary" : "neutral"}>{FEEDBACK_KINDS[f.kind]}</Badge>
+                      <span className="text-muted">
+                        {dateFmt(f.createdAt)} · {f.email ?? "compte sans courriel"}
+                        {f.page ? ` · depuis ${f.page}` : ""}
+                      </span>
+                    </div>
+                    <p className="whitespace-pre-line break-words">{f.message}</p>
+                    <form action={markFeedbackAction} className="flex flex-wrap gap-2">
+                      <input type="hidden" name="id" value={f.id} />
+                      <Button name="action" value={f.read ? "unread" : "read"} variant="secondary" size="sm">
+                        {f.read ? "Marquer non lu" : "Marquer lu"}
+                      </Button>
+                      {f.email && (
+                        <Button asChild variant="ghost" size="sm">
+                          <a href={`mailto:${f.email}?subject=${encodeURIComponent("Votre avis sur Primes LAMal")}`}>Répondre</a>
+                        </Button>
+                      )}
+                      <Button name="action" value="delete" variant="ghost" size="sm" className="text-increase">
+                        Supprimer
+                      </Button>
+                    </form>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Section>
     </Page>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl bg-surface-2 p-3">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="text-2xl font-bold">{value}</dd>
+    </div>
   );
 }

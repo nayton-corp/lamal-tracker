@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 import { generateFixtures, FIXTURES_DIR } from "../fixtures/generate";
 import { writePolicyPdf } from "../fixtures/policy-pdf";
-import { ADMIN_EMAIL, currentTotp, login, PASSWORD, saveAdminSecrets } from "./helpers";
+import { ADMIN_EMAIL, currentTotp, expectAccessible, login, PASSWORD, saveAdminSecrets } from "./helpers";
 
 const shots = path.join("test-results", "screens");
 const shot = (page: Page, name: string) => page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: true });
@@ -60,6 +60,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByRole("navigation", { name: "Navigation principale" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /juste prix/ })).toBeVisible();
   await shot(page, "01-accueil-vide");
+  await expectAccessible(page);
   await page.getByRole("button", { name: /Pour mon foyer/ }).click();
 
   await expect(page.getByRole("heading", { name: "Où habite votre foyer ?" })).toBeVisible();
@@ -78,6 +79,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await importFile(page, "primes-2026.xlsx", 2026);
   await importFile(page, "primes-2027.xlsx", 2027);
   await shot(page, "02-donnees");
+  await expectAccessible(page);
 
   // Personnes, puis contrat 2026 par la saisie guidée (la prime officielle est retrouvée).
   await page.goto("/bienvenue?etape=membres");
@@ -91,6 +93,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Les contrats actuels" })).toBeVisible();
   await expect(page.getByRole("radio", { name: /Importer la police/ })).toBeVisible();
   await shot(page, "03a-contrats");
+  await expectAccessible(page);
   await page.getByRole("radio", { name: /Saisie guidée/ }).click();
   await page.getByLabel("Rechercher une caisse").fill("hels");
   await page.getByRole("button", { name: "Helsana", exact: true }).click();
@@ -131,6 +134,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await lca.getByRole("button", { name: "Enregistrer la complémentaire" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await shot(page, "04-personne");
+  await expectAccessible(page);
 
   // Rituel 2027 : reconduction, stratégie, besoins, comparaison
   await page.getByRole("link", { name: "Rituel" }).click();
@@ -138,14 +142,17 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   // Le tarif renommé entre 2026 et 2027 est retrouvé sans rien demander.
   await expect(page.getByText("Produit à préciser")).toHaveCount(0);
   await shot(page, "05-rituel");
+  await expectAccessible(page);
   await page.getByRole("link", { name: "Choisir ma stratégie" }).first().click();
   await expect(page.getByRole("heading", { name: "Quelle stratégie ?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Maintien" })).toBeVisible();
   await shot(page, "05b-strategie");
+  await expectAccessible(page);
   await page.getByRole("button", { name: "Choisir « Économie max »" }).click();
   await expect(page.getByRole("heading", { name: "Votre besoin" })).toBeVisible();
   await page.getByRole("radio", { name: /Quelques consultations/ }).check();
   await shot(page, "05c-besoins");
+  await expectAccessible(page);
   await page.getByRole("button", { name: "Comparer les offres" }).click();
 
   // Comparateur : renouvellement connu, top 3 de la stratégie, choisir la meilleure offre
@@ -153,6 +160,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Top 3 · Économie max/ })).toBeVisible();
   await expect(page.getByText("Selon chaque stratégie")).toBeVisible();
   await shot(page, "06-comparateur");
+  await expectAccessible(page);
   await page.getByRole("button", { name: "Simulateur de franchise" }).click();
   await expect(page.getByText("Quelle franchise ?")).toBeVisible();
   await shot(page, "07-simulateur");
@@ -183,6 +191,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText("Ne résiliez jamais votre LCA par erreur")).toBeVisible();
   await expect(page.getByText("Hospitalisation demi-privée", { exact: true }).first()).toBeVisible();
   await shot(page, "08-lca");
+  await expectAccessible(page);
   const confirm = page.getByRole("button", { name: "J'ai compris, confirmer" });
   await expect(confirm).toBeDisabled();
   await page.getByText(/Seule l'assurance de base de Alex/).click();
@@ -222,6 +231,11 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByRole("img", { name: "Signature de Alex" })).toBeVisible();
   await page.getByRole("button", { name: "Préparer tous les courriers" }).click();
   await expect(page.getByText("2 courrier(s) prêt(s).")).toBeVisible();
+  // Envoi papier guidé : date limite, signatures, recommandé, numéro de suivi.
+  await page.getByText("Comment envoyer en recommandé").click();
+  await expect(page.getByText(/À poster au plus tard le lundi 23 novembre 2026/)).toBeVisible();
+  await expect(page.getByText(/Signez à la main/)).toBeVisible();
+  await expectAccessible(page);
   await expect(page.getByText(/avec offre de complémentaires/)).toBeVisible();
   const offerHref = await page.getByRole("link", { name: "Ouvrir le PDF" }).first().getAttribute("href");
   expect(offerHref).toMatch(/\/api\/offers\/\d+\/pdf/);
@@ -280,8 +294,10 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText("Économisé grâce aux rituels")).toBeVisible();
   await expect(page.getByText("Parcours de chaque personne")).toBeVisible();
   await shot(page, "10-historique");
+  await expectAccessible(page);
   await page.goto("/");
   await shot(page, "11-accueil");
+  await expectAccessible(page);
 });
 
 test.describe("sur ordinateur", () => {
@@ -373,4 +389,5 @@ test("recommencer à zéro, puis une personne seule depuis sa police PDF", async
   // Libellés au singulier en mode solo.
   await expect(page.getByRole("navigation", { name: "Navigation principale" }).getByRole("link", { name: "Moi" })).toBeVisible();
   await shot(page, "s03-accueil-solo");
+  await expectAccessible(page);
 });

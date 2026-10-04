@@ -14,7 +14,7 @@ const items = (solo: boolean) => [
 ];
 
 /** Pages plein écran : connexion et accueil guidé, sans barre de navigation. */
-const BARE = /^\/(login|bienvenue|inscription|verifier|confidentialite|compte\/passkey)(\/|$)/;
+const BARE = /^\/(login|bienvenue|inscription|verifier|presentation|compte\/passkey)(\/|$)/;
 
 function useActive() {
   const pathname = usePathname();
