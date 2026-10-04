@@ -116,5 +116,8 @@ export function accountExists(): boolean {
 /** Chemin de retour après connexion : seulement un chemin local. */
 export function safeNext(next: unknown): string {
   const s = String(next ?? "");
-  return /^\/(?![/\\])/.test(s) ? s : "/";
+  // Les navigateurs ignorent tabulations et retours à la ligne : « /\t/site.ch » mène ailleurs.
+  if (!/^\/(?![/\\])/.test(s) || /[\u0000-\u0020\u007f\\]/.test(s)) return "/";
+  const url = new URL(s, "http://app.invalid");
+  return url.origin === "http://app.invalid" ? url.pathname + url.search + url.hash : "/";
 }

@@ -24,7 +24,11 @@ ENV NODE_ENV=production \
     DATABASE_PATH=/data/lamal.db \
     MIGRATIONS_DIR=/app/drizzle
 # Node embarque ses certificats racines et les fuseaux horaires (ICU) : pas de paquet système requis.
-RUN mkdir -p /data && chown node:node /data
+# Correctifs Debian du jour ; npm et corepack, inutiles pour servir l'app, sont retirés (moins de
+# code exposé, et le scan Trivy de la CI ne bloque pas sur leurs dépendances).
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+ && mkdir -p /data && chown node:node /data
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --chown=node:node scripts/entrypoint.sh ./entrypoint.sh
 USER node

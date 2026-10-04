@@ -48,7 +48,7 @@ export function MfaForm({ next }: { next: string }) {
   );
 }
 
-export function CreatePasswordForm({ askEmail }: { askEmail: boolean }) {
+export function CreatePasswordForm({ askEmail, askSetupCode }: { askEmail: boolean; askSetupCode: boolean }) {
   const [state, action] = useActionState(createPasswordAction, null);
   const fe = state?.fieldErrors ?? {};
   return (
@@ -61,6 +61,11 @@ export function CreatePasswordForm({ askEmail }: { askEmail: boolean }) {
         <input type="hidden" name="username" autoComplete="username" value="administrateur" />
       )}
       <NewPasswordFields errors={fe} autoFocus={!askEmail} />
+      {askSetupCode && (
+        <Field label="Code d'installation" htmlFor="setup" error={fe.setup} hint="La valeur de SETUP_TOKEN dans la configuration du serveur.">
+          <Input id="setup" name="setup" type="password" autoComplete="off" required />
+        </Field>
+      )}
       <FormError message={state?.error} />
       <SubmitButton block pendingLabel="Enregistrement…">{askEmail ? "Créer le compte" : "Enregistrer le mot de passe"}</SubmitButton>
     </form>

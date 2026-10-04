@@ -38,6 +38,13 @@ test("présentation publique et pages légales, accessibles sans compte", async 
   await expect(page).toHaveURL(/\/login/);
   await expectAccessible(page);
 
+  // Politique de contenu stricte (scripts à nonce) et adresse de signalement des failles.
+  const login = await page.request.get("/login");
+  expect(login.headers()["content-security-policy"]).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
+  expect(login.headers()["permissions-policy"]).toContain("camera=()");
+  const securityTxt = await page.request.get("/.well-known/security.txt");
+  expect(await securityTxt.text()).toContain("Contact: mailto:securite@e2e.test");
+
   // Une page privée sans session mène toujours à la connexion, avec retour prévu.
   await page.goto("/foyer");
   await expect(page).toHaveURL(/\/login\?next=%2Ffoyer/);

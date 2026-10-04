@@ -38,6 +38,71 @@ jobs:
             test-results/
             playwright-report/
           retention-days: 7
+      # Scan ZAP passif des pages publiques, sur la base laissée par les tests e2e (comptes existants).
+      # Tout nouvel avertissement bloque ; les avertissements connus sont justifiés dans .zap/rules.tsv.
+      - name: Démarrage du serveur pour ZAP
+        run: |
+          DATABASE_PATH="$PWD/.e2e/e2e.db" MIGRATIONS_DIR="$PWD/drizzle" DISABLE_SCHEDULER=true HIBP_DISABLED=true \
+            CONTACT_EMAIL=securite@e2e.test PORT=3200 HOSTNAME=127.0.0.1 nohup node .next/standalone/server.js > zap-server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3200/api/health && exit 0; sleep 1; done
+          cat zap-server.log; exit 1
+      - uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://127.0.0.1:3200
+          rules_file_name: .zap/rules.tsv
+          cmd_options: -m 2 -I
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: zap
+
+  securite:
+    # Dépendances de production sans faille haute ni critique connue ; aucun secret dans l'historique.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm audit --prod --audit-level high
+      - name: Recherche de secrets (TruffleHog)
+        run: docker run --rm -v "$PWD:/repo:ro" trufflesecurity/trufflehog:3.90.8 git file:///repo --results=verified,unknown --fail --no-update
+
+  image:
+    # Image amd64 construite comme en production, puis scannée par Trivy (failles hautes et
+    # critiques corrigibles). L'image multi-architecture n'est publiée qu'après la CI, sur main.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: lamal-tracker:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Scan Trivy
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.67.2 image \
+            --db-repository mirror.gcr.io/aquasec/trivy-db --skip-java-db-update --scanners vuln \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 lamal-tracker:ci
+      - name: Conteneur en lecture seule, utilisateur non root
+        run: |
+          mkdir -p "$RUNNER_TEMP/data" && sudo chown 1000:1000 "$RUNNER_TEMP/data"
+          docker run -d --name ci --read-only --tmpfs /tmp --tmpfs /app/.next/cache --cap-drop ALL \
+            --security-opt no-new-privileges -v "$RUNNER_TEMP/data:/data" -e HIBP_DISABLED=true lamal-tracker:ci
+          for i in $(seq 1 30); do
+            if docker exec ci node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              test "$(docker exec ci id -u)" = 1000 && exit 0
+            fi
+            sleep 2
+          done
+          docker logs ci; exit 1
 
   real-ofsp-data:
     # Vérifie l'import sur le VRAI fichier de primes publié par l'OFSP (format, colonnes, codes).

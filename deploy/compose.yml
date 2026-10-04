@@ -1,0 +1,90 @@
+# Serveur public (VPS suisse) : production, staging, HTTPS et sauvegarde continue.
+# Mode d'emploi complet : docs/mise-en-ligne.md. Rien de secret ici : les valeurs sont dans
+# .env (variables de ce fichier), prod.env, staging.env, backup.env et secrets/ (chmod 600).
+name: primes-lamal
+
+x-app: &app
+  restart: unless-stopped
+  # Racine en lecture seule, aucun privilège : seul le volume de données est inscriptible.
+  read_only: true
+  tmpfs:
+    - /tmp
+    - /app/.next/cache
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  mem_limit: 768m
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?définissez DOMAIN dans .env}
+      STAGING_DOMAIN: ${STAGING_DOMAIN:?définissez STAGING_DOMAIN dans .env}
+      ACME_EMAIL: ${ACME_EMAIL:?définissez ACME_EMAIL dans .env}
+      STAGING_AUTH_USER: ${STAGING_AUTH_USER:-nathan}
+      STAGING_AUTH_HASH: ${STAGING_AUTH_HASH:?définissez STAGING_AUTH_HASH dans .env (caddy hash-password)}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [app, staging]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  app:
+    <<: *app
+    image: ghcr.io/nayton-corp/lamal-tracker:${APP_TAG:?définissez APP_TAG dans .env (ex. sha-1a2b3c4)}
+    env_file: prod.env
+    environment:
+      DATABASE_PATH: /data/lamal.db
+      MASTER_KEY_FILE: /run/secrets/master_key
+      TRUSTED_PROXY_HOPS: "1"
+    secrets: [master_key]
+    volumes:
+      - ./data/prod:/data
+
+  staging:
+    <<: *app
+    image: ghcr.io/nayton-corp/lamal-tracker:${STAGING_TAG:-latest}
+    env_file: staging.env
+    environment:
+      DATABASE_PATH: /data/lamal.db
+      MASTER_KEY_FILE: /run/secrets/staging_master_key
+      TRUSTED_PROXY_HOPS: "1"
+    secrets: [staging_master_key]
+    mem_limit: 512m
+    volumes:
+      - ./data/staging:/data
+
+  # Réplique la base de production en continu, chiffrée (age), vers un stockage objet suisse.
+  litestream:
+    image: litestream/litestream:0.3.13
+    restart: unless-stopped
+    command: ["replicate"]
+    env_file: backup.env
+    volumes:
+      - ./data/prod:/data
+      - ./litestream.yml:/etc/litestream.yml:ro
+    depends_on: [app]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+secrets:
+  master_key:
+    file: ./secrets/master_key
+  staging_master_key:
+    file: ./secrets/staging_master_key
+
+volumes:
+  caddy-data:
+  caddy-config:

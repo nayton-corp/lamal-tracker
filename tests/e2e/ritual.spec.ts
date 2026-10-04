@@ -29,6 +29,17 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByLabel("Votre courriel").fill(ADMIN_EMAIL);
   await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Confirmer").fill(PASSWORD);
+  if (!process.env.E2E_BASE_URL) {
+    // Sans le code d'installation du serveur, personne ne prend la place de l'administrateur.
+    await page.getByLabel("Code d'installation").fill("mauvais-code");
+    await page.getByRole("button", { name: "Créer le compte" }).click();
+    await expect(page.getByText("Code d'installation incorrect.")).toBeVisible();
+    // Le formulaire est vidé après chaque envoi : tout est ressaisi.
+    await page.getByLabel("Votre courriel").fill(ADMIN_EMAIL);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+    await page.getByLabel("Confirmer").fill(PASSWORD);
+    await page.getByLabel("Code d'installation").fill("code-installation-e2e");
+  }
   await page.getByRole("button", { name: "Créer le compte" }).click();
 
   // L'administrateur protège d'abord son compte d'un second facteur : rien d'autre n'est accessible.

@@ -177,6 +177,8 @@ export type LoginOutcome =
   | { kind: "mfa"; userId: number }
   /** Mot de passe correct, courriel pas encore confirmé. */
   | { kind: "unverified"; userId: number }
+  /** Mot de passe correct, mais administrateur protégé par une passkey seule : elle est exigée. */
+  | { kind: "passkey" }
   | { kind: "refused"; lockedSeconds: number };
 
 /**
@@ -203,6 +205,8 @@ export function login(db: Db, input: { email: string; password: string }, option
   }
   if (options.mailEnabled && user.email && !user.emailVerifiedAt) return { kind: "unverified", userId: user.id };
   if (user.totpEnabledAt) return { kind: "mfa", userId: user.id };
+  // Le second facteur de l'administrateur est sa passkey : le mot de passe seul ne suffit pas.
+  if (user.role === "ADMIN" && adminFactorRequired() && hasStrongFactor(db, user.id)) return { kind: "passkey" };
   return { kind: "ok", userId: user.id };
 }
 
@@ -222,12 +226,14 @@ export function hasStrongFactor(db: Db, userId: number): boolean {
   return db.select({ id: passkey.id }).from(passkey).where(eq(passkey.userId, userId)).limit(1).get() !== undefined;
 }
 
+const adminFactorRequired = (env: Record<string, string | undefined> = process.env) => env.ADMIN_REQUIRE_2FA !== "false";
+
 /**
  * L'administrateur doit protéger son compte d'un second facteur (passkey ou TOTP) avant d'utiliser
  * l'app. ADMIN_REQUIRE_2FA=false lève l'obligation (instance strictement personnelle).
  */
 export function adminNeedsFactor(db: Db, userId: number, env: Record<string, string | undefined> = process.env): boolean {
-  if (env.ADMIN_REQUIRE_2FA === "false") return false;
+  if (!adminFactorRequired(env)) return false;
   const user = db.select({ role: appUser.role }).from(appUser).where(eq(appUser.id, userId)).get();
   return user?.role === "ADMIN" && !hasStrongFactor(db, userId);
 }

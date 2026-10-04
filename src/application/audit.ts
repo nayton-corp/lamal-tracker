@@ -32,11 +32,15 @@ export const AUDIT_LABELS = {
   ACCOUNT_DISABLED: "Compte suspendu par l'administrateur",
   ACCOUNT_ENABLED: "Compte réactivé par l'administrateur",
   DATA_EXPORTED: "Données téléchargées",
+  BACKUP_DOWNLOADED: "Sauvegarde complète de l'instance téléchargée",
   ACCOUNT_DELETED: "Compte supprimé",
   HOUSEHOLD_DELETED: "Foyer supprimé",
   OWNER_TRANSFERRED: "Vous êtes désormais propriétaire du foyer",
   INACTIVITY_NOTICE: "Rappel avant suppression pour inactivité",
   LETTER_SENT: "Lettre confiée à Pingen",
+  PINGEN_SETTING_CHANGED: "Envoi par Pingen autorisé ou retiré pour un foyer",
+  INVITE_REVOKED: "Invitation révoquée",
+  FEEDBACK_DELETED: "Avis supprimé",
 } as const;
 
 export type AuditKind = keyof typeof AUDIT_LABELS;

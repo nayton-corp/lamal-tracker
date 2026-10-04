@@ -46,6 +46,9 @@ export default defineConfig({
             MAIL_DIR: path.join(E2E_DIR, "mail"),
             APP_URL: `http://localhost:${PORT}`,
             HIBP_DISABLED: "true",
+            // Code exigé pour créer le compte administrateur (serveur exposé avant sa première connexion).
+            SETUP_TOKEN: "code-installation-e2e",
+            CONTACT_EMAIL: "securite@e2e.test",
             PINGEN_CLIENT_ID: "client-test",
             PINGEN_CLIENT_SECRET: "secret-test",
             PINGEN_ORGANISATION_ID: "org-test",

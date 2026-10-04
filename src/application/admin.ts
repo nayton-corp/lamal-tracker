@@ -94,4 +94,5 @@ export function setPingenAllowed(db: Db, scope: Scope, householdId: number, allo
     .values({ householdId, key: PINGEN_KEY, value: allowed })
     .onConflictDoUpdate({ target: [householdSetting.householdId, householdSetting.key], set: { value: allowed } })
     .run();
+  audit(db, scope.userId, "PINGEN_SETTING_CHANGED", { householdId, detail: allowed ? "autorisé" : "retiré" });
 }

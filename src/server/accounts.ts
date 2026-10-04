@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import type { MailDeps } from "@/application/account-mail";
 import type { AccountDeps } from "@/application/account";
@@ -14,6 +15,30 @@ import { consume } from "@/infrastructure/rate-limit";
  */
 
 const globalForMail = globalThis as unknown as { __mailer?: { key: string; mailer: Mailer | null } };
+
+/**
+ * Code d'installation (SETUP_TOKEN) : exigé pour créer le compte administrateur ou redéfinir son
+ * mot de passe, tant qu'un serveur exposé attend sa première connexion. Null s'il n'est pas défini.
+ */
+export function setupToken(): string | null {
+  return process.env.SETUP_TOKEN?.trim() || null;
+}
+
+/**
+ * Instance publiée en HTTPS : le code d'installation y est obligatoire, sinon le premier venu
+ * créerait le compte administrateur (ou redéfinirait son mot de passe après un oubli).
+ */
+export function setupTokenMissing(): boolean {
+  return setupToken() === null && (process.env.APP_URL?.trim().startsWith("https://") ?? false);
+}
+
+/** Saisie conforme au code d'installation (comparaison à temps constant) ; sans code, vrai sur une instance locale. */
+export function setupCodeMatches(input: FormDataEntryValue | null): boolean {
+  const expected = setupToken();
+  if (expected === null) return !setupTokenMissing();
+  const digest = (v: string) => createHash("sha256").update(v).digest();
+  return timingSafeEqual(digest(String(input ?? "").trim()), digest(expected));
+}
 
 /** Adresse publique de l'app (APP_URL), sans barre finale ; null si elle n'est pas configurée. */
 export function appUrl(): string | null {
@@ -43,15 +68,31 @@ export function accountDeps(): AccountDeps {
 }
 
 /**
- * Adresse IP du client. Next ajoute l'adresse de la connexion à la fin de X-Forwarded-For ; chaque
- * mandataire de confiance devant l'app (TRUSTED_PROXY_HOPS, 1 derrière Caddy) en ajoute une. On
- * prend l'entrée posée par le dernier mandataire de confiance : les précédentes sont falsifiables.
+ * Adresse IP du client, pour les limites de débit. Next ne pose X-Forwarded-For que s'il manque :
+ * sans mandataire devant l'app, l'en-tête vient du client et ne prouve rien, d'où une clé unique.
+ * Chaque mandataire de confiance (TRUSTED_PROXY_HOPS, 1 derrière Caddy, qui écrase l'en-tête
+ * reçu) ajoute une entrée à droite : on prend celle du plus éloigné d'entre eux. Une adresse IPv6
+ * est ramenée à son préfixe /64, que le client contrôle en entier.
  */
-export async function clientIp(): Promise<string> {
-  const forwarded = (await headers()).get("x-forwarded-for") ?? "";
+export function clientIpFrom(forwarded: string, hops: number): string {
+  if (hops <= 0) return "directe";
   const parts = forwarded.split(",").map((p) => p.trim()).filter(Boolean);
-  const hops = Math.max(0, Number(process.env.TRUSTED_PROXY_HOPS ?? 0) || 0);
-  return parts[Math.max(0, parts.length - 1 - hops)] ?? "inconnue";
+  const ip = parts[parts.length - hops];
+  if (!ip) return "inconnue";
+  return ip.includes(":") ? ipv6Prefix(ip) : ip;
+}
+
+function ipv6Prefix(ip: string): string {
+  const [head, tail = ""] = ip.toLowerCase().replace(/^\[|\]$/g, "").split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = ip.includes("::") ? [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right] : left;
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
+
+export async function clientIp(): Promise<string> {
+  const hops = Math.max(0, Math.floor(Number(process.env.TRUSTED_PROXY_HOPS ?? 0)) || 0);
+  return clientIpFrom((await headers()).get("x-forwarded-for") ?? "", hops);
 }
 
 const TOO_MANY = "Trop de tentatives : réessayez dans quelques minutes.";
@@ -90,7 +131,9 @@ export const cookieNames = (name: string) => [`__Host-${name}`, name];
 
 export async function readCookie(name: string): Promise<string | undefined> {
   const jar = await cookies();
-  for (const n of cookieNames(name)) {
+  // En HTTPS, seul le cookie préfixé compte : un cookie simple a pu être posé par un sous-domaine.
+  const names = (await isSecureRequest()) ? [`__Host-${name}`] : cookieNames(name);
+  for (const n of names) {
     const value = jar.get(n)?.value;
     if (value) return value;
   }

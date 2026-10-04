@@ -174,11 +174,11 @@ export default async function DataPage() {
           {scope.admin && (
           <Section title="Sauvegarde">
             <Card className="space-y-3">
-              <p className="text-sm text-muted">Une copie de toute la base, tous foyers compris. Gardez-la ailleurs, par exemple sur une clé USB. Les signatures y sont chiffrées : pour les relire après une restauration, il faut aussi la clé maître (voir le README).</p>
+              <p className="text-sm text-muted">Une copie de toute la base, tous foyers compris, après confirmation de votre identité.</p>
               <Button asChild variant="secondary" block>
-                <a href="/api/backup" download={`primes-lamal-${today()}.db`}>
+                <Link href="/compte/donnees#sauvegarde">
                   <Download aria-hidden className="size-4" /> Télécharger une sauvegarde
-                </a>
+                </Link>
               </Button>
             </Card>
           </Section>
