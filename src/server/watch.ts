@@ -1,4 +1,7 @@
 import "server-only";
+import fs from "node:fs";
+import path from "node:path";
+import { opsTick } from "@/application/ops";
 import { reminderTick } from "@/application/reminders";
 import { getSetting, setSetting } from "@/infrastructure/db/settings";
 import { householdKey, notify } from "@/infrastructure/push/push";
@@ -136,7 +139,39 @@ export async function schedulerTick(): Promise<void> {
   } catch (error) {
     console.error("[watch] comptes inactifs", error instanceof Error ? error.message : error);
   }
+  try {
+    const sent = await opsTick(db(), { mail: mailDeps(), disk: dataDisk }, nowIso());
+    if (sent.length) console.warn(`[watch] alertes d'exploitation envoyées : ${sent.join(", ")}`);
+  } catch (error) {
+    console.error("[watch] alertes", error instanceof Error ? error.message : error);
+  }
   // Ménage : jetons expirés, journal de sécurité de plus de 12 mois.
   purgeExpiredTokens(db(), nowIso());
   purgeAudit(db(), nowIso());
+}
+
+/** Espace libre du volume qui contient la base. */
+function dataDisk(): { free: number; total: number } | null {
+  try {
+    const dir = path.dirname(db().$client.name);
+    const st = fs.statfsSync(dir);
+    return { free: st.bavail * st.bsize, total: st.blocks * st.bsize };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Signal de vie du planificateur (HEALTHCHECK_PING_URL, service de type healthchecks.io) : s'il
+ * cesse, l'app ou ses tâches de fond sont arrêtées et le service prévient l'exploitant.
+ */
+export async function pingHeartbeat(ok: boolean): Promise<void> {
+  const url = process.env.HEALTHCHECK_PING_URL?.trim();
+  if (!url) return;
+  try {
+    await fetch(ok ? url : `${url.replace(/\/$/, "")}/fail`, { method: "POST", signal: AbortSignal.timeout(10_000) });
+  } catch {
+    // Le service de surveillance est injoignable : il le signalera lui-même par l'absence de ping.
+    console.warn("[watch] signal de vie non transmis");
+  }
 }

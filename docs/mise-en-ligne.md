@@ -1,0 +1,230 @@
+# Mise en ligne sur un serveur suisse
+
+Ce guide installe l'app sur un petit serveur virtuel (VPS) en Suisse, avec :
+
+- la **production** sur `https://primes.exemple.ch` et un **staging** protégé par mot de passe sur
+  `https://staging.primes.exemple.ch`, chacun avec sa base et sa clé maître ;
+- **HTTPS** automatique (Caddy, Let's Encrypt), HSTS, aucun journal d'accès ;
+- une **sauvegarde continue** de la base (Litestream), **chiffrée sur le serveur** (age) avant
+  d'être envoyée vers un stockage objet suisse : copie complète chaque jour, gardée 30 jours ;
+- un **test de restauration quotidien** automatique, et des alertes sur le téléphone ;
+- des conteneurs sans privilèges, racine en lecture seule, accès SSH par clé uniquement.
+
+Tout se trouve dans [`deploy/`](../deploy). Comptez une soirée la première fois.
+
+## 1. Ce qu'il faut commander
+
+| Quoi | Exemple | Remarque |
+|---|---|---|
+| Serveur | Infomaniak VPS Lite (1 vCPU, 2 Go, 20 Go), Debian 12 ou Ubuntu 24.04 | Activez le chiffrement du disque s'il est proposé. Ajoutez votre **clé SSH publique** à la commande. |
+| Nom de domaine | `exemple.ch` chez Infomaniak, Gandi, Hostpoint… | Deux sous-domaines : l'app et le staging. |
+| Courriel transactionnel | Infomaniak (SMTP de l'hébergement mail), Brevo, Mailjet, Scaleway TEM | Prestataire suisse ou européen. Domaine authentifié : SPF, DKIM, DMARC. |
+| Stockage objet (S3) | Infomaniak Swiss Backup / Object Storage, Exoscale SOS (Genève, Zurich) | Un compartiment (bucket) dédié, avec une clé d'accès qui ne sert qu'à lui. |
+| Alertes | [healthchecks.io](https://healthchecks.io) (gratuit jusqu'à 20 contrôles) | Application mobile ou SMS. |
+
+## 2. DNS
+
+Chez le registraire du domaine (remplacez l'adresse par celle du VPS) :
+
+```
+primes.exemple.ch.           A     203.0.113.10
+staging.primes.exemple.ch.   A     203.0.113.10
+primes.exemple.ch.           AAAA  2001:db8::10      (si le VPS a une IPv6)
+staging.primes.exemple.ch.   AAAA  2001:db8::10
+```
+
+Pour le courriel, le prestataire donne ses propres valeurs ; elles ressemblent à :
+
+```
+exemple.ch.          TXT   "v=spf1 include:spf.prestataire.ch -all"
+xxx._domainkey       TXT   (clé DKIM fournie par le prestataire)
+_dmarc.exemple.ch.   TXT   "v=DMARC1; p=quarantine; rua=mailto:dmarc@exemple.ch"
+```
+
+Vérifiez avec [mail-tester.com](https://www.mail-tester.com) une fois l'app lancée (*Mot de passe
+oublié* vers l'adresse de test) : visez 9/10 ou plus.
+
+## 3. Préparer le serveur (une fois)
+
+Depuis votre ordinateur, copiez le dossier `deploy/` puis lancez la préparation :
+
+```sh
+scp -r deploy debian@203.0.113.10:~/
+ssh debian@203.0.113.10
+sudo bash ~/deploy/provision.sh
+```
+
+`provision.sh` met le système à jour, installe Docker (dépôt officiel), le pare-feu (ports 22, 80
+et 443 seulement), fail2ban et les mises à jour de sécurité automatiques (redémarrage à 4 h 30 si
+nécessaire). Il **désactive la connexion SSH par mot de passe et celle de root** : il refuse de
+tourner si votre clé SSH n'est pas déjà installée. Il crée `/opt/primes-lamal`.
+
+Reconnectez-vous (pour le groupe docker), puis :
+
+```sh
+cp -r ~/deploy/. /opt/primes-lamal/
+cd /opt/primes-lamal
+```
+
+## 4. Configuration et secrets
+
+Rien de secret n'est versionné : chaque fichier `*.example` est un modèle à copier.
+
+```sh
+cp env.example .env
+cp prod.env.example prod.env
+cp staging.env.example staging.env
+cp backup.env.example backup.env
+chmod 600 .env prod.env staging.env backup.env
+```
+
+- **`.env`** : domaines, adresse pour Let's Encrypt, versions déployées. Le mot de passe du
+  staging se hache avec `docker run --rm -it caddy:2.10-alpine caddy hash-password` ; collez le
+  résultat **entre apostrophes simples** (`STAGING_AUTH_HASH='$2a$14$…'`), sinon les `$` sont
+  interprétés.
+- **`prod.env`** : `APP_URL`, `CONTACT_EMAIL`, exploitant (mentions légales), `SMTP_URL` et
+  `MAIL_FROM`, `SETUP_TOKEN` (`openssl rand -hex 16`), `HEALTHCHECK_PING_URL`. Voir le README
+  pour chaque variable.
+- **`staging.env`** : les courriels restent dans `data/staging/mail` ; aucun ne part.
+- **Clés maîtres** (chiffrement des signatures et des secrets du double facteur) :
+
+  ```sh
+  openssl rand -base64 32 > secrets/master_key
+  openssl rand -base64 32 > secrets/staging_master_key
+  chmod 600 secrets/*
+  ```
+
+  **Copiez `secrets/master_key` dans votre gestionnaire de mots de passe.** Sans elle, une base
+  restaurée ne relit plus les signatures.
+
+### Sauvegarde chiffrée
+
+1. Créez le compartiment chez le prestataire S3 (Litestream ne le crée pas) et une clé d'accès
+   limitée à ce compartiment.
+2. Créez la paire de clés de chiffrement :
+
+   ```sh
+   docker run --rm alpine sh -c "apk add -q age && age-keygen"
+   ```
+
+   La ligne `# public key: age1…` va dans `BACKUP_AGE_RECIPIENT`, la ligne `AGE-SECRET-KEY-…`
+   dans `BACKUP_AGE_IDENTITY` (le test de restauration quotidien en a besoin sur le serveur).
+   **Gardez aussi la clé privée hors du serveur**, avec la clé maître : si le serveur disparaît,
+   ce sont les deux seules choses nécessaires pour tout récupérer.
+3. Complétez `backup.env` : clé d'accès, compartiment, adresse (endpoint) et région du prestataire.
+
+Le prestataire de stockage ne voit que des fichiers chiffrés.
+
+## 5. Données : instance neuve ou reprise du Raspberry Pi
+
+**Reprendre l'instance du Pi** (votre foyer, vos comptes, votre historique) :
+
+```sh
+# Sur le Pi : arrêter l'app pour une copie cohérente.
+cd ~/lamal-tracker && docker compose stop
+# Copier la base et sa clé maître vers le VPS.
+scp data/lamal.db debian@203.0.113.10:/opt/primes-lamal/data/prod/lamal.db
+scp data/master.key debian@203.0.113.10:/opt/primes-lamal/secrets/master_key
+```
+
+Puis sur le VPS : `sudo chown 1000:1000 data/prod/lamal.db && chmod 600 secrets/master_key`.
+La clé du Pi remplace alors celle générée à l'étape 4 : **c'est elle** qu'il faut garder dans le
+gestionnaire de mots de passe. Les migrations s'appliquent au premier démarrage (copie de la base
+faite juste avant, dans `data/prod/backups`). Gardez le Pi arrêté : deux instances divergeraient.
+
+**Instance neuve** : rien à copier. Au premier passage sur `https://primes.exemple.ch`, l'app
+demande le courriel et le mot de passe de l'administrateur, et le **code d'installation**
+(`SETUP_TOKEN`). Sans `SETUP_TOKEN`, la création est refusée : sur Internet, le premier visiteur
+prendrait la main.
+
+## 6. Démarrer
+
+```sh
+docker compose up -d
+docker compose ps          # tout « healthy » ou « running »
+docker compose logs -f app # Ctrl+C pour quitter
+```
+
+Caddy obtient les certificats en quelques secondes (les ports 80 et 443 doivent être joignables).
+Contrôles :
+
+```sh
+curl -sI https://primes.exemple.ch/login | grep -iE "strict-transport|content-security"
+curl -s https://primes.exemple.ch/api/health                  # {"ok":true}
+curl -s https://primes.exemple.ch/.well-known/security.txt
+curl -sI https://staging.primes.exemple.ch | head -1         # 401 sans mot de passe
+```
+
+Connectez-vous, ajoutez une passkey ou le double facteur (obligatoire pour l'administrateur),
+puis vérifiez que la sauvegarde part : `docker compose logs litestream` doit montrer
+`replicating to`.
+
+## 7. Surveillance et alertes
+
+Créez trois contrôles sur healthchecks.io (période indiquée, tolérance 15 minutes) et notez
+leurs URL de ping :
+
+| Contrôle | Période | Où mettre l'URL | Ce qu'il signale |
+|---|---|---|---|
+| App et tâches de fond | 1 h | `HEALTHCHECK_PING_URL` (prod.env) | l'app ou son planificateur arrêté, ou une tâche de fond en erreur |
+| Chien de garde | 5 min | `WATCHDOG_PING_URL` (.env) | site injoignable de l'extérieur, `/api/health` en erreur (dont une mauvaise clé maître), disque plein à 90 %, sauvegarde arrêtée |
+| Test de restauration | 1 jour | `RESTORE_PING_URL` (.env) | sauvegarde impossible à relire, base corrompue, clé maître qui n'ouvre plus les données |
+
+Installez les minuteries systemd (remplacez `debian` par votre utilisateur) :
+
+```sh
+sudo sed -i "s/REMPLACER_UTILISATEUR/debian/" systemd/*.service
+sudo cp systemd/* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now primes-lamal-watchdog.timer primes-lamal-restore-test.timer
+./restore-test.sh   # premier essai à la main : « Restauration réussie … »
+```
+
+L'app envoie en plus un courriel aux administrateurs (une fois par jour au plus, sans donnée
+personnelle) quand il reste moins de 10 % ou de 1 Go sur le disque des données, ou quand plus de
+30 connexions échouent en une heure. Les erreurs du serveur sont dans `docker compose logs app` ;
+elles ne contiennent ni mot de passe ni donnée de santé.
+
+## 8. Mettre à jour
+
+Chaque commit sur `main` qui passe la CI publie une image `ghcr.io/nayton-corp/lamal-tracker:sha-…`.
+Toujours le staging d'abord :
+
+```sh
+./deploy.sh staging sha-1a2b3c4    # puis contrôle sur https://staging.primes.exemple.ch
+./deploy.sh prod sha-1a2b3c4       # refusé si le staging n'est pas sur la même version
+./deploy.sh rollback               # retour à la version précédente
+```
+
+- Les migrations de schéma s'appliquent au démarrage, après une copie de la base dans
+  `data/prod/backups`. Si une migration échoue, la base n'a pas changé : `rollback` suffit. Si
+  la nouvelle version a déjà écrit dans la base, arrêtez l'app, remettez la copie
+  (`cp data/prod/backups/<fichier> data/prod/lamal.db`), puis `rollback`.
+- **Gel du 16 au 30 novembre** : c'est la période où les foyers envoient leurs résiliations.
+  `deploy.sh prod` refuse alors toute mise en production, sauf correctif urgent (`--urgent`).
+- `docker compose pull caddy litestream && docker compose up -d` met à jour les autres conteneurs.
+
+## 9. Restaurer après un incident
+
+Serveur perdu ou base abîmée, sur un serveur préparé comme aux étapes 3 et 4 (avec **la même clé
+maître** et **la même clé age**) :
+
+```sh
+docker compose stop app
+docker compose run --rm --no-deps -v "$PWD/data/prod:/restore" litestream \
+  restore -config /etc/litestream.yml -o /restore/lamal.db.restauree /data/lamal.db
+mv data/prod/lamal.db data/prod/lamal.db.abimee 2>/dev/null; mv data/prod/lamal.db.restauree data/prod/lamal.db
+sudo chown 1000:1000 data/prod/lamal.db && docker compose up -d
+```
+
+Ajoutez `-timestamp 2026-11-20T08:00:00Z` à `restore` pour revenir à un instant précis des
+30 derniers jours.
+
+## 10. Avant d'inviter les premiers foyers
+
+- [ ] `./restore-test.sh` réussi, et les trois contrôles healthchecks.io au vert.
+- [ ] Clé maître et clé privée age copiées hors du serveur.
+- [ ] Courriel testé (mail-tester ≥ 9/10), lien *Mot de passe oublié* reçu.
+- [ ] Administrateur protégé par une passkey ou le double facteur.
+- [ ] Aucune faille élevée ouverte dans la [revue de sécurité](securite/revue-asvs.md).
+- [ ] Invitations créées dans *Réglages › Administration*.

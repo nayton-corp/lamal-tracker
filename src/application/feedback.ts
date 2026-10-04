@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Db } from "@/infrastructure/db/client";
 import { appUser, feedback } from "@/infrastructure/db/schema";
 import type { MailDeps } from "./account-mail";
+import { audit } from "./audit";
 import { UserError } from "./errors";
 import { requireAdmin, type Scope } from "./scope";
 
@@ -69,8 +70,9 @@ export function listFeedback(db: Db, scope: Scope, limit = 50): FeedbackRow[] {
 /** Lu (ou à relire) ; supprimer efface l'avis. */
 export function markFeedback(db: Db, scope: Scope, id: number, action: "read" | "unread" | "delete", nowIso: string) {
   requireAdmin(scope);
-  if (action === "delete") db.delete(feedback).where(eq(feedback.id, id)).run();
-  else db.update(feedback).set({ readAt: action === "read" ? nowIso : null }).where(eq(feedback.id, id)).run();
+  if (action === "delete") {
+    if (db.delete(feedback).where(eq(feedback.id, id)).run().changes > 0) audit(db, scope.userId, "FEEDBACK_DELETED", { nowIso });
+  } else db.update(feedback).set({ readAt: action === "read" ? nowIso : null }).where(eq(feedback.id, id)).run();
 }
 
 /** Avis du compte, pour la copie de ses données. */

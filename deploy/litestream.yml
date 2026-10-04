@@ -1,0 +1,22 @@
+# Réplication continue de la base de production (WAL) vers un stockage objet compatible S3.
+# Les copies sont chiffrées par age avant de quitter le serveur ; seule la clé privée (gardée hors
+# du serveur, voir docs/mise-en-ligne.md) permet de les relire.
+dbs:
+  - path: /data/lamal.db
+    replicas:
+      - type: s3
+        bucket: ${BACKUP_BUCKET}
+        path: lamal
+        endpoint: ${BACKUP_ENDPOINT}
+        region: ${BACKUP_REGION}
+        force-path-style: true
+        # Un instantané complet par jour, gardé 30 jours ; contrôle toutes les heures.
+        snapshot-interval: 24h
+        retention: 720h
+        retention-check-interval: 1h
+        sync-interval: 10s
+        age:
+          recipients:
+            - ${BACKUP_AGE_RECIPIENT}
+          identities:
+            - ${BACKUP_AGE_IDENTITY}

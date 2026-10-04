@@ -4,11 +4,11 @@ import { appUser, authToken, householdMember, passkey } from "@/infrastructure/d
 import { bumpUsage } from "./usage";
 import { alreadyRegisteredMail, emailChangeMail, passwordResetDoneMail, resetPasswordMail, verifyEmailMail, type MailDeps } from "./account-mail";
 import { audit } from "./audit";
-import { checkNewPassword, closeAllSessions, findUserByEmail, normalizeEmail, setPassword, storedPassword, verifyPassword, type PwnedCheck } from "./auth";
+import { checkNewPassword, closeAllSessions, findUserByEmail, normalizeEmail, setPassword, storedPassword, validatePassword, verifyPassword, type PwnedCheck } from "./auth";
 import { UserError } from "./errors";
 import { claimInvitation, findUsableInvitation } from "./invitations";
-import { recoveryCodesLeft, verifySecondFactor } from "./mfa";
-import { consumeToken, deleteUserTokens, issueToken, peekToken } from "./tokens";
+import { checkSecondFactor, FACTOR_LOCKED, recoveryCodesLeft } from "./mfa";
+import { consumeToken, countAttempt, deleteUserTokens, issueToken, peekToken } from "./tokens";
 
 /*
  * Cycle de vie d'un compte : inscription sur invitation, confirmation du courriel, réinitialisation
@@ -18,6 +18,8 @@ import { consumeToken, deleteUserTokens, issueToken, peekToken } from "./tokens"
 
 const VERIFY_HOURS = 24;
 const RESET_MINUTES = 60;
+/** Codes de double facteur erronés tolérés sur un même lien de réinitialisation. */
+const MAX_RESET_CODE_ATTEMPTS = 5;
 /** Délai minimal entre deux liens de confirmation renvoyés au même compte. */
 const RESEND_MINUTES = 5;
 
@@ -149,10 +151,17 @@ export async function resetPassword(
   if (!row?.userId) throw new UserError(invalid);
   const user = db.select().from(appUser).where(eq(appUser.id, row.userId)).get();
   if (!user || user.disabledAt) throw new UserError(invalid);
-  await checkNewPassword(input.password, deps.pwned);
-  if (user.totpEnabledAt && !verifySecondFactor(db, user.id, input.code ?? "", now.ms, now.iso)) {
-    throw new UserError("Code du double facteur incorrect.");
+  validatePassword(input.password);
+  // Le code d'abord : un lien volé n'offre que quelques essais, puis il disparaît.
+  if (user.totpEnabledAt) {
+    const result = checkSecondFactor(db, user.id, input.code ?? "", now.ms, now.iso);
+    if (result === "locked") throw new UserError(FACTOR_LOCKED);
+    if (result === "wrong") {
+      if (!countAttempt(db, row.id, MAX_RESET_CODE_ATTEMPTS)) throw new UserError(invalid);
+      throw new UserError("Code du double facteur incorrect.");
+    }
   }
+  await checkNewPassword(input.password, deps.pwned);
   if (!consumeToken(db, "RESET_PASSWORD", input.token, now.iso)) throw new UserError(invalid);
   setPassword(db, user.id, input.password);
   closeAllSessions(db, user.id);

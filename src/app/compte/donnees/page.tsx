@@ -66,6 +66,25 @@ export default async function MyDataPage() {
         </Card>
       </Section>
 
+      {scope.admin && (
+        <Section title="Sauvegarde de l'instance">
+          <Card id="sauvegarde" className="scroll-mt-20 space-y-3">
+            <p className="text-sm text-muted">
+              Une copie de toute la base, tous foyers compris. Gardez-la ailleurs, par exemple sur une clé USB. Les signatures y sont chiffrées : pour les relire après une restauration, il faut aussi la clé maître (voir le README).
+            </p>
+            {until ? (
+              <Button asChild variant="secondary" block>
+                <a href="/api/backup" download>
+                  <Download aria-hidden className="size-4" /> Télécharger une sauvegarde
+                </a>
+              </Button>
+            ) : (
+              <p className="text-sm text-muted">Disponible après confirmation.</p>
+            )}
+          </Card>
+        </Section>
+      )}
+
       {owner && (
         <Section title="Journal du foyer">
           <Card>

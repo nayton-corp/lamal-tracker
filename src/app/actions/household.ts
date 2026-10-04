@@ -298,6 +298,8 @@ export async function applyPolicyImportAction(input: ConfirmedImport): Promise<{
     revalidatePath("/", "layout");
     return { ok: `${n} contrat(s) ${input.year} enregistré(s).` };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Enregistrement impossible." };
+    if (e instanceof UserError) return { error: e.message };
+    console.error("[import du contrat]", e);
+    return { error: "Enregistrement impossible : réessayez, ou saisissez les contrats à la main." };
   }
 }

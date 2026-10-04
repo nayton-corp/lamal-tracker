@@ -98,6 +98,7 @@ export function revokeInvitation(db: Db, scope: Scope, id: number, nowIso: strin
   const allowed = row && (row.kind === "SIGNUP" ? scope.admin : row.householdId === scope.householdId && scope.householdRole === "OWNER");
   if (!row || !allowed) throw new NotFoundError("Invitation");
   db.update(invitation).set({ revokedAt: nowIso }).where(eq(invitation.id, id)).run();
+  audit(db, scope.userId, "INVITE_REVOKED", { householdId: row.householdId, nowIso });
 }
 
 /** Invitation utilisable pour ce code (ni expirée, ni révoquée, ni épuisée), ou null. */

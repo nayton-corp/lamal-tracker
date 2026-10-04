@@ -124,6 +124,21 @@ export function openForHousehold(db: Db, householdId: number, sealed: string, co
   }
 }
 
+/**
+ * La clé maître ouvre-t-elle les clés de foyer de cette base ? Null s'il n'y en a encore aucune.
+ * Sert au point de santé : une base restaurée avec la mauvaise clé se voit tout de suite.
+ */
+export function masterKeyMatches(db: Db): boolean | null {
+  const row = db.select().from(householdKey).limit(1).get();
+  if (!row) return null;
+  try {
+    unseal(masterKey(db), row.wrappedKey, `household-key:${row.householdId}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Secret d'un compte (double facteur), chiffré directement par la clé maître. */
 export function sealSecret(db: Db, plaintext: string, context: string): string {
   return seal(masterKey(db), plaintext, context);

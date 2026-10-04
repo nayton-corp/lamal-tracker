@@ -1,0 +1,8 @@
+[Unit]
+Description=Primes LAMal : test de restauration de la sauvegarde
+After=docker.service
+
+[Service]
+Type=oneshot
+User=REMPLACER_UTILISATEUR
+ExecStart=/opt/primes-lamal/restore-test.sh

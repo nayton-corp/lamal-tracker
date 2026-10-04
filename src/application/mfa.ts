@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq, gt, isNull } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
-import { appUser, passkey, recoveryCode } from "@/infrastructure/db/schema";
+import { appUser, auditEvent, passkey, recoveryCode } from "@/infrastructure/db/schema";
 import { totpContext } from "@/infrastructure/crypto/legacy";
 import { openSecret, sealSecret } from "@/infrastructure/crypto/vault";
 import { audit } from "./audit";
@@ -28,6 +28,8 @@ export const RECOVERY_CODE_COUNT = 10;
 const SETUP_MINUTES = 15;
 const LOGIN_MINUTES = 5;
 const MAX_CODE_ATTEMPTS = 5;
+/** Codes erronés tolérés par compte sur 24 heures, toutes étapes confondues ; ensuite, passkey seule. */
+export const MAX_FACTOR_FAILURES_PER_DAY = 10;
 const RECOVERY_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
 const normalizeRecovery = (code: string) => code.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -136,6 +138,31 @@ export function verifySecondFactor(db: Db, userId: number, code: string, nowMs: 
   return true;
 }
 
+/** Trop de codes erronés pour ce compte depuis 24 heures : le double facteur est bloqué. */
+export function secondFactorLocked(db: Db, userId: number, nowIso: string): boolean {
+  const since = new Date(Date.parse(nowIso) - 24 * 3600_000).toISOString();
+  const row = db
+    .select({ n: count() })
+    .from(auditEvent)
+    .where(and(eq(auditEvent.userId, userId), eq(auditEvent.kind, "MFA_FAILED"), gt(auditEvent.createdAt, since)))
+    .get();
+  return (row?.n ?? 0) >= MAX_FACTOR_FAILURES_PER_DAY;
+}
+
+export const FACTOR_LOCKED = "Trop de codes incorrects aujourd'hui : réessayez demain, ou connectez-vous avec une passkey.";
+
+/**
+ * Contrôle d'un code de double facteur, avec limite par compte : un mot de passe ou un lien de
+ * réinitialisation volé ne suffit pas à essayer les codes un par un, quel que soit le nombre de
+ * jetons d'attente ouverts. Chaque échec est journalisé.
+ */
+export function checkSecondFactor(db: Db, userId: number, code: string, nowMs: number, nowIso: string): "ok" | "wrong" | "locked" {
+  if (secondFactorLocked(db, userId, nowIso)) return "locked";
+  if (verifySecondFactor(db, userId, code, nowMs, nowIso)) return "ok";
+  audit(db, userId, "MFA_FAILED", { nowIso });
+  return "wrong";
+}
+
 /** Mot de passe correct, double facteur actif : jeton d'attente à garder dans un cookie. */
 export function startMfaLogin(db: Db, userId: number, nowIso: string): string {
   return issueToken(db, { userId, kind: "LOGIN_MFA", ttlMs: LOGIN_MINUTES * 60_000 }, nowIso);
@@ -150,11 +177,15 @@ export type MfaOutcome = { ok: true; userId: number } | { ok: false; error: stri
 export function finishMfaLogin(db: Db, token: string | undefined, code: string, nowMs: number, nowIso: string): MfaOutcome {
   const row = peekToken(db, "LOGIN_MFA", token, nowIso);
   if (!row?.userId) return { ok: false, error: "Étape expirée : reconnectez-vous.", restart: true };
-  if (verifySecondFactor(db, row.userId, code, nowMs, nowIso)) {
+  const result = checkSecondFactor(db, row.userId, code, nowMs, nowIso);
+  if (result === "ok") {
     consumeToken(db, "LOGIN_MFA", token, nowIso);
     return { ok: true, userId: row.userId };
   }
-  audit(db, row.userId, "MFA_FAILED", { nowIso });
+  if (result === "locked") {
+    consumeToken(db, "LOGIN_MFA", token, nowIso);
+    return { ok: false, error: FACTOR_LOCKED, restart: true };
+  }
   if (!countAttempt(db, row.id, MAX_CODE_ATTEMPTS)) return { ok: false, error: "Trop d'essais : reconnectez-vous.", restart: true };
   return { ok: false, error: "Code incorrect.", restart: false };
 }

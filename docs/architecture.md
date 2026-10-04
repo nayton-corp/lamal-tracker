@@ -98,13 +98,23 @@ Le module est isolé dans `src/application` (`auth.ts`, `account.ts`, `mfa.ts`, 
 - **Second facteur** : passkeys (`@simplewebauthn`, vérification de l'utilisateur exigée ; une
   passkey suffit à se connecter) et TOTP (RFC 6238, `totp.ts`, codes non rejouables) avec dix codes
   de secours. Obligatoire pour l'administrateur (`adminNeedsFactor`, appliqué par le proxy,
-  `pageScope` et `requireAdminScope`).
+  `pageScope` et `requireAdminScope`) ; un administrateur sans TOTP mais avec une passkey ne se
+  connecte pas par mot de passe seul. 10 codes erronés par compte et par 24 h bloquent le TOTP
+  (`checkSecondFactor`), quel que soit le nombre d'étapes ou de liens ouverts.
+- **Installation** : la création du compte administrateur (ou la redéfinition de son mot de passe)
+  exige `SETUP_TOKEN`, obligatoire dès qu'`APP_URL` est en HTTPS.
 - **Jetons** : liens de confirmation (24 h) et de réinitialisation (1 h), étape du double facteur
   (5 min, 5 essais), défis WebAuthn (5 min) ; tous à usage unique, hachés (`tokens.ts`).
-- **Sessions et cookies** : préfixe `__Host-` en HTTPS, 30 jours sans visite, 90 jours au plus ;
+- **Sessions et cookies** : préfixe `__Host-` en HTTPS (seul lu en HTTPS), 30 jours sans visite, 90 jours au plus ;
   toutes fermées après une réinitialisation ou une suspension.
 - **Limitation de débit** en mémoire par IP et par compte (`infrastructure/rate-limit.ts`) sur la
-  connexion, l'inscription, la réinitialisation et les actions du compte.
+  connexion, l'inscription, la réinitialisation et les actions du compte. L'IP vient de
+  `X-Forwarded-For` seulement derrière un mandataire de confiance (`TRUSTED_PROXY_HOPS`), IPv6
+  ramenée au /64 (`server/accounts.ts`, `clientIpFrom`).
+- **En-têtes** (`proxy.ts`, `next.config.ts`) : CSP avec nonce par requête (`script-src 'nonce-…'
+  'strict-dynamic'`, `frame-ancestors 'none'`), `Permissions-Policy`, COOP, `nosniff`,
+  `Referrer-Policy` ; HSTS posé par Caddy. `/.well-known/security.txt` publié si `CONTACT_EMAIL`
+  est défini.
 - **Courriels** (`infrastructure/mail/mailer.ts`) : SMTP, ou fichiers JSON pour les tests
   (`MAIL_DIR`). Les liens sont construits à partir d'`APP_URL`, jamais de l'en-tête Host.
 - **Pingen** n'est proposé qu'aux foyers autorisés par l'administrateur (`household_setting`
@@ -141,7 +151,21 @@ fichier OFSP (quotidien du 15.09 au 30.11, hebdomadaire sinon), import en arriè
 le fichier a changé, notification ; rappels d'envoi et relances de confirmation (`application/reminders.ts`, règles pures dans
 `domain/reminders.ts` : seulement les foyers qui ont encore un courrier à poster) ; vérification hebdomadaire des
 référentiels officiels (`server/reference.ts`) ; suivi des lettres confiées à Pingen (statut, n° de suivi, prix ; notification
-en cas de refus) ; rappels et suppression des comptes inactifs.
+en cas de refus) ; rappels et suppression des comptes inactifs ; alertes d'exploitation aux
+administrateurs (`application/ops.ts` : disque presque plein, vague d'échecs de connexion, une fois
+par jour au plus). Chaque passage appelle `HEALTHCHECK_PING_URL` (ou `…/fail` en cas d'erreur).
+
+`/api/health` (public, sans donnée) vérifie la base et que la clé maître ouvre les clés de foyer :
+503 sinon, ce qui signale tout de suite une base restaurée avec la mauvaise clé.
+
+## Exploitation
+
+`deploy/` décrit le serveur public (voir `docs/mise-en-ligne.md`) : Caddy (HTTPS, HSTS, staging
+derrière mot de passe), production et staging séparés (bases et clés maîtres distinctes),
+conteneurs en lecture seule sans privilèges, Litestream (réplication continue chiffrée par age
+vers un stockage S3 suisse), chien de garde et test de restauration quotidien (systemd), mise en
+production après le staging avec gel du 16 au 30 novembre (`deploy.sh`). La CI bloque sur
+`pnpm audit`, TruffleHog, Trivy (image) et un scan ZAP passif ; Dependabot propose les mises à jour.
 
 ## Envoi par Pingen
 

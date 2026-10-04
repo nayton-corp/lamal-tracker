@@ -14,6 +14,14 @@ PWA mobile d'abord, auto-hébergée (Raspberry Pi ou petit serveur), **multi-foy
 
 > Outil d'aide à la décision, pas un conseil en assurance. Vérifiez toujours les conditions des modèles (liste de médecins, Telmed…) auprès de la caisse.
 
+## Mise en ligne sur un serveur suisse
+
+Pour ouvrir l'app à d'autres foyers, suivez [docs/mise-en-ligne.md](docs/mise-en-ligne.md) : petit
+serveur virtuel en Suisse, HTTPS, staging, sauvegarde continue chiffrée avec test de restauration
+quotidien, alertes, et mises à jour en deux temps (staging puis production). Les fichiers sont dans
+[`deploy/`](deploy). La revue de sécurité (OWASP ASVS) et son suivi sont dans
+[docs/securite/revue-asvs.md](docs/securite/revue-asvs.md).
+
 ## Déploiement sur le Raspberry Pi
 
 Prérequis : Raspberry Pi 4 ou 5 avec un **OS 64 bits** (Raspberry Pi OS 64-bit ou Ubuntu), 2 Go de RAM minimum, et Docker.
@@ -65,8 +73,10 @@ Variables utiles (dans `docker-compose.yml`, ou dans un fichier `.env` en `chmod
 | `PINGEN_STAGING=true` | Utilise l'environnement de test de Pingen : rien n'est imprimé ni posté. |
 | `APP_URL` | Adresse publique de l'app (ex. `https://primes.exemple.ch`). Sert aux liens des courriels et aux passkeys ; nécessaire pour envoyer des courriels. |
 | `SMTP_URL`, `MAIL_FROM` | Service d'envoi de courriels (ex. `smtps://utilisateur:motdepasse@smtp.exemple.ch:465`, `Primes LAMal <no-reply@exemple.ch>`) : confirmation d'adresse, mot de passe oublié, alertes de connexion. |
-| `TRUSTED_PROXY_HOPS` | Nombre de mandataires inverses devant l'app (`1` derrière Caddy ou `tailscale serve`), pour lire la vraie adresse IP dans la limitation de débit. Défaut `0`. |
-| `ADMIN_REQUIRE_2FA=false` | Lève l'obligation, pour l'administrateur, d'avoir une passkey ou le double facteur (instance strictement personnelle, déconseillé). |
+| `TRUSTED_PROXY_HOPS` | Nombre de mandataires inverses devant l'app (`1` derrière Caddy), pour lire la vraie adresse IP dans la limitation de débit. Défaut `0` : l'en-tête `X-Forwarded-For`, falsifiable, est ignoré et les limites valent pour tous les clients ensemble. |
+| `SETUP_TOKEN` | Code d'installation (`openssl rand -hex 16`), demandé pour créer le compte administrateur ou redéfinir son mot de passe. **Obligatoire** quand `APP_URL` est en `https://` : sans lui, la page de création refuse. |
+| `HEALTHCHECK_PING_URL` | Facultatif : URL de ping (healthchecks.io…) appelée après chaque passage horaire des tâches de fond, ou `…/fail` en cas d'erreur. |
+| `ADMIN_REQUIRE_2FA=false` | Lève l'obligation, pour l'administrateur, d'avoir une passkey ou le double facteur (instance strictement personnelle, déconseillé). Un administrateur protégé par une passkey seule se connecte avec elle : le mot de passe seul ne suffit pas. |
 | `HIBP_DISABLED=true` | Ne vérifie pas les nouveaux mots de passe auprès de Have I Been Pwned (serveur sans Internet). |
 | `CONTACT_EMAIL` | Adresse affichée dans la déclaration de confidentialité, les conditions d'utilisation et les mentions légales. |
 | `OPERATOR_NAME`, `OPERATOR_ADDRESS` | Exploitant de l'instance, affiché dans les *Mentions légales* (adresse sur plusieurs lignes séparées par `;`, ex. `Rue du Lac 1; 1000 Lausanne`). |
@@ -131,13 +141,13 @@ Les signatures dessinées et les secrets du double facteur sont chiffrés dans l
 cd ~/lamal-tracker && docker compose pull && docker compose up -d
 ```
 
-- **Sauvegarde** : *Réglages › Sauvegarde* télécharge une copie cohérente de la base. Ou, sur le Pi : `cp data/lamal.db* /un/autre/disque/` (app arrêtée), ou `sqlite3 data/lamal.db ".backup '/chemin/sauvegarde.db'"`. Gardez aussi la clé maître (`data/master.key`), séparément.
+- **Sauvegarde** : *Mon compte › Mes données › Sauvegarde de l'instance* (administrateur protégé d'un second facteur, identité confirmée) télécharge une copie cohérente de la base ; chaque téléchargement est journalisé. Ou, sur le Pi : `cp data/lamal.db* /un/autre/disque/` (app arrêtée), ou `sqlite3 data/lamal.db ".backup '/chemin/sauvegarde.db'"`. Gardez aussi la clé maître (`data/master.key`), séparément.
 - **Sauvegarde automatique avant migration** : quand une mise à jour modifie le schéma, l'app copie d'abord la base dans `data/backups/lamal-<date>.db` (les cinq dernières copies sont gardées). Si la migration échoue, le journal du conteneur (`docker logs lamal-tracker`) indique la copie à restaurer et l'app refuse de démarrer.
 - **Restauration** : arrêter le conteneur, remettre le fichier `lamal.db` dans `data/` (et supprimer `lamal.db-wal` / `lamal.db-shm`), relancer. Pour revenir à une version antérieure du code, épingler son tag `sha-…` (voir plus haut).
 - Les migrations du schéma s'appliquent seules au démarrage.
 - **Mon compte** (*Réglages › Mon compte*) : courriel, mot de passe, passkeys, double facteur et codes de secours, appareils connectés, activité récente (cinq échecs de connexion verrouillent le compte quelques minutes ; les sessions expirent après 30 jours sans visite, et au plus tard après 90 jours).
 - **Recommencer à zéro** (*Mon compte › Mes données › Supprimer le foyer*, propriétaire du foyer, identité confirmée) : efface personnes, contrats, rituels, lettres et signatures du foyer, pour tous ses comptes ; les primes officielles et les comptes restent.
-- **Mot de passe oublié** : avec les courriels configurés, *Mot de passe oublié ?* sur la page de connexion envoie un lien valable une heure (le double facteur reste exigé). Sinon, pour l'administrateur, cette commande efface son mot de passe et ferme ses sessions ; l'app en redemande un au prochain chargement. Le foyer et ses données restent.
+- **Mot de passe oublié** : avec les courriels configurés, *Mot de passe oublié ?* sur la page de connexion envoie un lien valable une heure (le double facteur reste exigé). Sinon, pour l'administrateur, cette commande efface son mot de passe et ferme ses sessions ; l'app en redemande un au prochain chargement (avec le code `SETUP_TOKEN` s'il est défini), puis renvoie à la connexion si le compte a une passkey ou le double facteur. Le foyer et ses données restent.
 
   ```sh
   docker exec lamal-tracker node -e "const {DatabaseSync}=require('node:sqlite');new DatabaseSync('/data/lamal.db').exec(\"UPDATE app_user SET password='{\\\"salt\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"cost\\\":0}', failed_logins=0, locked_until=NULL WHERE role='ADMIN'; DELETE FROM session\")"

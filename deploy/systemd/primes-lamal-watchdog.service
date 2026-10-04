@@ -1,0 +1,8 @@
+[Unit]
+Description=Primes LAMal : contrôle du site, du disque et de la sauvegarde
+After=docker.service
+
+[Service]
+Type=oneshot
+User=REMPLACER_UTILISATEUR
+ExecStart=/opt/primes-lamal/watchdog.sh

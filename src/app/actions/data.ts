@@ -130,7 +130,8 @@ export async function subscribePushAction(sub: unknown) {
   try {
     saveSubscription(db(), scope.userId, parsed.data);
   } catch (e) {
-    throw new UserError(e instanceof Error ? e.message : String(e));
+    console.error("[notifications] abonnement :", e instanceof Error ? e.message : e);
+    throw new UserError("Abonnement aux notifications impossible : réessayez.");
   }
   revalidatePath("/donnees");
 }

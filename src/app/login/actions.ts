@@ -3,10 +3,10 @@
 import type { AuthenticationResponseJSON, PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/server";
 import { redirect } from "next/navigation";
 import { requestPasswordReset, resendVerification, resetPassword } from "@/application/account";
-import { checkNewPassword, createFirstAdmin, login, normalizeEmail, passwordToDefine, primaryUserId, setPassword } from "@/application/auth";
+import { checkNewPassword, createFirstAdmin, hasStrongFactor, login, normalizeEmail, passwordToDefine, primaryUserId, setPassword } from "@/application/auth";
 import { finishMfaLogin, startMfaLogin } from "@/application/mfa";
 import { finishPasskeyLogin, passkeyLoginOptions } from "@/application/passkeys";
-import { accountDeps, clientIp, deleteCookie, mailDeps, rateLimit, readCookie, relyingParty, writeCookie } from "@/server/accounts";
+import { accountDeps, clientIp, deleteCookie, mailDeps, rateLimit, readCookie, relyingParty, setupCodeMatches, writeCookie } from "@/server/accounts";
 import type { ActionState } from "@/server/action";
 import { toActionError } from "@/server/action";
 import { completeLogin, endSession, landingAfterLogin, safeNext } from "@/server/auth";
@@ -29,6 +29,11 @@ export async function createPasswordAction(_: ActionState, form: FormData): Prom
   let userId: number;
   try {
     rateLimit([`creer:${await clientIp()}`], 10, 15);
+    // Serveur exposé sur Internet : sans le code d'installation, personne d'autre ne prend la main.
+    if (!setupCodeMatches(form.get("setup"))) {
+      await slowDown();
+      return { error: "Code d'installation incorrect.", fieldErrors: { setup: "Code incorrect." } };
+    }
     await checkNewPassword(password, accountDeps().pwned);
     // Mot de passe effacé (oubli) : le compte et son foyer restent, seul le mot de passe change.
     const existing = primaryUserId(db());
@@ -40,6 +45,8 @@ export async function createPasswordAction(_: ActionState, form: FormData): Prom
   } catch (e) {
     return toActionError(e);
   }
+  // Compte déjà protégé d'un second facteur : il reste exigé, la connexion passe par /login.
+  if (hasStrongFactor(db(), userId)) redirect("/login?reinitialise=1");
   await completeLogin(userId);
   redirect(landingAfterLogin(userId, "/"));
 }
@@ -65,6 +72,8 @@ export async function loginAction(_: ActionState, form: FormData): Promise<Actio
       }
       return { error: email.trim() ? "Courriel ou mot de passe incorrect." : "Mot de passe incorrect." };
     }
+    case "passkey":
+      return { error: "Ce compte administrateur se connecte avec sa passkey : touchez « Se connecter avec une passkey »." };
     case "unverified":
       if (mail) await resendVerification(db(), outcome.userId, mail, nowIso());
       return { error: "Confirmez d'abord votre adresse : le lien de confirmation vient de vous être renvoyé (pensez aux courriels indésirables)." };

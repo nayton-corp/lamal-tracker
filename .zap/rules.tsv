@@ -1,0 +1,5 @@
+10202	IGNORE	(Absence de jeton anti-CSRF : les server actions Next refusent toute requête d'une autre origine, cookies SameSite=Lax)
+10055	IGNORE	(CSP style-src 'unsafe-inline' : styles en ligne de React et Tailwind ; les scripts restent limités par nonce)
+10111	IGNORE	(Requête d'authentification repérée : information, pas une faille)
+10031	IGNORE	(Attribut HTML contrôlé par l'utilisateur : paramètre next filtré par safeNext, valeurs échappées par React)
+10019	IGNORE	(Content-Type absent sur une réponse 404 vide de sitemap.xml)
