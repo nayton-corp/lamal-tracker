@@ -1,6 +1,8 @@
 import "server-only";
 import { eq } from "drizzle-orm";
+import { pingenAllowed } from "@/application/admin";
 import { syncPingenLetters, type PingenDeps } from "@/application/pingen";
+import type { Scope } from "@/application/scope";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { insurer, letter, review } from "@/infrastructure/db/schema";
 import { createPingenClient, pingenConfig, type PingenClient } from "@/infrastructure/pingen/client";
@@ -17,6 +19,11 @@ export function pingenClient(): PingenClient | null {
   const key = JSON.stringify(config);
   if (globalForPingen.__pingen?.key !== key) globalForPingen.__pingen = { key, client: createPingenClient(config) };
   return globalForPingen.__pingen.client;
+}
+
+/** Client Pingen pour ce foyer : configuré ET activé pour lui par l'administrateur. */
+export function pingenClientFor(scope: Scope): PingenClient | null {
+  return pingenAllowed(db(), scope) ? pingenClient() : null;
 }
 
 export function pingenDeps(client: PingenClient): PingenDeps {

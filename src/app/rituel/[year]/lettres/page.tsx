@@ -23,7 +23,7 @@ import { Input } from "@/ui/form";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
 import { pingenReadiness } from "@/application/pingen";
-import { pingenClient } from "@/server/pingen";
+import { pingenClientFor } from "@/server/pingen";
 import { PingenOffer, PingenTracking } from "./pingen-panel";
 import { ShareButton } from "./share-button";
 import { SignaturePad } from "./signature-pad";
@@ -99,7 +99,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
   const confirmDone = offers.every((o) => o.answeredAt) && terminations.every((l) => l.acknowledgedAt) && offers.length + terminations.length > 0;
   const involved = new Set([...switching, ...adjusting].map((p) => p.person.id));
   const signers = listSignatures(db(), scope).filter((s) => involved.has(s.personId) && year - 1 - Number(s.birthDate.slice(0, 4)) >= 18);
-  const pingen = pingenClient();
+  const pingen = pingenClientFor(scope);
   let n = 0;
 
   return (

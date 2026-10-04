@@ -50,9 +50,12 @@ d'extérieur ; l'application ne dépend pas de l'interface.
   (n° OFSP, nom, coordonnées officielles de l'annuaire, adresse propre facultative) ;
   `insurer_indicator` (comptes publiés par caisse et par année) ; `lamal_parameters` (par année,
   CO2 officiel ou saisi). Partagé par tous les foyers ; seul l'administrateur le modifie.
-- Comptes : `app_user` (mot de passe haché scrypt, rôle `ADMIN` ou `USER`, verrouillage après
-  échecs), `household_member` (un compte appartient à un foyer, propriétaire ou membre),
-  `session` (par compte et par appareil).
+- Comptes : `app_user` (courriel, mot de passe haché scrypt, rôle `ADMIN` ou `USER`, verrouillage
+  après échecs, secret TOTP, consentement, suspension), `household_member` (un compte appartient à
+  un foyer, propriétaire ou membre), `session` (par compte et par appareil), `passkey` (WebAuthn),
+  `recovery_code`, `invitation` (inscription ou foyer, code haché), `auth_token` (jetons à usage
+  unique hachés : confirmation, réinitialisation, étape du double facteur, défi WebAuthn),
+  `known_device` (alerte de nouvel appareil), `audit_event` (journal de sécurité, 12 mois).
 - Foyer : `household`, `household_setting` (dont le mode « une personne / foyer »), `person`,
   `lamal_policy` (un contrat par personne et par année, prime réellement facturée), `lca_policy`,
   `tariff_lineage` (correspondance d'un code tarif d'une année à l'autre, confirmée par le foyer).
@@ -76,7 +79,33 @@ Plusieurs foyers partagent la base. Le foyer d'une requête vient toujours de la
 - Le référentiel (primes, caisses, CO2) et la sauvegarde complète de la base sont réservés à
   l'administrateur ; l'import des primes d'une année (données publiques) reste ouvert à tous.
 - `tests/unit/isolation.test.ts` appelle chaque cas d'usage du foyer A avec les identifiants du
-  foyer B et exige un refus, sans aucune modification.
+  foyer B et exige un refus, sans aucune modification ; `tests/e2e/sharing.spec.ts` refait
+  l'essai dans le navigateur avec un second compte.
+- Dans un foyer, le propriétaire seul invite, retire un membre ou efface tout (`requireOwner`).
+
+## Comptes et authentification
+
+Le module est isolé dans `src/application` (`auth.ts`, `account.ts`, `mfa.ts`, `passkeys.ts`,
+`invitations.ts`, `admin.ts`) pour pouvoir déléguer plus tard à un fournisseur OIDC.
+
+- **Inscription sur invitation** (`invitations.ts`, `account.ts`) : code haché, compteur d'usages
+  avancé dans la transaction de création du compte. Une adresse déjà inscrite n'est pas révélée.
+- **Mot de passe** : 12 caractères au moins, refusé s'il figure dans Have I Been Pwned
+  (k-anonymat, `infrastructure/hibp.ts`). Messages d'échec identiques que le compte existe ou non.
+- **Second facteur** : passkeys (`@simplewebauthn`, vérification de l'utilisateur exigée ; une
+  passkey suffit à se connecter) et TOTP (RFC 6238, `totp.ts`, codes non rejouables) avec dix codes
+  de secours. Obligatoire pour l'administrateur (`adminNeedsFactor`, appliqué par le proxy,
+  `pageScope` et `requireAdminScope`).
+- **Jetons** : liens de confirmation (24 h) et de réinitialisation (1 h), étape du double facteur
+  (5 min, 5 essais), défis WebAuthn (5 min) ; tous à usage unique, hachés (`tokens.ts`).
+- **Sessions et cookies** : préfixe `__Host-` en HTTPS, 30 jours sans visite, 90 jours au plus ;
+  toutes fermées après une réinitialisation ou une suspension.
+- **Limitation de débit** en mémoire par IP et par compte (`infrastructure/rate-limit.ts`) sur la
+  connexion, l'inscription, la réinitialisation et les actions du compte.
+- **Courriels** (`infrastructure/mail/mailer.ts`) : SMTP, ou fichiers JSON pour les tests
+  (`MAIL_DIR`). Les liens sont construits à partir d'`APP_URL`, jamais de l'en-tête Host.
+- **Pingen** n'est proposé qu'aux foyers autorisés par l'administrateur (`household_setting`
+  `pingen.enabled`), puisqu'il est facturé à l'exploitant.
 
 Une modification du schéma : éditer `src/infrastructure/db/schema.ts`, puis `pnpm db:generate`
 (migration SQL dans `drizzle/`, appliquée au démarrage).
@@ -91,7 +120,8 @@ en cas de refus).
 
 ## Envoi par Pingen
 
-Facultatif, actif seulement si `PINGEN_CLIENT_ID`, `PINGEN_CLIENT_SECRET` et `PINGEN_ORGANISATION_ID` sont définis.
+Facultatif, actif seulement si `PINGEN_CLIENT_ID`, `PINGEN_CLIENT_SECRET` et `PINGEN_ORGANISATION_ID` sont définis,
+et pour les seuls foyers que l'administrateur y autorise.
 La lettre est rendue dans une mise en page dédiée (`letter-pdf.tsx`, `layout="pingen"` : adresse dans la zone lue par
 Pingen, zone d'affranchissement vide, mention du recommandé déplacée au-dessus de l'objet), déposée puis créée avec
 `delivery_product: "registered"` et envoi automatique. La lettre est réservée en base avant l'appel (jamais deux envois) ;

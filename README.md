@@ -1,6 +1,6 @@
 # Primes LAMal — suivi et comparateur annuel
 
-PWA personnelle, mobile d'abord, auto-hébergée sur un Raspberry Pi, protégée par un **mot de passe** choisi au premier démarrage. À la première connexion, un **accueil guidé** demande pour qui gérer l'assurance (une personne seule ou un foyer), puis propose de **partir du PDF de la police** : personnes, adresse et contrats en sont lus (sur le Pi, rien ne sort), il ne reste qu'à vérifier. Sinon, une **saisie guidée** en quelques questions. Chaque automne :
+PWA mobile d'abord, auto-hébergée (Raspberry Pi ou petit serveur), **multi-foyers** : chaque foyer a ses comptes (courriel et mot de passe, passkeys, double facteur), l'inscription se fait **sur invitation**, et un conjoint peut rejoindre le foyer avec son propre compte. À la première connexion, un **accueil guidé** demande pour qui gérer l'assurance (une personne seule ou un foyer), puis propose de **partir du PDF de la police** : personnes, adresse et contrats en sont lus (sur le Pi, rien ne sort), il ne reste qu'à vérifier. Sinon, une **saisie guidée** en quelques questions. Chaque automne :
 
 1. **les primes officielles de l'OFSP sont importées automatiquement** dès leur publication (fin septembre) ;
 2. pendant la fenêtre de changement (publication des primes → 30 novembre), l'accueil montre la **reconduction tacite** : ce que le foyer paiera l'an prochain sans rien faire, personne par personne, l'écart avec cette année et le compte à rebours ;
@@ -47,7 +47,7 @@ docker compose up -d
 
 Le dossier `data/` doit exister **avant** le premier `docker compose up` et appartenir à l'utilisateur 1000 : sinon Docker le crée pour `root`, l'app ne peut pas y écrire sa base et le conteneur s'arrête avec un message qui rappelle la commande `chown`.
 
-L'app répond sur `http://<ip-du-pi>:3000`. Les données vivent dans `~/lamal-tracker/data` (un seul fichier SQLite). **Au premier démarrage, l'app demande de choisir un mot de passe** ; il protège toutes les pages et la sauvegarde.
+L'app répond sur `http://<ip-du-pi>:3000`. Les données vivent dans `~/lamal-tracker/data` (un seul fichier SQLite). **Au premier démarrage, l'app demande de créer le compte administrateur** (courriel et mot de passe), puis de le protéger d'une passkey ou du double facteur avant toute autre chose.
 
 Si l'app n'est jointe qu'à travers Tailscale (voir ci-dessous), n'exposez le port qu'en local en remplaçant `"3000:3000"` par `"127.0.0.1:3000:3000"` dans `docker-compose.yml` : les autres appareils du réseau local ne voient plus le port.
 
@@ -63,6 +63,20 @@ Variables utiles (dans `docker-compose.yml`, ou dans un fichier `.env` en `chmod
 | `OFSP_PREMIUMS_URL` | Force l'URL du fichier de primes si l'OFSP la change. |
 | `PINGEN_CLIENT_ID`, `PINGEN_CLIENT_SECRET`, `PINGEN_ORGANISATION_ID` | Facultatif : envoi des lettres en recommandé par [Pingen](https://www.pingen.ch) (voir ci-dessous). Sans ces trois variables, l'option n'apparaît pas. |
 | `PINGEN_STAGING=true` | Utilise l'environnement de test de Pingen : rien n'est imprimé ni posté. |
+| `APP_URL` | Adresse publique de l'app (ex. `https://primes.exemple.ch`). Sert aux liens des courriels et aux passkeys ; nécessaire pour envoyer des courriels. |
+| `SMTP_URL`, `MAIL_FROM` | Service d'envoi de courriels (ex. `smtps://utilisateur:motdepasse@smtp.exemple.ch:465`, `Primes LAMal <no-reply@exemple.ch>`) : confirmation d'adresse, mot de passe oublié, alertes de connexion. |
+| `TRUSTED_PROXY_HOPS` | Nombre de mandataires inverses devant l'app (`1` derrière Caddy ou `tailscale serve`), pour lire la vraie adresse IP dans la limitation de débit. Défaut `0`. |
+| `ADMIN_REQUIRE_2FA=false` | Lève l'obligation, pour l'administrateur, d'avoir une passkey ou le double facteur (instance strictement personnelle, déconseillé). |
+| `HIBP_DISABLED=true` | Ne vérifie pas les nouveaux mots de passe auprès de Have I Been Pwned (serveur sans Internet). |
+| `CONTACT_EMAIL` | Adresse affichée dans la déclaration de confidentialité pour les demandes d'accès ou de suppression. |
+
+#### Comptes, invitations et courriels
+
+- **Inviter un foyer** : *Réglages › Administration › Inviter un foyer* crée un lien d'inscription (nombre d'utilisations et durée au choix, affiché une seule fois). La personne choisit son courriel et son mot de passe (12 caractères au moins, refusé s'il figure dans une fuite connue), confirme son adresse, puis l'accueil guidé crée son foyer. Une passkey lui est proposée dès l'inscription.
+- **Partager son foyer** : *Foyer › Accès au foyer › Inviter une personne* (propriétaire du foyer) crée un lien valable 48 heures, à usage unique. Le conjoint arrive directement dans le foyer, comme membre : il voit et prépare tout, mais ne peut ni inviter, ni retirer quelqu'un, ni tout effacer.
+- **Courriels** : sans `SMTP_URL` et `APP_URL`, l'app n'envoie rien. L'inscription ouvre alors le compte sans confirmer l'adresse, et seul l'administrateur peut rétablir un accès perdu (commandes ci-dessous). Un service européen avec domaine authentifié (SPF, DKIM, DMARC) est conseillé ; les courriels ne contiennent aucune donnée de santé.
+- **Administration** : comptes (courriel, facteurs, dernière activité ; jamais le contenu des foyers), suspension d'un compte, et envoi Pingen autorisé foyer par foyer (il est facturé à l'exploitant).
+- **Mise à jour d'une instance existante** : le mot de passe actuel reste celui de l'administrateur, qui se connecte en laissant le courriel vide jusqu'à ce qu'il en enregistre un dans *Mon compte* ; il doit d'abord ajouter une passkey ou activer le double facteur. Pingen reste ouvert à son foyer.
 
 #### Envoi en recommandé par Pingen (facultatif)
 
@@ -98,12 +112,18 @@ cd ~/lamal-tracker && docker compose pull && docker compose up -d
 - **Sauvegarde automatique avant migration** : quand une mise à jour modifie le schéma, l'app copie d'abord la base dans `data/backups/lamal-<date>.db` (les cinq dernières copies sont gardées). Si la migration échoue, le journal du conteneur (`docker logs lamal-tracker`) indique la copie à restaurer et l'app refuse de démarrer.
 - **Restauration** : arrêter le conteneur, remettre le fichier `lamal.db` dans `data/` (et supprimer `lamal.db-wal` / `lamal.db-shm`), relancer. Pour revenir à une version antérieure du code, épingler son tag `sha-…` (voir plus haut).
 - Les migrations du schéma s'appliquent seules au démarrage.
-- **Sécurité** (*Réglages › Sécurité*) : changer le mot de passe, voir et fermer les sessions ouvertes sur les autres appareils (cinq échecs de connexion verrouillent l'accès quelques minutes).
-- **Recommencer à zéro** (*Réglages › Sécurité › Recommencer à zéro*, mot de passe demandé) : efface personnes, contrats, rituels, lettres et signatures ; les primes officielles et le mot de passe restent.
-- **Mot de passe oublié** : cette commande efface le mot de passe du compte administrateur et ferme ses sessions ; l'app en redemande un au prochain chargement. Le foyer et ses données restent.
+- **Mon compte** (*Réglages › Mon compte*) : courriel, mot de passe, passkeys, double facteur et codes de secours, appareils connectés, activité récente (cinq échecs de connexion verrouillent le compte quelques minutes ; les sessions expirent après 30 jours sans visite, et au plus tard après 90 jours).
+- **Recommencer à zéro** (*Réglages › Foyer › Recommencer à zéro*, propriétaire du foyer, mot de passe demandé) : efface personnes, contrats, rituels, lettres et signatures du foyer, pour tous ses comptes ; les primes officielles et les comptes restent.
+- **Mot de passe oublié** : avec les courriels configurés, *Mot de passe oublié ?* sur la page de connexion envoie un lien valable une heure (le double facteur reste exigé). Sinon, pour l'administrateur, cette commande efface son mot de passe et ferme ses sessions ; l'app en redemande un au prochain chargement. Le foyer et ses données restent.
 
   ```sh
   docker exec lamal-tracker node -e "const {DatabaseSync}=require('node:sqlite');new DatabaseSync('/data/lamal.db').exec(\"UPDATE app_user SET password='{\\\"salt\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"cost\\\":0}', failed_logins=0, locked_until=NULL WHERE role='ADMIN'; DELETE FROM session\")"
+  ```
+
+- **Téléphone du double facteur perdu, sans code de secours** (administrateur) : cette commande retire son double facteur et ses passkeys ; il devra en ajouter un à la connexion suivante.
+
+  ```sh
+  docker exec lamal-tracker node -e "const {DatabaseSync}=require('node:sqlite');new DatabaseSync('/data/lamal.db').exec(\"UPDATE app_user SET totp_secret=NULL, totp_enabled_at=NULL, totp_last_step=NULL WHERE role='ADMIN'; DELETE FROM recovery_code WHERE user_id IN (SELECT id FROM app_user WHERE role='ADMIN'); DELETE FROM passkey WHERE user_id IN (SELECT id FROM app_user WHERE role='ADMIN'); DELETE FROM session\")"
   ```
 
 - Les journaux du conteneur sont limités (3 × 10 Mo) pour ne pas remplir la carte SD.

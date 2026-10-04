@@ -13,20 +13,22 @@ export interface Scope {
   userId: number;
   /** Foyer du compte ; null tant que l'accueil ne l'a pas créé. */
   householdId: number | null;
+  /** Propriétaire (tout, y compris inviter et supprimer) ou membre (consulter, préparer, signer). */
+  householdRole: "OWNER" | "MEMBER" | null;
   admin: boolean;
 }
 
-/** Portée d'un compte : son foyer et son rôle. Null si le compte n'existe plus. */
+/** Portée d'un compte : son foyer et son rôle. Null si le compte n'existe plus ou est suspendu. */
 export function scopeForUser(db: Db, userId: number): Scope | null {
-  const user = db.select({ id: appUser.id, role: appUser.role }).from(appUser).where(eq(appUser.id, userId)).get();
-  if (!user) return null;
-  const member = db.select({ householdId: householdMember.householdId }).from(householdMember).where(eq(householdMember.userId, userId)).get();
-  return { userId: user.id, householdId: member?.householdId ?? null, admin: user.role === "ADMIN" };
+  const user = db.select({ id: appUser.id, role: appUser.role, disabledAt: appUser.disabledAt }).from(appUser).where(eq(appUser.id, userId)).get();
+  if (!user || user.disabledAt) return null;
+  const member = db.select({ householdId: householdMember.householdId, role: householdMember.role }).from(householdMember).where(eq(householdMember.userId, userId)).get();
+  return { userId: user.id, householdId: member?.householdId ?? null, householdRole: member?.role ?? null, admin: user.role === "ADMIN" };
 }
 
-/** Le même compte, rattaché au foyer qu'il vient de créer. */
+/** Le même compte, propriétaire du foyer qu'il vient de créer. */
 export function withHousehold(scope: Scope, householdId: number): Scope {
-  return { ...scope, householdId };
+  return { ...scope, householdId, householdRole: "OWNER" };
 }
 
 /** Identifiant du foyer, ou une erreur lisible si l'accueil n'est pas fait. */
@@ -37,6 +39,12 @@ export function householdIdOf(scope: Scope): number {
 
 export function requireAdmin(scope: Scope) {
   if (!scope.admin) throw new UserError("Réservé à l'administrateur.");
+}
+
+/** Inviter, retirer un membre, tout effacer : réservé au propriétaire du foyer. */
+export function requireOwner(scope: Scope) {
+  householdIdOf(scope);
+  if (scope.householdRole !== "OWNER") throw new UserError("Réservé au propriétaire du foyer.");
 }
 
 /** Crée le foyer d'un compte qui n'en a pas encore, et l'en rend propriétaire. */

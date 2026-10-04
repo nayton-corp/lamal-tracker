@@ -42,6 +42,10 @@ export default defineConfig({
             MIGRATIONS_DIR: path.resolve("drizzle"),
             FAKE_TODAY: "2026-10-05",
             DISABLE_SCHEDULER: "true",
+            // Comptes : courriels écrits dans des fichiers, liens vers le serveur de test, pas d'appel à HIBP.
+            MAIL_DIR: path.join(E2E_DIR, "mail"),
+            APP_URL: `http://localhost:${PORT}`,
+            HIBP_DISABLED: "true",
             PINGEN_CLIENT_ID: "client-test",
             PINGEN_CLIENT_SECRET: "secret-test",
             PINGEN_ORGANISATION_ID: "org-test",

@@ -50,6 +50,13 @@
       "when": 1791111128331,
       "tag": "0006_multi_household",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791129786551,
+      "tag": "0007_accounts",
+      "breakpoints": true
     }
   ]
 }

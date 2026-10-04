@@ -306,6 +306,17 @@ export const appUser = sqliteTable("app_user", {
   role: text("role", { enum: ["ADMIN", "USER"] }).notNull().default("USER"),
   failedLogins: integer("failed_logins").notNull().default(0),
   lockedUntil: text("locked_until"),
+  /** Courriel confirmé par le lien envoyé ; null tant qu'il ne l'est pas. */
+  emailVerifiedAt: text("email_verified_at"),
+  /** Secret TOTP (base32) du double facteur, actif dès `totpEnabledAt`. */
+  totpSecret: text("totp_secret"),
+  totpEnabledAt: text("totp_enabled_at"),
+  /** Dernier pas de 30 s accepté : un même code ne sert qu'une fois. */
+  totpLastStep: integer("totp_last_step"),
+  /** Consentement au traitement de données de santé, donné à l'inscription. */
+  consentAt: text("consent_at"),
+  /** Compte suspendu par l'administrateur : plus aucune connexion. */
+  disabledAt: text("disabled_at"),
   createdAt: createdAt(),
 });
 
@@ -360,4 +371,91 @@ export const notificationLog = sqliteTable(
     sentAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.key] })],
+);
+
+/**
+ * Jetons à usage unique, conservés hachés : confirmation de courriel, réinitialisation du mot de
+ * passe, connexion en attente du double facteur, défi WebAuthn, activation du TOTP.
+ */
+export const authToken = sqliteTable(
+  "auth_token",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => appUser.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["VERIFY_EMAIL", "RESET_PASSWORD", "LOGIN_MFA", "WEBAUTHN", "TOTP_SETUP"] }).notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    data: text("data", { mode: "json" }).$type<Record<string, unknown>>(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("auth_token_user").on(t.userId, t.kind)],
+);
+
+/**
+ * Invitation : à créer un compte (administrateur) ou à rejoindre un foyer (propriétaire).
+ * Le code n'est montré qu'une fois ; seule son empreinte est gardée.
+ */
+export const invitation = sqliteTable("invitation", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kind: text("kind", { enum: ["SIGNUP", "HOUSEHOLD"] }).notNull(),
+  codeHash: text("code_hash").notNull().unique(),
+  label: text("label").notNull().default(""),
+  createdBy: integer("created_by").references(() => appUser.id, { onDelete: "set null" }),
+  householdId: integer("household_id").references(() => household.id, { onDelete: "cascade" }),
+  maxUses: integer("max_uses").notNull().default(1),
+  uses: integer("uses").notNull().default(0),
+  expiresAt: text("expires_at").notNull(),
+  revokedAt: text("revoked_at"),
+  createdAt: createdAt(),
+});
+
+/** Passkey (WebAuthn) d'un compte. */
+export const passkey = sqliteTable("passkey", {
+  /** Identifiant de l'authentifiant, en base64url. */
+  id: text("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => appUser.id, { onDelete: "cascade" }),
+  publicKey: text("public_key").notNull(),
+  counter: integer("counter").notNull().default(0),
+  transports: text("transports", { mode: "json" }).$type<string[]>(),
+  name: text("name").notNull().default(""),
+  createdAt: createdAt(),
+  lastUsedAt: text("last_used_at"),
+});
+
+/** Codes de secours du double facteur, à usage unique, conservés hachés. */
+export const recoveryCode = sqliteTable(
+  "recovery_code",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => appUser.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    usedAt: text("used_at"),
+  },
+  (t) => [index("recovery_code_user").on(t.userId)],
+);
+
+/** Appareils déjà connus d'un compte : une connexion depuis un autre déclenche une alerte. */
+export const knownDevice = sqliteTable(
+  "known_device",
+  {
+    userId: integer("user_id").notNull().references(() => appUser.id, { onDelete: "cascade" }),
+    deviceHash: text("device_hash").notNull(),
+    lastSeenAt: text("last_seen_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.deviceHash] })],
+);
+
+/** Journal de sécurité : connexions, facteurs, invitations. Aucune donnée de santé. */
+export const auditEvent = sqliteTable(
+  "audit_event",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => appUser.id, { onDelete: "cascade" }),
+    householdId: integer("household_id").references(() => household.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    detail: text("detail").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [index("audit_event_user").on(t.userId, t.createdAt)],
 );
