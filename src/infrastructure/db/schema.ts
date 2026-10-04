@@ -2,10 +2,12 @@ import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /*
- * Trois familles de tables :
- *  - référentiel OFSP (jeux de tarifs immuables, un par année et par fichier) ;
- *  - foyer (personnes, contrats LAMal par année, contrats LCA) ;
+ * Quatre familles de tables :
+ *  - référentiel OFSP (jeux de tarifs immuables, un par année et par fichier), partagé par tous ;
+ *  - comptes (utilisateurs, appartenance à un foyer, sessions) ;
+ *  - foyer (personnes, contrats LAMal par année, contrats LCA, réglages) ;
  *  - rituel (revue annuelle, décisions figées, lettres).
+ * Toute donnée de foyer se rattache à un `household` (directement, ou par la personne ou la revue).
  * Montants en centimes entiers (*_rp). Dates ISO en texte.
  */
 
@@ -183,17 +185,19 @@ export const lcaPolicy = sqliteTable("lca_policy", {
   notes: text("notes"),
 });
 
+/** Correspondance d'un code tarif d'une année à l'autre, confirmée par un foyer (propre à ce foyer). */
 export const tariffLineage = sqliteTable(
   "tariff_lineage",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    householdId: integer("household_id").notNull().references(() => household.id, { onDelete: "cascade" }),
     insurerId: integer("insurer_id").notNull().references(() => insurer.id),
     fromYear: integer("from_year").notNull(),
     fromCode: text("from_code").notNull(),
     toYear: integer("to_year").notNull(),
     toCode: text("to_code").notNull(),
   },
-  (t) => [uniqueIndex("lineage_unique").on(t.insurerId, t.fromYear, t.fromCode, t.toYear)],
+  (t) => [uniqueIndex("lineage_unique").on(t.householdId, t.insurerId, t.fromYear, t.fromCode, t.toYear)],
 );
 
 export const review = sqliteTable(
@@ -292,9 +296,46 @@ export const signature = sqliteTable("signature", {
   createdAt: createdAt(),
 });
 
-/** Session ouverte par le mot de passe : un jeton aléatoire par appareil, révocable. */
+/** Compte d'un utilisateur. Le mot de passe est conservé haché (scrypt, sel et coût inclus). */
+export const appUser = sqliteTable("app_user", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** Identifiant de connexion ; facultatif tant que l'instance n'a qu'un compte. */
+  email: text("email").unique(),
+  password: text("password", { mode: "json" }).$type<{ salt: string; hash: string; cost: number }>().notNull(),
+  /** ADMIN : référentiel OFSP, caisses, sauvegarde de la base. USER : son foyer seulement. */
+  role: text("role", { enum: ["ADMIN", "USER"] }).notNull().default("USER"),
+  failedLogins: integer("failed_logins").notNull().default(0),
+  lockedUntil: text("locked_until"),
+  createdAt: createdAt(),
+});
+
+/** Appartenance d'un compte à un foyer ; un compte n'a qu'un foyer. */
+export const householdMember = sqliteTable(
+  "household_member",
+  {
+    householdId: integer("household_id").notNull().references(() => household.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => appUser.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["OWNER", "MEMBER"] }).notNull().default("OWNER"),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.householdId, t.userId] }), uniqueIndex("household_member_user").on(t.userId)],
+);
+
+/** Réglages propres à un foyer (ex. « une personne / foyer »). */
+export const householdSetting = sqliteTable(
+  "household_setting",
+  {
+    householdId: integer("household_id").notNull().references(() => household.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    value: text("value", { mode: "json" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.householdId, t.key] })],
+);
+
+/** Session d'un compte : un jeton aléatoire par appareil, révocable. */
 export const session = sqliteTable("session", {
   id: text("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => appUser.id, { onDelete: "cascade" }),
   /** Empreinte SHA-256 du jeton : le jeton lui-même ne vit que dans le cookie. */
   tokenHash: text("token_hash").notNull().unique(),
   device: text("device").notNull().default(""),
@@ -303,8 +344,10 @@ export const session = sqliteTable("session", {
   expiresAt: text("expires_at").notNull(),
 });
 
+/** Appareil abonné aux notifications, rattaché au compte qui l'a abonné. */
 export const pushSubscription = sqliteTable("push_subscription", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().references(() => appUser.id, { onDelete: "cascade" }),
   endpoint: text("endpoint").notNull().unique(),
   keys: text("keys", { mode: "json" }).$type<{ p256dh: string; auth: string }>().notNull(),
   createdAt: createdAt(),

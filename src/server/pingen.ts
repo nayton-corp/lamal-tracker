@@ -5,7 +5,7 @@ import { insurerLabel } from "@/infrastructure/db/queries";
 import { insurer, letter, review } from "@/infrastructure/db/schema";
 import { createPingenClient, pingenConfig, type PingenClient } from "@/infrastructure/pingen/client";
 import { renderLetterPdf } from "@/infrastructure/pdf/letter-pdf";
-import { notifyAll } from "@/infrastructure/push/push";
+import { householdKey, notify } from "@/infrastructure/push/push";
 import { db, nowIso } from "./context";
 
 const globalForPingen = globalThis as unknown as { __pingen?: { key: string; client: PingenClient } };
@@ -30,16 +30,18 @@ export async function pingenTick(): Promise<void> {
   const result = await syncPingenLetters(db(), client, nowIso());
   for (const id of result.newlyFailed) {
     const row = db()
-      .select({ insurer, year: review.targetYear })
+      .select({ insurer, year: review.targetYear, householdId: review.householdId })
       .from(letter)
       .innerJoin(insurer, eq(insurer.id, letter.insurerId))
       .innerJoin(review, eq(review.id, letter.reviewId))
       .where(eq(letter.id, id))
       .get();
-    await notifyAll(
+    if (!row) continue;
+    await notify(
       db(),
-      { title: "Lettre non envoyée par Pingen", body: `Le courrier à ${row ? insurerLabel(row.insurer) : "la caisse"} doit être repris : ouvrez les démarches.`, url: row ? `/rituel/${row.year}/lettres` : "/" },
-      `pingen-echec-${id}`,
+      { householdId: row.householdId },
+      { title: "Lettre non envoyée par Pingen", body: `Le courrier à ${insurerLabel(row.insurer)} doit être repris : ouvrez les démarches.`, url: `/rituel/${row.year}/lettres` },
+      householdKey(row.householdId, `pingen-echec-${id}`),
     );
   }
   if (result.errors.length) console.error("[pingen]", result.errors.join(" ; "));

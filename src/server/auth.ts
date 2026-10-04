@@ -1,14 +1,17 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { closeSession, describeDevice, hasPassword, openSession, touchSession, type SessionInfo } from "@/application/auth";
-import { UserError } from "@/application/review";
+import { cache } from "react";
+import { closeSession, describeDevice, openSession, passwordToDefine, touchSession, type SessionInfo } from "@/application/auth";
+import { UserError } from "@/application/errors";
+import { requireAdmin as assertAdmin, scopeForUser, type Scope } from "@/application/scope";
 import { db, nowIso } from "./context";
 
 /*
- * Le mot de passe est obligatoire : sans mot de passe défini, tout mène à sa création ; sans
- * session valable, à la connexion. Le proxy fait ce contrôle pour chaque requête, et les
- * actions serveur le refont elles-mêmes (`requireSession`), pour ne pas dépendre du seul proxy.
+ * La connexion est obligatoire : sans compte, tout mène à la création du premier ; sans session
+ * valable, à la connexion. Le proxy fait ce contrôle pour chaque requête, et les pages et actions
+ * serveur le refont elles-mêmes (`pageScope`, `requireScope`), pour ne pas dépendre du seul proxy.
+ * Le foyer de chaque requête vient de la session, jamais d'un paramètre du navigateur.
  */
 export const SESSION_COOKIE = "lamal_session";
 
@@ -17,16 +20,38 @@ export async function currentSession(): Promise<SessionInfo | null> {
   return touchSession(db(), token, nowIso());
 }
 
-/** À appeler au début de chaque action serveur : refuse tout appel sans session ouverte. */
-export async function requireSession(): Promise<SessionInfo> {
+/** Compte et foyer de la requête en cours (une seule lecture par requête). */
+export const currentScope = cache(async (): Promise<(Scope & { sessionId: string }) | null> => {
   const s = await currentSession();
-  if (!s) throw new UserError("Session expirée : reconnectez-vous.");
-  return s;
+  if (!s) return null;
+  const scope = scopeForUser(db(), s.userId);
+  return scope ? { ...scope, sessionId: s.id } : null;
+});
+
+/** À appeler au début de chaque action serveur : refuse tout appel sans session ouverte. */
+export async function requireScope(): Promise<Scope & { sessionId: string }> {
+  const scope = await currentScope();
+  if (!scope) throw new UserError("Session expirée : reconnectez-vous.");
+  return scope;
 }
 
-export async function startSession() {
+/** Actions qui touchent le référentiel partagé (primes, caisses) ou toute la base. */
+export async function requireAdminScope(): Promise<Scope & { sessionId: string }> {
+  const scope = await requireScope();
+  assertAdmin(scope);
+  return scope;
+}
+
+/** Pour les pages : sans session, retour à la connexion. */
+export async function pageScope(): Promise<Scope & { sessionId: string }> {
+  const scope = await currentScope();
+  if (!scope) redirect("/login");
+  return scope;
+}
+
+export async function startSession(userId: number) {
   const h = await headers();
-  const { token, expiresAt } = openSession(db(), describeDevice(h.get("user-agent")), nowIso());
+  const { token, expiresAt } = openSession(db(), userId, describeDevice(h.get("user-agent")), nowIso());
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -47,8 +72,8 @@ export async function redirectIfSignedIn(to = "/") {
   if (await currentSession()) redirect(to);
 }
 
-export function passwordDefined(): boolean {
-  return hasPassword(db());
+export function accountExists(): boolean {
+  return !passwordToDefine(db());
 }
 
 /** Chemin de retour après connexion : seulement un chemin local. */

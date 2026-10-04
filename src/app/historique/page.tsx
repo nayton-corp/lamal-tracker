@@ -11,12 +11,14 @@ import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import type { ReactNode } from "react";
 import { EmptyState, Page, PageHeader } from "@/ui/page";
 import { MarketChart, PersonChart, TotalsChart } from "./charts";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Historique" };
 
-export default function HistoryPage() {
-  const h = householdHistory(db());
+export default async function HistoryPage() {
+  const scope = await pageScope();
+  const h = householdHistory(db(), scope);
   if (h.years.length === 0) {
     return (
       <Page>

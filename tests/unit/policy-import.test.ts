@@ -11,6 +11,8 @@ import { openDb, type Db } from "@/infrastructure/db/client";
 import { importPremiumFile } from "@/infrastructure/ofsp/importer";
 import { readPdfText } from "@/infrastructure/pdf/read-text";
 import { FIXTURES_DIR } from "../fixtures/generate";
+import { testAccount } from "../accounts";
+import { withHousehold, type Scope } from "@/application/scope";
 
 describe("lecture d'une police (texte)", () => {
   it("lit montants, franchise, accident, modèle et numéro", () => {
@@ -62,12 +64,14 @@ describe("import d'une police PDF", () => {
   let db: Db;
   let adult: number;
   let kid: number;
+  let scope: Scope;
   beforeAll(async () => {
     db = openDb(":memory:");
     await importPremiumFile(db, path.join(FIXTURES_DIR, "primes-2026.xlsx"), "test");
-    saveHousehold(db, { name: "Famille Test", street: "Rue du Lac 1", postalCode: "1003", city: "Lausanne", canton: "VD", region: 1 });
-    adult = savePerson(db, 1, { firstName: "Alex", lastName: "Test", birthDate: "1988-04-12", healthCostsRp: 50000 });
-    kid = savePerson(db, 1, { firstName: "Lou", lastName: "Test", birthDate: "2016-06-30", kidSubgroup: "K1", healthCostsRp: 30000 });
+    scope = testAccount(db);
+    scope = withHousehold(scope, saveHousehold(db, scope, { name: "Famille Test", street: "Rue du Lac 1", postalCode: "1003", city: "Lausanne", canton: "VD", region: 1 }));
+    adult = savePerson(db, scope, { firstName: "Alex", lastName: "Test", birthDate: "1988-04-12", healthCostsRp: 50000 });
+    kid = savePerson(db, scope, { firstName: "Lou", lastName: "Test", birthDate: "2016-06-30", kidSubgroup: "K1", healthCostsRp: 30000 });
   });
 
   async function policyPdf(lines: string[]): Promise<Uint8Array> {
@@ -77,9 +81,9 @@ describe("import d'une police PDF", () => {
 
   it("retrouve la caisse, l'année et le tarif exact de chaque membre", async () => {
     const hel = listInsurers(db).find((i) => i.bagNumber === 1562)!.id;
-    const tel = tariffOptions(db, adult, 2026, hel).tariffs.find((t) => t.modelType === "TELMED")!;
+    const tel = tariffOptions(db, scope, adult, 2026, hel).tariffs.find((t) => t.modelType === "TELMED")!;
     const adultPremium = tel.premiums[2500]![0]!;
-    const base = tariffOptions(db, kid, 2026, hel).tariffs.find((t) => t.modelType === "STANDARD")!;
+    const base = tariffOptions(db, scope, kid, 2026, hel).tariffs.find((t) => t.modelType === "STANDARD")!;
     const kidPremium = base.premiums[0]![1]!;
 
     const pdf = await policyPdf([
@@ -91,7 +95,7 @@ describe("import d'une police PDF", () => {
       `Lou Test, née le 30.06.2016 · LAMal · franchise CHF 0 · avec accidents · ${formatChf(kidPremium, { currency: false })}`,
     ]);
     const text = await readPdfText(pdf);
-    const res = analyzePolicyText(db, text, 2026);
+    const res = analyzePolicyText(db, scope, text, 2026);
     expect(res.insurerId).toBe(hel);
     expect(res.year).toBe(2026);
     expect(res.warnings).toEqual([]);
@@ -100,19 +104,19 @@ describe("import d'une police PDF", () => {
     expect(a!.lca).toEqual([{ guarantee: "HOSPITAL_SEMI_PRIVATE", label: "Hospitalisation demi-privée", monthlyRp: 6420 }]);
     expect(k).toMatchObject({ personId: kid, matched: true, tariffCode: base.code, franchiseChf: 0, accident: true, billedMonthlyRp: kidPremium });
 
-    applyPolicyImport(db, {
+    applyPolicyImport(db, scope, {
       insurerId: hel,
       year: 2026,
       persons: res.persons.map((p) => ({ ...p, franchiseChf: p.franchiseChf!, billedMonthlyRp: p.billedMonthlyRp! })),
     });
-    applyPolicyImport(db, { insurerId: hel, year: 2026, persons: res.persons.map((p) => ({ ...p, franchiseChf: p.franchiseChf!, billedMonthlyRp: p.billedMonthlyRp! })) });
+    applyPolicyImport(db, scope, { insurerId: hel, year: 2026, persons: res.persons.map((p) => ({ ...p, franchiseChf: p.franchiseChf!, billedMonthlyRp: p.billedMonthlyRp! })) });
     expect(listPolicies(db, adult).map((x) => [x.policy.coverageYear, x.policy.tariffCode])).toEqual([[2026, tel.code]]);
     expect(listLca(db, adult)).toHaveLength(1);
   });
 
   it("refuse un PDF sans texte", async () => {
     const pdf = await policyPdf([" "]);
-    expect(() => analyzePolicyText(db, "", 2026)).toThrow(/scanné/);
+    expect(() => analyzePolicyText(db, scope, "", 2026)).toThrow(/scanné/);
     expect((await readPdfText(pdf)).trim()).toBe("");
   });
 });

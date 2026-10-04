@@ -1,9 +1,11 @@
 import "server-only";
 import { getReviewByYear } from "@/application/review";
+import { eq } from "drizzle-orm";
+import { household, householdMember } from "@/infrastructure/db/schema";
 import { reviewDeadlines, dueReminder } from "@/domain/deadlines";
 import { formatDateLong } from "@/domain/dates";
 import { getSetting, setSetting } from "@/infrastructure/db/settings";
-import { notifyAll } from "@/infrastructure/push/push";
+import { householdKey, notify } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
 import { yearAttemptKey, yearRetryDue } from "@/infrastructure/ofsp/retry";
 import { activeDataset } from "@/infrastructure/db/queries";
@@ -38,8 +40,9 @@ export async function checkForNewPremiums(force = false): Promise<string> {
     if (sig && (outcome.status === "IMPORTED" || outcome.status === "ALREADY")) setSetting(db(), "ofsp.signature", sig);
     if (outcome.status === "IMPORTED" && outcome.report.year) {
       const year = outcome.report.year;
-      await notifyAll(
+      await notify(
         db(),
+        { all: true },
         { title: `Primes ${year} publiées`, body: "Les nouveaux tarifs sont importés : découvrez la hausse pour votre foyer.", url: `/rituel/${year}` },
         `primes-${year}-${outcome.datasetId}`,
       );
@@ -50,24 +53,35 @@ export async function checkForNewPremiums(force = false): Promise<string> {
   return started ? "Import lancé." : "Un import est déjà en cours.";
 }
 
-/** Rappels avant la date d'envoi recommandée, tant que des lettres restent à envoyer. */
+/** Rappels avant la date d'envoi recommandée, foyer par foyer, tant que son rituel n'est pas clôturé. */
 export async function sendDeadlineReminders(): Promise<void> {
   const year = ritualYear();
   if (!activeDataset(db(), year)) return;
-  const r = getReviewByYear(db(), year);
-  if (r?.status === "CLOSED") return;
   const d = reviewDeadlines(year);
   const left = dueReminder(today(), d);
   if (left === null) return;
-  await notifyAll(
-    db(),
-    {
-      title: `Primes ${year} : J-${left}`,
-      body: `Envoyez vos éventuelles résiliations avant le ${formatDateLong(d.sendBy)} (réception au plus tard le ${formatDateLong(d.receiptDeadline)}).`,
-      url: `/rituel/${year}`,
-    },
-    `rappel-${year}-J${left}`,
-  );
+  const households = db()
+    .selectDistinct({ id: household.id, userId: householdMember.userId })
+    .from(household)
+    .innerJoin(householdMember, eq(householdMember.householdId, household.id))
+    .all();
+  const seen = new Set<number>();
+  for (const h of households) {
+    if (seen.has(h.id)) continue;
+    seen.add(h.id);
+    const r = getReviewByYear(db(), { userId: h.userId, householdId: h.id, admin: false }, year);
+    if (r?.status === "CLOSED") continue;
+    await notify(
+      db(),
+      { householdId: h.id },
+      {
+        title: `Primes ${year} : J-${left}`,
+        body: `Envoyez vos éventuelles résiliations avant le ${formatDateLong(d.sendBy)} (réception au plus tard le ${formatDateLong(d.receiptDeadline)}).`,
+        url: `/rituel/${year}`,
+      },
+      householdKey(h.id, `rappel-${year}-J${left}`),
+    );
+  }
 }
 
 function inPublicationSeason(iso: string): boolean {

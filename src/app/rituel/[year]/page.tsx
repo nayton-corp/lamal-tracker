@@ -23,6 +23,7 @@ import { ConfirmButton } from "@/ui/confirm-button";
 import { Chf, Delta, Saving } from "@/ui/money";
 import { EmptyState, Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +42,10 @@ const RENEWAL_BADGE = {
 } as const;
 
 export default async function RitualPage({ params }: { params: Promise<{ year: string }> }) {
+  const scope = await pageScope();
   const year = Number((await params).year);
   if (!Number.isInteger(year) || year < 2011 || year > Number(today().slice(0, 4)) + 1) notFound();
-  const h = getHousehold(db());
+  const h = getHousehold(db(), scope);
   const persons = h ? listPersons(db(), h.id) : [];
 
   if (!h || persons.length === 0) {
@@ -60,8 +62,8 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
   const dataset = activeDataset(db(), year);
   // Les primes sont publiées : l'analyse s'ouvre d'elle-même (rien n'est décidé à la place de l'utilisateur).
   const windowOpen = ritualWindowOpen(today(), year, Boolean(dataset));
-  if (windowOpen && !getReviewByYear(db(), year)) ensureReview(db(), year);
-  const reviewRow = getReviewByYear(db(), year);
+  if (windowOpen && !getReviewByYear(db(), scope, year)) ensureReview(db(), scope, year);
+  const reviewRow = getReviewByYear(db(), scope, year);
   const hasContracts = persons.some((p) => listPolicies(db(), p.id).some((x) => x.policy.coverageYear === year - 1));
 
   if (!reviewRow) {
@@ -102,7 +104,7 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
     );
   }
 
-  const view = getReviewView(db(), reviewRow.id, today());
+  const view = getReviewView(db(), scope, reviewRow.id, today());
   const closed = view.review.status === "CLOSED";
   const missingPersons = persons.filter((p) => !view.persons.some((x) => x.person.id === p.id));
   return (

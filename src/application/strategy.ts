@@ -7,10 +7,10 @@ import { franchisesFor } from "@/domain/parameters";
 import { qualityPoints, rankForStrategy, STRATEGIES, strategyDefaults, type Strategy } from "@/domain/strategy";
 import type { Db } from "@/infrastructure/db/client";
 import { offersFor, parametersFor } from "@/infrastructure/db/queries";
-import { lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
-import { getHousehold } from "./household";
+import { household, lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
+import { ownedLine, ownedReview, type Scope } from "./scope";
 import { insurerProfiles } from "./insurers";
-import { UserError } from "./review";
+import { NotFoundError, UserError } from "./errors";
 
 type LineRow = typeof reviewLine.$inferSelect;
 type ReviewRow = typeof review.$inferSelect;
@@ -33,19 +33,18 @@ export interface LineContext {
   ctx: Parameters<typeof costOf>[1];
 }
 
-export function lineContext(db: Db, lineId: number, healthCostsRp?: number): LineContext {
-  const line = db.select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
-  if (!line) throw new UserError("Ligne introuvable.");
+export function lineContext(db: Db, scope: Scope, lineId: number, healthCostsRp?: number): LineContext {
+  const line = ownedLine(db, scope, lineId);
   const r = db.select().from(review).where(eq(review.id, line.reviewId)).get()!;
   const p = db.select().from(person).where(eq(person.id, line.personId)).get()!;
   const policy = db.select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
-  const h = getHousehold(db)!;
+  const h = db.select().from(household).where(eq(household.id, r.householdId)).get()!;
   const params = parametersFor(db, r.targetYear);
   const allowedFranchises = franchisesFor(params, line.targetAgeClass);
   const ctx = { ageClass: line.targetAgeClass, params, healthCostsRp: healthCostsRp ?? p.healthCostsRp };
-  const scope = { canton: h.canton, region: h.region, ageClass: line.targetAgeClass, accident: line.accident, subgroup: line.subgroup };
-  const offers = offersFor(db, { datasetId: r.datasetId, ...scope }).filter((o) => allowedFranchises.includes(o.franchiseChf));
-  const profiles = insurerProfiles(db, { ...scope, targetYear: r.targetYear });
+  const profile = { canton: h.canton, region: h.region, ageClass: line.targetAgeClass, accident: line.accident, subgroup: line.subgroup };
+  const offers = offersFor(db, { datasetId: r.datasetId, ...profile }).filter((o) => allowedFranchises.includes(o.franchiseChf));
+  const profiles = insurerProfiles(db, { ...profile, targetYear: r.targetYear });
   const qualityById: Record<number, number> = {};
   for (const [id, profile] of profiles) qualityById[id] = qualityPoints(profile);
   const renewalTotalRp =
@@ -97,9 +96,10 @@ export interface StrategyOverview {
 }
 
 /** Aperçu des trois stratégies pour le foyer : ce que chacune ferait économiser. */
-export function strategyOverview(db: Db, reviewId: number): StrategyOverview[] {
+export function strategyOverview(db: Db, scope: Scope, reviewId: number): StrategyOverview[] {
+  ownedReview(db, scope, reviewId);
   const lines = db.select().from(reviewLine).where(eq(reviewLine.reviewId, reviewId)).orderBy(asc(reviewLine.id)).all();
-  const contexts = lines.map((l) => lineContext(db, l.id));
+  const contexts = lines.map((l) => lineContext(db, scope, l.id));
   const picks = contexts.map((c) => ({ c, picks: picksFor(c) }));
   return STRATEGIES.map((strategy) => {
     const persons = picks.map(({ c, picks: ps }) => ({ lineId: c.line.id, firstName: c.person.firstName, offer: ps.find((p) => p.strategy === strategy)!.offer }));
@@ -112,9 +112,8 @@ export function strategyOverview(db: Db, reviewId: number): StrategyOverview[] {
   });
 }
 
-function openReviewRow(db: Db, reviewId: number) {
-  const r = db.select().from(review).where(eq(review.id, reviewId)).get();
-  if (!r) throw new UserError("Rituel introuvable.");
+function openReviewRow(db: Db, scope: Scope, reviewId: number) {
+  const r = ownedReview(db, scope, reviewId);
   if (r.status === "CLOSED") throw new UserError("Ce rituel est clôturé.");
   return r;
 }
@@ -123,8 +122,8 @@ function openReviewRow(db: Db, reviewId: number) {
  * Choisit la stratégie du foyer. Les besoins des personnes encore sans décision repartent des
  * réglages de la stratégie (ils restent modifiables à l'étape suivante).
  */
-export function setStrategy(db: Db, reviewId: number, strategy: Strategy) {
-  const r = openReviewRow(db, reviewId);
+export function setStrategy(db: Db, scope: Scope, reviewId: number, strategy: Strategy) {
+  const r = openReviewRow(db, scope, reviewId);
   db.transaction((tx) => {
     tx.update(review).set({ strategy, needsConfirmedAt: null }).where(eq(review.id, r.id)).run();
     const lines = tx.select().from(reviewLine).where(and(eq(reviewLine.reviewId, r.id), eq(reviewLine.decision, "UNDECIDED"))).all();
@@ -147,12 +146,12 @@ export interface NeedsInput {
 }
 
 /** Enregistre le questionnaire des besoins de chaque personne et ouvre le comparateur. */
-export function saveNeeds(db: Db, reviewId: number, needs: NeedsInput[], nowIso: string) {
-  const r = openReviewRow(db, reviewId);
+export function saveNeeds(db: Db, scope: Scope, reviewId: number, needs: NeedsInput[], nowIso: string) {
+  const r = openReviewRow(db, scope, reviewId);
   db.transaction((tx) => {
     for (const n of needs) {
       const line = tx.select().from(reviewLine).where(eq(reviewLine.id, n.lineId)).get();
-      if (!line || line.reviewId !== r.id) throw new UserError("Personne introuvable dans ce rituel.");
+      if (!line || line.reviewId !== r.id) throw new NotFoundError("Personne");
       const models = n.models.filter((m): m is ModelType => (MODEL_TYPES as readonly string[]).includes(m));
       if (n.healthCostsRp < 0) throw new UserError("Frais de santé invalides.");
       tx.update(reviewLine).set({ wishFranchiseChf: n.franchiseChf, wishModels: models }).where(eq(reviewLine.id, line.id)).run();

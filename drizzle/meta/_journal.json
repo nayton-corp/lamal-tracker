@@ -43,6 +43,13 @@
       "when": 1791004519313,
       "tag": "0005_letter_pingen",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791111128331,
+      "tag": "0006_multi_household",
+      "breakpoints": true
     }
   ]
 }

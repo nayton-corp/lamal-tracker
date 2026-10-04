@@ -7,6 +7,7 @@ import type { Db } from "@/infrastructure/db/client";
 import { activeDataset, insurerLabel, offersFor, parametersFor } from "@/infrastructure/db/queries";
 import { insurer, lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
 import { getHousehold } from "./household";
+import type { Scope } from "./scope";
 
 export interface HistoryPoint {
   year: number;
@@ -59,8 +60,8 @@ export interface HouseholdHistory {
 }
 
 /** Historique pluriannuel : primes réellement facturées, nettes de CO2, et repères de marché. */
-export function householdHistory(db: Db): HouseholdHistory {
-  const h = getHousehold(db);
+export function householdHistory(db: Db, scope: Scope): HouseholdHistory {
+  const h = getHousehold(db, scope);
   if (!h) return { years: [], persons: [], totals: [], stats: { totalPaidRp: 0, ritualSavings: [], avgChangePermille: null, avgMarketChangePermille: null, gapToCheapestAnnualRp: null } };
   const persons = db.select().from(person).where(eq(person.householdId, h.id)).orderBy(asc(person.sortOrder), asc(person.birthDate)).all();
   const insurers = new Map(db.select().from(insurer).all().map((i) => [i.id, i]));

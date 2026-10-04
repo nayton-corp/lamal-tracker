@@ -8,6 +8,7 @@ import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/p
 import type { Db } from "@/infrastructure/db/client";
 import { activeDataset, insurerLabel, parametersFor } from "@/infrastructure/db/queries";
 import { insurer, premium, tariff } from "@/infrastructure/db/schema";
+import { withHousehold, type Scope } from "./scope";
 import { getHousehold, listInsurers, listLca, listPersons, saveHousehold, saveLca, savePerson, savePolicy, setHouseholdMode } from "./household";
 import { UserError } from "./review";
 
@@ -45,8 +46,8 @@ interface Candidate {
 }
 
 /** Primes officielles d'une personne pour l'année, dont le montant figure sur la police. */
-function candidates(db: Db, year: number, birthDate: string, kidSubgroup: string, amounts: number[], insurerId: number | null): Candidate[] {
-  const h = getHousehold(db);
+function candidates(db: Db, scope: Scope, year: number, birthDate: string, kidSubgroup: string, amounts: number[], insurerId: number | null): Candidate[] {
+  const h = getHousehold(db, scope);
   const ds = activeDataset(db, year);
   if (!h || !ds || amounts.length === 0) return [];
   const ageClass = ageClassForYear(birthDate, year);
@@ -82,8 +83,8 @@ function bestCandidate(list: Candidate[], read: PolicyExtract["persons"][number]
  * Analyse le texte d'une police : caisse, année, puis pour chaque membre du foyer reconnu, le
  * tarif officiel dont la prime figure sur la police (ou, à défaut, ce qu'on a pu lire).
  */
-export function analyzePolicyText(db: Db, text: string, currentYear: number): PolicyImport {
-  const h = getHousehold(db);
+export function analyzePolicyText(db: Db, scope: Scope, text: string, currentYear: number): PolicyImport {
+  const h = getHousehold(db, scope);
   if (!h) throw new UserError("Configurez d'abord le foyer (canton, région, membres).");
   const persons = listPersons(db, h.id);
   if (persons.length === 0) throw new UserError("Ajoutez d'abord les membres du foyer : leur date de naissance permet de les retrouver dans la police.");
@@ -106,9 +107,9 @@ export function analyzePolicyText(db: Db, text: string, currentYear: number): Po
   let insurerId = extract.insurerId;
   const out: ImportedPerson[] = extract.persons.map((read) => {
     const p = persons.find((x) => x.id === read.personId)!;
-    let list = candidates(db, year, p.birthDate, p.kidSubgroup, read.amountsRp, insurerId);
+    let list = candidates(db, scope, year, p.birthDate, p.kidSubgroup, read.amountsRp, insurerId);
     // Caisse mal reconnue (ou absente) : la prime exacte suffit à retrouver le tarif.
-    if (list.length === 0) list = candidates(db, year, p.birthDate, p.kidSubgroup, read.amountsRp, null);
+    if (list.length === 0) list = candidates(db, scope, year, p.birthDate, p.kidSubgroup, read.amountsRp, null);
     const c = bestCandidate(list, read);
     if (c && (insurerId === null || list.every((x) => x.insurerId === c.insurerId))) insurerId = c.insurerId;
     return {
@@ -172,18 +173,19 @@ export interface HouseholdFromPolicy {
 }
 
 /** Crée le foyer et ses personnes d'un coup (accueil depuis la police) ; solo si une seule personne. */
-export function createHouseholdFromPolicy(db: Db, input: HouseholdFromPolicy): number {
-  if (getHousehold(db)) throw new UserError("Un foyer existe déjà.");
+export function createHouseholdFromPolicy(db: Db, scope: Scope, input: HouseholdFromPolicy): number {
+  if (scope.householdId !== null) throw new UserError("Un foyer existe déjà.");
   if (input.persons.length === 0) throw new UserError("Indiquez au moins une personne.");
   const first = input.persons[0]!;
   return db.transaction(() => {
-    const id = saveHousehold(db, {
+    const id = saveHousehold(db, scope, {
       name: input.persons.length === 1 ? `${first.firstName} ${first.lastName}` : `Famille ${first.lastName}`,
       ...input.address,
       canton: input.address.canton as never,
     });
-    for (const p of input.persons) savePerson(db, id, { ...p, healthCostsRp: 50000 });
-    setHouseholdMode(db, input.persons.length === 1 ? "SOLO" : "FAMILY");
+    const created = withHousehold(scope, id);
+    for (const p of input.persons) savePerson(db, created, { ...p, healthCostsRp: 50000 });
+    setHouseholdMode(db, created, input.persons.length === 1 ? "SOLO" : "FAMILY");
     return id;
   });
 }
@@ -205,12 +207,12 @@ export interface ConfirmedImport {
 }
 
 /** Enregistre les contrats confirmés (remplace le contrat de l'année s'il existe) et les complémentaires nouvelles. */
-export function applyPolicyImport(db: Db, input: ConfirmedImport): number {
+export function applyPolicyImport(db: Db, scope: Scope, input: ConfirmedImport): number {
   const ins = db.select().from(insurer).where(eq(insurer.id, input.insurerId)).get();
   if (!ins) throw new UserError("Caisse inconnue.");
   db.transaction(() => {
     for (const p of input.persons) {
-      savePolicy(db, {
+      savePolicy(db, scope, {
         personId: p.personId,
         coverageYear: input.year,
         insurerId: input.insurerId,
@@ -224,7 +226,7 @@ export function applyPolicyImport(db: Db, input: ConfirmedImport): number {
       });
       const existing = new Set(listLca(db, p.personId).filter((c) => c.active).map((c) => c.guarantee));
       for (const l of p.lca.filter((x) => !existing.has(x.guarantee))) {
-        saveLca(db, {
+        saveLca(db, scope, {
           personId: p.personId,
           insurerName: ins.groupName ?? insurerLabel(ins),
           linkedInsurerId: input.insurerId,

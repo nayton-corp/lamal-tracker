@@ -27,6 +27,7 @@ import { pingenClient } from "@/server/pingen";
 import { PingenOffer, PingenTracking } from "./pingen-panel";
 import { ShareButton } from "./share-button";
 import { SignaturePad } from "./signature-pad";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Démarches" };
@@ -72,17 +73,18 @@ function PdfButtons({ url, filename, mailto, primary }: { url: string; filename:
 }
 
 export default async function ProceduresPage({ params }: { params: Promise<{ year: string }> }) {
+  const scope = await pageScope();
   const year = Number((await params).year);
-  const r = getReviewByYear(db(), year);
+  const r = getReviewByYear(db(), scope, year);
   if (!r) redirect(`/rituel/${year}`);
-  const view = getReviewView(db(), r.id, today());
+  const view = getReviewView(db(), scope, r.id, today());
   const switching = view.persons.filter((p) => p.line.decision === "SWITCH");
   const adjusting = view.persons.filter((p) => p.line.decision === "ADJUST");
   const keeping = view.persons.filter((p) => p.line.decision === "KEEP");
   const undecided = view.persons.filter((p) => p.line.decision === "UNDECIDED");
   // Aucune décision prise : les démarches n'ont pas encore de sens.
   if (undecided.length === view.persons.length) redirect(`/rituel/${year}`);
-  const offers = listOfferRequests(db(), r.id);
+  const offers = listOfferRequests(db(), scope, r.id);
   const terminations = view.letters.filter((l) => l.kind === "TERMINATION");
   const changes = view.letters.filter((l) => l.kind === "CHANGE");
   const warnings = [...switching, ...adjusting].flatMap((p) => p.letterCheck.warnings.filter((w) => !/Demandez d'abord/.test(w)).map((w) => `${p.person.firstName} : ${w}`));
@@ -96,7 +98,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
     [...switching, ...adjusting].length > 0 && [...terminations, ...changes].length > 0 && [...terminations, ...changes].every((l) => l.sentAt && !failedAtPingen(l));
   const confirmDone = offers.every((o) => o.answeredAt) && terminations.every((l) => l.acknowledgedAt) && offers.length + terminations.length > 0;
   const involved = new Set([...switching, ...adjusting].map((p) => p.person.id));
-  const signers = listSignatures(db()).filter((s) => involved.has(s.personId) && year - 1 - Number(s.birthDate.slice(0, 4)) >= 18);
+  const signers = listSignatures(db(), scope).filter((s) => involved.has(s.personId) && year - 1 - Number(s.birthDate.slice(0, 4)) >= 18);
   const pingen = pingenClient();
   let n = 0;
 
@@ -302,7 +304,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
                   </ActionForm>
                 )}
                 {pingen && !l.sentAt && (
-                  <PingenOffer letterId={l.id} termination={l.kind === "TERMINATION"} blockers={pingenReadiness(db(), content)} sendBy={view.deadlines.sendBy} staging={pingen.staging} />
+                  <PingenOffer letterId={l.id} termination={l.kind === "TERMINATION"} blockers={pingenReadiness(db(), scope, content)} sendBy={view.deadlines.sendBy} staging={pingen.staging} />
                 )}
                 {!l.sentAt && (
                   <form action={deleteLetterAction}>

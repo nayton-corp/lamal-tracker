@@ -1,16 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { hasPassword, touchSession } from "@/application/auth";
+import { passwordToDefine, touchSession } from "@/application/auth";
 import { db, nowIso } from "@/server/context";
 import { SESSION_COOKIE } from "@/server/auth";
 
 /**
- * Contrôle d'accès de chaque requête : pas de mot de passe défini → sa création ; pas de
+ * Contrôle d'accès de chaque requête : aucun compte → création du premier ; pas de
  * session → connexion. Seuls les fichiers statiques de la PWA et /api/health passent.
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const onLogin = pathname === "/login" || pathname.startsWith("/login/");
-  if (!hasPassword(db())) {
+  if (passwordToDefine(db())) {
     if (pathname === "/login/creer") return NextResponse.next();
     if (pathname.startsWith("/api/")) return new NextResponse("Mot de passe à définir", { status: 401 });
     return NextResponse.redirect(new URL("/login/creer", request.url));

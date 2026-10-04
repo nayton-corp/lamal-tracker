@@ -1,7 +1,7 @@
 import { ArrowRight, Check, Pencil, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { chooseModeAction } from "@/app/actions/journey";
-import { getHousehold, getHouseholdMode, listInsurers, listPersons, listPolicies } from "@/application/household";
+import { getHousehold, listInsurers, listPersons, listPolicies } from "@/application/household";
 import { formatDateShort } from "@/domain/dates";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { db, today } from "@/server/context";
@@ -10,6 +10,8 @@ import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
 import { Page } from "@/ui/page";
 import { ContractsStep, IdentityStep, MemberAdder } from "./steps";
+import { pageScope } from "@/server/auth";
+import { chosenMode } from "@/server/onboarding";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bienvenue" };
@@ -33,9 +35,10 @@ const FAMILY_STEPS: { key: StepKey; label: string }[] = [
  * PDF) → votre contrat. Foyer : pour qui → adresse (ou la police PDF) → personnes → contrats.
  */
 export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ etape?: string }> }) {
+  const scope = await pageScope();
   const asked = (await searchParams).etape as StepKey | undefined;
-  const h = getHousehold(db());
-  const mode = getHouseholdMode(db());
+  const h = getHousehold(db(), scope);
+  const mode = await chosenMode(scope);
   const solo = mode === "SOLO";
   const year = Number(today().slice(0, 4));
   const persons = h ? listPersons(db(), h.id) : [];

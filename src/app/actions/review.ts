@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { generateLetters } from "@/application/letters";
 import { abandonPingen, sendLetterViaPingen, syncPingenLetters } from "@/application/pingen";
 import { deleteOfferRequest, generateOfferRequests, markOfferRequestAnswered, markOfferRequestSent, setLcaWishes } from "@/application/offers";
@@ -19,23 +18,25 @@ import {
   openReview,
   reopenReview,
   getReviewView,
+  reviewMembers,
+  setHealthCosts,
   setLineFlags,
   undoDecision,
 } from "@/application/review";
 import { nextStep } from "@/app/rituel/_parts/next-step";
-import { person, reviewLine } from "@/infrastructure/db/schema";
 import { toActionError, chfField, rethrowForeignKey, type ActionState } from "@/server/action";
 import { db, nowIso, today } from "@/server/context";
-import { requireSession } from "@/server/auth";
+import { requireScope } from "@/server/auth";
+import { findLine, ownedLetter, type Scope } from "@/application/scope";
 import { pingenClient, pingenDeps } from "@/server/pingen";
 
 /** Après un choix : la personne suivante sans choix, sinon l'étape suivante du rituel (LCA, démarches…). */
-function afterDecision(year: number, lineId: number) {
-  const line = db().select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
+function afterDecision(scope: Scope, year: number, lineId: number) {
+  const line = findLine(db(), scope, lineId);
   if (!line) return done(year);
-  const next = db().select().from(reviewLine).where(eq(reviewLine.reviewId, line.reviewId)).all().find((l) => l.decision === "UNDECIDED");
+  const next = reviewMembers(db(), scope, line.reviewId).find((l) => l.decision === "UNDECIDED");
   if (next) return done(year, `/personne/${next.id}`);
-  const step = nextStep(getReviewView(db(), line.reviewId, today()));
+  const step = nextStep(getReviewView(db(), scope, line.reviewId, today()));
   revalidatePath("/", "layout");
   redirect(step.kind === "close" || step.kind === "none" ? `/rituel/${year}#ligne-${lineId}` : step.href);
 }
@@ -46,10 +47,10 @@ function done(year: number, path = "") {
 }
 
 export async function openReviewAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   const year = Number(form.get("year"));
   try {
-    const { skipped } = openReview(db(), year);
+    const { skipped } = openReview(db(), scope, year);
     if (skipped.length) {
       revalidatePath("/", "layout");
       return { error: `Personnes non incluses : ${skipped.join(", ")}. Ajoutez leur contrat dans Foyer.` };
@@ -62,33 +63,33 @@ export async function openReviewAction(_: ActionState, form: FormData): Promise<
 }
 
 export async function decideAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   const year = Number(form.get("year"));
   try {
-    decide(db(), Number(form.get("lineId")), { tariffId: Number(form.get("tariffId")), franchiseChf: Number(form.get("franchiseChf")) }, nowIso());
+    decide(db(), scope, Number(form.get("lineId")), { tariffId: Number(form.get("tariffId")), franchiseChf: Number(form.get("franchiseChf")) }, nowIso());
   } catch (e) {
     return toActionError(e);
   }
-  afterDecision(year, Number(form.get("lineId")));
+  afterDecision(scope, year, Number(form.get("lineId")));
   return null;
 }
 
 export async function keepAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   const year = Number(form.get("year"));
   try {
-    keepAsIs(db(), Number(form.get("lineId")), nowIso());
+    keepAsIs(db(), scope, Number(form.get("lineId")), nowIso());
   } catch (e) {
     return toActionError(e);
   }
-  afterDecision(year, Number(form.get("lineId")));
+  afterDecision(scope, year, Number(form.get("lineId")));
   return null;
 }
 
 export async function undoAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    undoDecision(db(), Number(form.get("lineId")));
+    undoDecision(db(), scope, Number(form.get("lineId")));
   } catch (e) {
     return toActionError(e);
   }
@@ -97,9 +98,9 @@ export async function undoAction(_: ActionState, form: FormData): Promise<Action
 }
 
 export async function confirmLineageAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    confirmLineage(db(), Number(form.get("lineId")), String(form.get("toCode")));
+    confirmLineage(db(), scope, Number(form.get("lineId")), String(form.get("toCode")));
   } catch (e) {
     return toActionError(e);
   }
@@ -108,9 +109,9 @@ export async function confirmLineageAction(_: ActionState, form: FormData): Prom
 }
 
 export async function acknowledgeLcaAction(lineId: number): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    acknowledgeLca(db(), lineId, nowIso());
+    acknowledgeLca(db(), scope, Number(lineId), nowIso());
   } catch (e) {
     return toActionError(e);
   }
@@ -119,10 +120,10 @@ export async function acknowledgeLcaAction(lineId: number): Promise<ActionState>
 }
 
 export async function lineFlagsAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
     const doctor = form.get("doctorCheck");
-    setLineFlags(db(), Number(form.get("lineId")), {
+    setLineFlags(db(), scope, Number(form.get("lineId")), {
       ...(doctor ? { doctorCheck: String(doctor) as "YES" | "NO" | "UNKNOWN" } : {}),
       ...(form.has("affiliation") ? { affiliationRequestedAt: form.get("affiliation") === "on" ? today() : null } : {}),
     });
@@ -134,11 +135,10 @@ export async function lineFlagsAction(_: ActionState, form: FormData): Promise<A
 }
 
 export async function healthCostsAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    const line = db().select().from(reviewLine).where(eq(reviewLine.id, Number(form.get("lineId")))).get();
     const amount = chfField(form.get("healthCosts"));
-    if (line && amount !== null) db().update(person).set({ healthCostsRp: amount }).where(eq(person.id, line.personId)).run();
+    if (amount !== null) setHealthCosts(db(), scope, Number(form.get("lineId")), amount);
   } catch (e) {
     return toActionError(e);
   }
@@ -147,9 +147,9 @@ export async function healthCostsAction(_: ActionState, form: FormData): Promise
 }
 
 export async function generateLettersAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    const res = generateLetters(db(), Number(form.get("reviewId")), today());
+    const res = generateLetters(db(), scope, Number(form.get("reviewId")), today());
     revalidatePath("/", "layout");
     if (res.blocked.length) {
       return { error: res.blocked.map((b) => `${b.person} : ${b.reasons.join(" ")}`).join("\n") };
@@ -161,10 +161,10 @@ export async function generateLettersAction(_: ActionState, form: FormData): Pro
 }
 
 export async function letterSentAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
     const date = String(form.get("sentAt") || today());
-    markLetterSent(db(), Number(form.get("letterId")), date, String(form.get("tracking") ?? "").trim() || null);
+    markLetterSent(db(), scope, Number(form.get("letterId")), date, String(form.get("tracking") ?? "").trim() || null);
   } catch (e) {
     return toActionError(e);
   }
@@ -173,9 +173,9 @@ export async function letterSentAction(_: ActionState, form: FormData): Promise<
 }
 
 export async function letterAckAction(form: FormData) {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    markLetterAcknowledged(db(), Number(form.get("letterId")), form.get("undo") ? null : today());
+    markLetterAcknowledged(db(), scope, Number(form.get("letterId")), form.get("undo") ? null : today());
   } catch (e) {
     rethrowForeignKey(e, "Cette lettre est encore référencée : impossible de modifier son état.");
   }
@@ -183,9 +183,9 @@ export async function letterAckAction(form: FormData) {
 }
 
 export async function deleteLetterAction(form: FormData) {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    deleteLetter(db(), Number(form.get("letterId")));
+    deleteLetter(db(), scope, Number(form.get("letterId")));
   } catch (e) {
     rethrowForeignKey(e, "Cette lettre est encore référencée : supprimez d'abord ce qui s'y rapporte.");
   }
@@ -193,10 +193,10 @@ export async function deleteLetterAction(form: FormData) {
 }
 
 export async function closeReviewAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   const year = Number(form.get("year"));
   try {
-    closeReview(db(), Number(form.get("reviewId")), nowIso());
+    closeReview(db(), scope, Number(form.get("reviewId")), nowIso());
   } catch (e) {
     return toActionError(e);
   }
@@ -205,10 +205,10 @@ export async function closeReviewAction(_: ActionState, form: FormData): Promise
 }
 
 export async function reopenReviewAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   const year = Number(form.get("year"));
   try {
-    reopenReview(db(), Number(form.get("reviewId")));
+    reopenReview(db(), scope, Number(form.get("reviewId")));
   } catch (e) {
     return toActionError(e);
   }
@@ -217,10 +217,10 @@ export async function reopenReviewAction(_: ActionState, form: FormData): Promis
 }
 
 export async function deleteReviewAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   const year = Number(form.get("year"));
   try {
-    deleteReview(db(), Number(form.get("reviewId")));
+    deleteReview(db(), scope, Number(form.get("reviewId")));
   } catch (e) {
     return toActionError(e);
   }
@@ -229,9 +229,9 @@ export async function deleteReviewAction(_: ActionState, form: FormData): Promis
 }
 
 export async function generateOffersAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    const ids = generateOfferRequests(db(), Number(form.get("reviewId")), today());
+    const ids = generateOfferRequests(db(), scope, Number(form.get("reviewId")), today());
     revalidatePath("/", "layout");
     return { ok: ids.length ? `${ids.length} demande(s) prête(s).` : "Aucune nouvelle caisse choisie." };
   } catch (e) {
@@ -240,9 +240,9 @@ export async function generateOffersAction(_: ActionState, form: FormData): Prom
 }
 
 export async function offerSentAction(form: FormData) {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    markOfferRequestSent(db(), Number(form.get("offerId")), form.get("undo") ? null : today());
+    markOfferRequestSent(db(), scope, Number(form.get("offerId")), form.get("undo") ? null : today());
   } catch (e) {
     rethrowForeignKey(e, "Cette demande d'offre est encore référencée : impossible de modifier son état.");
   }
@@ -250,9 +250,9 @@ export async function offerSentAction(form: FormData) {
 }
 
 export async function offerAnsweredAction(form: FormData) {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    markOfferRequestAnswered(db(), Number(form.get("offerId")), form.get("undo") ? null : today());
+    markOfferRequestAnswered(db(), scope, Number(form.get("offerId")), form.get("undo") ? null : today());
   } catch (e) {
     rethrowForeignKey(e, "Cette demande d'offre est encore référencée : impossible de modifier son état.");
   }
@@ -260,9 +260,9 @@ export async function offerAnsweredAction(form: FormData) {
 }
 
 export async function deleteOfferAction(form: FormData) {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    deleteOfferRequest(db(), Number(form.get("offerId")));
+    deleteOfferRequest(db(), scope, Number(form.get("offerId")));
   } catch (e) {
     rethrowForeignKey(e, "Cette demande d'offre est encore référencée : supprimez d'abord ce qui s'y rapporte.");
   }
@@ -270,9 +270,9 @@ export async function deleteOfferAction(form: FormData) {
 }
 
 export async function lcaWishesAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    setLcaWishes(db(), Number(form.get("lineId")), form.getAll("wish").map(String));
+    setLcaWishes(db(), scope, Number(form.get("lineId")), form.getAll("wish").map(String));
   } catch (e) {
     return toActionError(e);
   }
@@ -282,11 +282,11 @@ export async function lcaWishesAction(_: ActionState, form: FormData): Promise<A
 
 /** Prépare d'un coup les demandes aux nouvelles caisses et les lettres aux caisses actuelles. */
 export async function prepareAllAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
     const reviewId = Number(form.get("reviewId"));
-    const offers = generateOfferRequests(db(), reviewId, today());
-    const res = generateLetters(db(), reviewId, today());
+    const offers = generateOfferRequests(db(), scope, reviewId, today());
+    const res = generateLetters(db(), scope, reviewId, today());
     revalidatePath("/", "layout");
     if (res.blocked.length) {
       return { error: res.blocked.map((b) => `${b.person} : ${b.reasons.join(" ")}`).join("\n") };
@@ -299,11 +299,11 @@ export async function prepareAllAction(_: ActionState, form: FormData): Promise<
 }
 
 export async function pingenSendAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   const client = pingenClient();
   if (!client) return { error: "L'envoi par Pingen n'est pas configuré." };
   try {
-    await sendLetterViaPingen(db(), Number(form.get("letterId")), today(), nowIso(), pingenDeps(client));
+    await sendLetterViaPingen(db(), scope, Number(form.get("letterId")), today(), nowIso(), pingenDeps(client));
   } catch (e) {
     revalidatePath("/", "layout");
     return toActionError(e);
@@ -313,19 +313,25 @@ export async function pingenSendAction(_: ActionState, form: FormData): Promise<
 }
 
 export async function pingenRefreshAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   const client = pingenClient();
   if (!client) return { error: "L'envoi par Pingen n'est pas configuré." };
-  const result = await syncPingenLetters(db(), client, nowIso(), Number(form.get("letterId")));
+  let letterId: number;
+  try {
+    letterId = ownedLetter(db(), scope, Number(form.get("letterId"))).id;
+  } catch (e) {
+    return toActionError(e);
+  }
+  const result = await syncPingenLetters(db(), client, nowIso(), letterId);
   revalidatePath("/", "layout");
   if (result.errors.length) return { error: `Pingen n'a pas pu être consulté : ${result.errors[0]}` };
   return { ok: "Suivi mis à jour." };
 }
 
 export async function pingenAbandonAction(_: ActionState, form: FormData): Promise<ActionState> {
-  await requireSession();
+  const scope = await requireScope();
   try {
-    abandonPingen(db(), Number(form.get("letterId")));
+    abandonPingen(db(), scope, Number(form.get("letterId")));
   } catch (e) {
     return toActionError(e);
   }

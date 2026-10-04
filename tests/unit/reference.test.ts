@@ -11,6 +11,7 @@ import { scanCo2Amounts } from "@/infrastructure/reference/co2";
 import { cellLines, parseInsurerDirectory, pickDirectoryLink, splitAddress, splitLegalNames } from "@/infrastructure/reference/insurer-directory";
 import { parseSupervisoryData } from "@/infrastructure/reference/supervisory";
 import { readWorkbook } from "@/infrastructure/reference/workbook";
+import { testAccount } from "../accounts";
 
 const FIXTURE = path.join(import.meta.dirname, "..", "fixtures", "official", "zugelassene-krankenversicherer-2026-10.xlsx");
 
@@ -120,7 +121,7 @@ describe("application des référentiels", () => {
   });
 
   it("garde l'adresse saisie par l'utilisateur quand l'annuaire change", () => {
-    saveInsurer(db, { id: css().id, terminationAddress: "Case postale 2568\n6002 Lucerne" }, "2026-10-05T08:00:00Z");
+    saveInsurer(db, testAccount(db, "ADMIN"), { id: css().id, terminationAddress: "Case postale 2568\n6002 Lucerne" }, "2026-10-05T08:00:00Z");
     applyDirectory(db, { validFrom: "2027-01-01", entries: [{ bagNumber: 8, legalNames: ["CSS SA"], legalNameFr: "CSS SA", address: ["Neue Strasse 1", "6000 Luzern"], phone: null, email: null, website: null, group: null }] });
     expect(insurerAddressLines(css())).toEqual(["Case postale 2568", "6002 Lucerne"]);
     expect(css().officialAddress).toBe("Neue Strasse 1\n6000 Luzern");

@@ -12,7 +12,7 @@ import { Sheet } from "@/ui/sheet";
 import { SubmitButton } from "@/ui/submit";
 
 /** Réglages › Sécurité : mot de passe, appareils connectés, déconnexion, remise à zéro. */
-export function SecurityPanel({ sessions, currentId }: { sessions: SessionInfo[]; currentId: string }) {
+export function SecurityPanel({ sessions, currentId }: { sessions: Omit<SessionInfo, "userId">[]; currentId: string }) {
   return (
     <div className="space-y-4">
       <ul className="divide-y divide-border rounded-xl border border-border text-sm">

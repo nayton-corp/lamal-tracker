@@ -7,9 +7,9 @@ import { buildOfferRequest, letterPlainText, type LetterContent } from "@/domain
 import { formatChf } from "@/domain/money";
 import type { Db } from "@/infrastructure/db/client";
 import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
-import { insurer, lcaPolicy, offerRequest, reviewLine } from "@/infrastructure/db/schema";
-import { getHousehold } from "./household";
+import { household, insurer, lcaPolicy, offerRequest, review, reviewLine } from "@/infrastructure/db/schema";
 import { getReviewView, UserError } from "./review";
+import { findOfferRequest, ownedLine, ownedOfferRequest, ownedReview, type Scope } from "./scope";
 
 /** Complémentaires à demander pour une ligne : celles choisies, sinon celles en cours. */
 export function lcaWishesFor(db: Db, line: { personId: number; lcaWishes: string[] | null }): LcaGuarantee[] {
@@ -22,7 +22,8 @@ export function lcaWishesFor(db: Db, line: { personId: number; lcaWishes: string
   return [...new Set(active.map((a) => a.guarantee).filter((g): g is LcaGuarantee => (LCA_GUARANTEE_KEYS as string[]).includes(g ?? "")))];
 }
 
-export function setLcaWishes(db: Db, lineId: number, keys: string[]) {
+export function setLcaWishes(db: Db, scope: Scope, lineId: number, keys: string[]) {
+  ownedLine(db, scope, lineId);
   const valid = keys.filter((k) => (LCA_GUARANTEE_KEYS as string[]).includes(k));
   db.update(reviewLine).set({ lcaWishes: valid }).where(eq(reviewLine.id, lineId)).run();
 }
@@ -31,11 +32,11 @@ export function setLcaWishes(db: Db, lineId: number, keys: string[]) {
  * Prépare une demande d'offre par nouvelle caisse choisie (décision « changer de caisse »),
  * pour toutes les personnes qui la rejoignent. Les demandes non envoyées sont refaites.
  */
-export function generateOfferRequests(db: Db, reviewId: number, today: IsoDate): number[] {
-  const view = getReviewView(db, reviewId, today);
-  const h = getHousehold(db);
+export function generateOfferRequests(db: Db, scope: Scope, reviewId: number, today: IsoDate): number[] {
+  const view = getReviewView(db, scope, reviewId, today);
+  const h = db.select().from(household).where(eq(household.id, view.review.householdId)).get();
   if (!h) throw new UserError("Foyer non configuré.");
-  const sent = new Set(listOfferRequests(db, reviewId).filter((o) => o.sentAt).flatMap((o) => o.lineIds));
+  const sent = new Set(listOfferRequests(db, scope, reviewId).filter((o) => o.sentAt).flatMap((o) => o.lineIds));
   const groups = new Map<number, typeof view.persons>();
   for (const pr of view.persons) {
     if (pr.line.decision !== "SWITCH" || !pr.line.chosenInsurerId || sent.has(pr.line.id)) continue;
@@ -82,7 +83,8 @@ export function generateOfferRequests(db: Db, reviewId: number, today: IsoDate):
   return created;
 }
 
-export function listOfferRequests(db: Db, reviewId: number) {
+export function listOfferRequests(db: Db, scope: Scope, reviewId: number) {
+  ownedReview(db, scope, reviewId);
   return db
     .select({ request: offerRequest, insurer })
     .from(offerRequest)
@@ -103,15 +105,14 @@ export function listOfferRequests(db: Db, reviewId: number) {
     });
 }
 
-export function getOfferRequest(db: Db, id: number) {
-  const row = db.select().from(offerRequest).where(eq(offerRequest.id, id)).get();
+export function getOfferRequest(db: Db, scope: Scope, id: number) {
+  const row = findOfferRequest(db, scope, id);
   return row ? { ...row, content: row.content as LetterContent } : null;
 }
 
 /** Envoi de la demande : vaut demande d'affiliation pour les personnes concernées. */
-export function markOfferRequestSent(db: Db, id: number, at: IsoDate | null) {
-  const row = getOfferRequest(db, id);
-  if (!row) throw new UserError("Demande introuvable.");
+export function markOfferRequestSent(db: Db, scope: Scope, id: number, at: IsoDate | null) {
+  const row = ownedOfferRequest(db, scope, id);
   db.transaction((tx) => {
     tx.update(offerRequest).set({ sentAt: at, answeredAt: at ? row.answeredAt : null }).where(eq(offerRequest.id, id)).run();
     for (const lineId of row.lineIds) {
@@ -123,15 +124,24 @@ export function markOfferRequestSent(db: Db, id: number, at: IsoDate | null) {
 }
 
 /** Réponse de la caisse (confirmation d'affiliation) : l'ancienne caisse pourra libérer la personne. */
-export function markOfferRequestAnswered(db: Db, id: number, at: IsoDate | null) {
-  const row = getOfferRequest(db, id);
-  if (!row) throw new UserError("Demande introuvable.");
+export function markOfferRequestAnswered(db: Db, scope: Scope, id: number, at: IsoDate | null) {
+  const row = ownedOfferRequest(db, scope, id);
   db.transaction((tx) => {
     tx.update(offerRequest).set({ answeredAt: at }).where(eq(offerRequest.id, id)).run();
     for (const lineId of row.lineIds) tx.update(reviewLine).set({ affiliationConfirmedAt: at }).where(eq(reviewLine.id, lineId)).run();
   });
 }
 
-export function deleteOfferRequest(db: Db, id: number) {
+export function deleteOfferRequest(db: Db, scope: Scope, id: number) {
+  if (!findOfferRequest(db, scope, id)) return;
   db.delete(offerRequest).where(and(eq(offerRequest.id, id), isNull(offerRequest.sentAt))).run();
+}
+
+/** Demande d'offre du foyer prête à rendre en PDF : contenu, caisse destinataire et année visée. */
+export function offerDocument(db: Db, scope: Scope, id: number) {
+  const row = getOfferRequest(db, scope, id);
+  if (!row) return null;
+  const ins = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
+  const r = db.select({ targetYear: review.targetYear }).from(review).where(eq(review.id, row.reviewId)).get()!;
+  return { ...row, insurerName: insurerLabel(ins), targetYear: r.targetYear };
 }

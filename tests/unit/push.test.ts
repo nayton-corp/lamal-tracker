@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { openDb } from "@/infrastructure/db/client";
+import { testAccount } from "../accounts";
 import { isPushEndpoint, MAX_SUBSCRIPTIONS, pushSubscriptionSchema, saveSubscription, subscriptionCount } from "@/infrastructure/push/push";
 
 describe("abonnements push", () => {
@@ -29,12 +30,13 @@ describe("abonnements push", () => {
 
   it("plafonne le nombre d'appareils, sans bloquer la mise à jour d'un appareil connu", () => {
     const db = openDb(":memory:");
+    const { userId } = testAccount(db);
     for (let i = 0; i < MAX_SUBSCRIPTIONS; i++) {
-      saveSubscription(db, { endpoint: `https://fcm.googleapis.com/fcm/send/${i}`, keys: { p256dh: "k", auth: "a" } });
+      saveSubscription(db, userId, { endpoint: `https://fcm.googleapis.com/fcm/send/${i}`, keys: { p256dh: "k", auth: "a" } });
     }
-    expect(subscriptionCount(db)).toBe(MAX_SUBSCRIPTIONS);
-    expect(() => saveSubscription(db, { endpoint: "https://fcm.googleapis.com/fcm/send/new", keys: { p256dh: "k", auth: "a" } })).toThrow(/Trop d'appareils/);
-    saveSubscription(db, { endpoint: "https://fcm.googleapis.com/fcm/send/0", keys: { p256dh: "k2", auth: "a2" } });
-    expect(subscriptionCount(db)).toBe(MAX_SUBSCRIPTIONS);
+    expect(subscriptionCount(db, userId)).toBe(MAX_SUBSCRIPTIONS);
+    expect(() => saveSubscription(db, userId, { endpoint: "https://fcm.googleapis.com/fcm/send/new", keys: { p256dh: "k", auth: "a" } })).toThrow(/Trop d'appareils/);
+    saveSubscription(db, userId, { endpoint: "https://fcm.googleapis.com/fcm/send/0", keys: { p256dh: "k2", auth: "a2" } });
+    expect(subscriptionCount(db, userId)).toBe(MAX_SUBSCRIPTIONS);
   });
 });

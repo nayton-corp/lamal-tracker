@@ -10,6 +10,7 @@ import { cn } from "@/ui/cn";
 import { Chf, Saving } from "@/ui/money";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Comparer des offres" };
@@ -17,13 +18,14 @@ export const metadata = { title: "Comparer des offres" };
 const pct = (permille: number) => `${permille >= 0 ? "+" : ""}${(permille / 10).toFixed(1)} %`;
 
 export default async function ComparePage({ params, searchParams }: { params: Promise<{ year: string; lineId: string }>; searchParams: Promise<{ c?: string }> }) {
+  const scope = await pageScope();
   const { year: y, lineId: l } = await params;
   const year = Number(y);
   const lineId = Number(l);
   const keys = ((await searchParams).c ?? "").split(",").filter(Boolean);
   let view;
   try {
-    view = compareForLine(db(), lineId, { all: true, everyOffer: true });
+    view = compareForLine(db(), scope, lineId, { all: true, everyOffer: true });
   } catch {
     notFound();
   }

@@ -4,11 +4,17 @@ import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { db, today } from "@/server/context";
+import { currentScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
-/** Copie cohérente de la base (API de sauvegarde SQLite), diffusée en flux puis supprimée. */
+/**
+ * Copie cohérente de la base (API de sauvegarde SQLite), diffusée en flux puis supprimée. Elle
+ * contient les données de tous les foyers : réservée à l'administrateur.
+ */
 export async function GET() {
+  const scope = await currentScope();
+  if (!scope?.admin) return new Response("Non autorisé", { status: 403 });
   // Nom imprévisible : le dossier temporaire est partagé avec les autres processus.
   const target = path.join(os.tmpdir(), `lamal-${randomUUID()}.db`);
   const cleanup = () => fs.rm(target, { force: true }, () => {});

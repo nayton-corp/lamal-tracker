@@ -4,12 +4,14 @@ import { insurerLabel } from "@/infrastructure/db/queries";
 import { db, today } from "@/server/context";
 import { Page, PageHeader } from "@/ui/page";
 import { ImportFlow } from "./import-flow";
+import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Importer une police" };
 
-export default function ImportPolicyPage() {
-  const h = getHousehold(db());
+export default async function ImportPolicyPage() {
+  const scope = await pageScope();
+  const h = getHousehold(db(), scope);
   if (!h) redirect("/bienvenue");
   const persons = listPersons(db(), h.id);
   const year = Number(today().slice(0, 4));
