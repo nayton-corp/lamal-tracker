@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, Download, Landmark } from "lucide-react";
+import { CheckCircle2, ChevronRight, Download, Landmark, ShieldCheck, UserRoundCog } from "lucide-react";
 import Link from "next/link";
 import { listInsurers } from "@/application/household";
 import type { ValidationReport } from "@/domain/ofsp/report";
@@ -20,10 +20,8 @@ import { ActionForm } from "@/ui/action-form";
 import { SubmitButton } from "@/ui/submit";
 import { ImportPanel } from "./import-panel";
 import { PushPanel } from "./push-panel";
-import { SecurityPanel } from "./security-panel";
-import { listSessions } from "@/application/auth";
+import { ResetAll } from "./security-panel";
 import { pageScope } from "@/server/auth";
-import { nowIso } from "@/server/context";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Réglages" };
@@ -153,11 +151,20 @@ export default async function DataPage() {
             </Card>
           </Section>
 
-          <Section title="Sécurité">
-            <Card>
-              <SecurityPanel sessions={listSessions(db(), scope.userId, nowIso())} currentId={scope.sessionId} />
-            </Card>
+          <Section title="Compte">
+            <div className="space-y-3">
+              <SettingsLink href="/compte" icon={<UserRoundCog aria-hidden className="size-5 text-primary" />} title="Mon compte" text="Courriel, mot de passe, passkeys, double facteur, appareils connectés." />
+              {scope.admin && <SettingsLink href="/admin" icon={<ShieldCheck aria-hidden className="size-5 text-primary" />} title="Administration" text="Invitations, comptes, envoi Pingen par foyer." />}
+            </div>
           </Section>
+
+          {scope.householdRole === "OWNER" && (
+            <Section title="Foyer">
+              <Card>
+                <ResetAll />
+              </Card>
+            </Section>
+          )}
 
           {scope.admin && (
           <Section title="Sauvegarde">
@@ -174,5 +181,18 @@ export default async function DataPage() {
         </div>
       </div>
     </Page>
+  );
+}
+
+function SettingsLink({ href, icon, title, text }: { href: string; icon: React.ReactNode; title: string; text: string }) {
+  return (
+    <Link href={href} className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
+      {icon}
+      <div className="flex-1">
+        <p className="font-medium">{title}</p>
+        <p className="text-sm text-muted">{text}</p>
+      </div>
+      <ChevronRight aria-hidden className="size-5 text-muted" />
+    </Link>
   );
 }

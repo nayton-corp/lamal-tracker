@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 import { generateFixtures, FIXTURES_DIR } from "../fixtures/generate";
 import { writePolicyPdf } from "../fixtures/policy-pdf";
+import { ADMIN_EMAIL, currentTotp, login, PASSWORD, saveAdminSecrets } from "./helpers";
 
 const shots = path.join("test-results", "screens");
 const shot = (page: Page, name: string) => page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: true });
@@ -11,16 +12,6 @@ test.beforeAll(async () => {
   await writePolicyPdf(FIXTURES_DIR);
 });
 
-const PASSWORD = "e2e-mot-de-passe";
-
-/** Les contextes de navigation suivants n'ont pas le cookie : connexion avec le mot de passe créé au premier test. */
-async function login(page: Page) {
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/login/);
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Entrer" }).click();
-  await expect(page).not.toHaveURL(/\/login/);
-}
 
 async function importFile(page: Page, file: string, year: number) {
   await page.goto("/donnees");
@@ -31,15 +22,39 @@ async function importFile(page: Page, file: string, year: number) {
 }
 
 test("rituel annuel complet sur mobile", async ({ page }) => {
-  // Premier démarrage : l'app exige un mot de passe avant tout.
+  // Premier démarrage : l'app exige le compte administrateur avant tout.
   await page.goto("/");
   await expect(page).toHaveURL(/\/login\/creer/);
   await shot(page, "00-mot-de-passe");
+  await page.getByLabel("Votre courriel").fill(ADMIN_EMAIL);
   await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Confirmer").fill(PASSWORD);
-  await page.getByRole("button", { name: "Créer le mot de passe" }).click();
+  await page.getByRole("button", { name: "Créer le compte" }).click();
+
+  // L'administrateur protège d'abord son compte d'un second facteur : rien d'autre n'est accessible.
+  await expect(page).toHaveURL(/\/compte\?requis=1/);
+  await expect(page.getByText("Protégez votre compte administrateur")).toBeVisible();
+  await page.goto("/foyer");
+  await expect(page).toHaveURL(/\/compte\?requis=1/);
+  await page.getByRole("button", { name: "Activer le double facteur" }).click();
+  const totp = page.getByRole("dialog");
+  await totp.getByLabel("Votre mot de passe, pour confirmer").fill(PASSWORD);
+  await totp.getByRole("button", { name: "Continuer" }).click();
+  const secret = (await totp.getByTestId("totp-secret").textContent())!.trim();
+  await expect(totp.getByRole("img", { name: /QR code/ })).toBeVisible();
+  await shot(page, "00b-double-facteur");
+  await totp.getByLabel("Code affiché par l'application").fill(currentTotp(secret));
+  await totp.getByRole("button", { name: "Activer" }).click();
+  const codesSheet = page.getByRole("dialog", { name: "Codes de secours" });
+  const codeItems = codesSheet.getByRole("list", { name: "Codes de secours" }).getByRole("listitem");
+  await expect(codeItems).toHaveCount(10);
+  const codes = await codeItems.allTextContents();
+  saveAdminSecrets({ secret, codes });
+  await codesSheet.getByRole("button", { name: "J'ai noté mes codes" }).click();
+  await expect(page.getByText("Protégez votre compte administrateur")).toHaveCount(0);
 
   // Première connexion : accueil guidé (pour qui, adresse, personnes, contrats).
+  await page.goto("/");
   await expect(page).toHaveURL(/\/bienvenue/);
   // Pas de barre de navigation pendant l'accueil.
   await expect(page.getByRole("navigation", { name: "Navigation principale" })).toHaveCount(0);
@@ -224,6 +239,12 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   // Envoi par Pingen (doublure locale, configurée seulement pour le serveur lancé par les tests) :
   // transmission, refus constaté au suivi, puis reprise de la lettre pour l'envoyer soi-même.
   if (!process.env.E2E_BASE_URL) {
+    // Pingen est facturé à l'exploitant : l'administrateur l'ouvre foyer par foyer.
+    await expect(page.getByRole("button", { name: "Envoyer en recommandé via Pingen" })).toHaveCount(0);
+    await page.goto("/admin");
+    await page.getByRole("button", { name: "Autoriser l'envoi Pingen" }).click();
+    await expect(page.getByText("Envoi Pingen activé pour ce foyer.")).toBeVisible();
+    await page.goto("/rituel/2027/lettres");
     await page.getByRole("button", { name: "Envoyer en recommandé via Pingen" }).click();
     await expect(page.getByText(/Une signature imprimée n'est pas une signature manuscrite/)).toBeVisible();
     await page.getByRole("button", { name: "Envoyer (test)" }).click();

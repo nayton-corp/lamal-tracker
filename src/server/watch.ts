@@ -9,7 +9,9 @@ import { householdKey, notify } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
 import { yearAttemptKey, yearRetryDue } from "@/infrastructure/ofsp/retry";
 import { activeDataset } from "@/infrastructure/db/queries";
-import { db, ritualYear, today } from "./context";
+import { purgeAudit } from "@/application/audit";
+import { purgeExpiredTokens } from "@/application/tokens";
+import { db, nowIso, ritualYear, today } from "./context";
 import { pingenTick } from "./pingen";
 import { referenceTick } from "./reference";
 import { importJob, startBootstrapImport, startImport, startYearImport } from "./jobs";
@@ -69,7 +71,7 @@ export async function sendDeadlineReminders(): Promise<void> {
   for (const h of households) {
     if (seen.has(h.id)) continue;
     seen.add(h.id);
-    const r = getReviewByYear(db(), { userId: h.userId, householdId: h.id, admin: false }, year);
+    const r = getReviewByYear(db(), { userId: h.userId, householdId: h.id, householdRole: "OWNER", admin: false }, year);
     if (r?.status === "CLOSED") continue;
     await notify(
       db(),
@@ -143,4 +145,7 @@ export async function schedulerTick(): Promise<void> {
   } catch (error) {
     console.error("[watch] suivi Pingen", error);
   }
+  // Ménage : jetons expirés, journal de sécurité de plus de 12 mois.
+  purgeExpiredTokens(db(), nowIso());
+  purgeAudit(db(), nowIso());
 }

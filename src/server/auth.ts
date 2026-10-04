@@ -1,11 +1,15 @@
 import "server-only";
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { closeSession, describeDevice, openSession, passwordToDefine, touchSession, type SessionInfo } from "@/application/auth";
+import { newDeviceMail } from "@/application/account-mail";
+import { audit } from "@/application/audit";
+import { adminNeedsFactor, closeSession, describeDevice, openSession, passwordToDefine, rememberDevice, SESSION_MAX_DAYS, touchSession, userEmail, type SessionInfo } from "@/application/auth";
 import { UserError } from "@/application/errors";
 import { requireAdmin as assertAdmin, scopeForUser, type Scope } from "@/application/scope";
-import { db, nowIso } from "./context";
+import { randomToken } from "@/application/tokens";
+import { deleteCookie, mailDeps, readCookie, writeCookie } from "./accounts";
+import { db, nowIso, TIME_ZONE } from "./context";
 
 /*
  * La connexion est obligatoire : sans compte, tout mène à la création du premier ; sans session
@@ -14,10 +18,11 @@ import { db, nowIso } from "./context";
  * Le foyer de chaque requête vient de la session, jamais d'un paramètre du navigateur.
  */
 export const SESSION_COOKIE = "lamal_session";
+/** Jeton d'appareil de longue durée : reconnaît un appareil déjà utilisé (alerte sinon). */
+const DEVICE_COOKIE = "lamal_device";
 
 export async function currentSession(): Promise<SessionInfo | null> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  return touchSession(db(), token, nowIso());
+  return touchSession(db(), await readCookie(SESSION_COOKIE), nowIso());
 }
 
 /** Compte et foyer de la requête en cours (une seule lecture par requête). */
@@ -35,36 +40,68 @@ export async function requireScope(): Promise<Scope & { sessionId: string }> {
   return scope;
 }
 
-/** Actions qui touchent le référentiel partagé (primes, caisses) ou toute la base. */
+/** Actions qui touchent le référentiel partagé (primes, caisses), les comptes ou toute la base. */
 export async function requireAdminScope(): Promise<Scope & { sessionId: string }> {
   const scope = await requireScope();
   assertAdmin(scope);
+  if (adminNeedsFactor(db(), scope.userId)) throw new UserError("Protégez d'abord votre compte d'un second facteur (Mon compte).");
   return scope;
 }
 
-/** Pour les pages : sans session, retour à la connexion. */
+/**
+ * Pour les pages : sans session, retour à la connexion ; administrateur sans second facteur,
+ * détour par son compte (le proxy le fait déjà, mais pas après la redirection d'une action serveur).
+ */
 export async function pageScope(): Promise<Scope & { sessionId: string }> {
+  const scope = await accountPageScope();
+  if (scope.admin && adminNeedsFactor(db(), scope.userId)) redirect("/compte?requis=1");
+  return scope;
+}
+
+/** Pages du compte : accessibles même à l'administrateur qui doit encore ajouter un facteur. */
+export async function accountPageScope(): Promise<Scope & { sessionId: string }> {
   const scope = await currentScope();
   if (!scope) redirect("/login");
   return scope;
 }
 
-export async function startSession(userId: number) {
+async function startSession(userId: number): Promise<string> {
   const h = await headers();
-  const { token, expiresAt } = openSession(db(), userId, describeDevice(h.get("user-agent")), nowIso());
-  (await cookies()).set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: (h.get("x-forwarded-proto") ?? "http") === "https",
-    path: "/",
-    expires: new Date(expiresAt),
-  });
+  const device = describeDevice(h.get("user-agent"));
+  const { token } = openSession(db(), userId, device, nowIso());
+  await writeCookie(SESSION_COOKIE, token, SESSION_MAX_DAYS * 86_400);
+  return device;
+}
+
+/**
+ * Connexion réussie (mot de passe et double facteur, passkey, lien de confirmation) : session
+ * ouverte, appareil reconnu ou signalé par courriel, événement au journal.
+ */
+export async function completeLogin(userId: number) {
+  const device = await startSession(userId);
+  let deviceToken = await readCookie(DEVICE_COOKIE);
+  if (!deviceToken || deviceToken.length > 100) deviceToken = randomToken(24);
+  await writeCookie(DEVICE_COOKIE, deviceToken, 400 * 86_400);
+  const now = nowIso();
+  const { alert } = rememberDevice(db(), userId, deviceToken, now);
+  audit(db(), userId, "LOGIN", { detail: device, nowIso: now });
+  const mail = mailDeps();
+  const email = userEmail(db(), userId);
+  if (alert && mail && email) {
+    const when = new Date(now).toLocaleString("fr-CH", { timeZone: TIME_ZONE, dateStyle: "long", timeStyle: "short" });
+    // Un courriel en échec ne doit pas empêcher la connexion.
+    await mail.mailer.send(newDeviceMail(email, device, when)).catch((e) => console.error("[courriel] alerte de connexion :", e instanceof Error ? e.message : e));
+  }
+}
+
+/** Où aller après la connexion : le compte d'abord si l'administrateur doit ajouter un facteur. */
+export function landingAfterLogin(userId: number, next: string): string {
+  return adminNeedsFactor(db(), userId) ? "/compte?requis=1" : next;
 }
 
 export async function endSession() {
-  const jar = await cookies();
-  closeSession(db(), jar.get(SESSION_COOKIE)?.value);
-  jar.delete(SESSION_COOKIE);
+  closeSession(db(), await readCookie(SESSION_COOKIE));
+  await deleteCookie(SESSION_COOKIE);
 }
 
 /** Pages de connexion : inutiles quand on est déjà connecté. */

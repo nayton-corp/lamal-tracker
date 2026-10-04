@@ -1,4 +1,4 @@
-import { ChevronRight, FileUp, Plus, UserRound, Users } from "lucide-react";
+import { ChevronRight, FileUp, KeyRound, Plus, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getHousehold, getHouseholdMode, listLca, listPersons, listPolicies } from "@/application/household";
@@ -104,6 +104,15 @@ export default async function FoyerPage() {
           )}
         </Section>
       )}
+
+      <Link href="/foyer/comptes" className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
+        <KeyRound aria-hidden className="size-5 text-primary" />
+        <div className="flex-1">
+          <p className="font-medium">Accès au foyer</p>
+          <p className="text-sm text-muted">Inviter votre conjoint ou partenaire à partager ce foyer avec son propre compte.</p>
+        </div>
+        <ChevronRight aria-hidden className="size-5 text-muted" />
+      </Link>
     </Page>
   );
 }

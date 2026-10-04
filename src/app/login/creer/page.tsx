@@ -1,28 +1,24 @@
 import { LockKeyhole } from "lucide-react";
 import { redirect } from "next/navigation";
+import { hasAnyUser } from "@/application/auth";
 import { accountExists } from "@/server/auth";
-import { Card } from "@/ui/card";
-import { Page } from "@/ui/page";
+import { db } from "@/server/context";
+import { AuthShell } from "@/ui/auth-shell";
 import { CreatePasswordForm } from "../login-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Mot de passe" };
 
-/** Premier démarrage : l'app n'est utilisable qu'après le choix d'un mot de passe. */
+/**
+ * Premier démarrage : création du compte administrateur. Après la procédure « mot de passe
+ * oublié » du README, seul un nouveau mot de passe est demandé.
+ */
 export default function CreatePasswordPage() {
   if (accountExists()) redirect("/login");
+  const fresh = !hasAnyUser(db());
   return (
-    <Page className="flex min-h-[80dvh] flex-col justify-center">
-      <Card className="space-y-4">
-        <div className="flex items-center gap-3">
-          <LockKeyhole aria-hidden className="size-8 text-primary" />
-          <div>
-            <h1 className="text-xl font-bold">Bienvenue</h1>
-            <p className="text-sm text-muted">Choisissez le mot de passe de l&apos;app.</p>
-          </div>
-        </div>
-        <CreatePasswordForm />
-      </Card>
-    </Page>
+    <AuthShell icon={LockKeyhole} title="Bienvenue" subtitle={fresh ? "Créez le compte administrateur de l'app." : "Choisissez un nouveau mot de passe."}>
+      <CreatePasswordForm askEmail={fresh} />
+    </AuthShell>
   );
 }

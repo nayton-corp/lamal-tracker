@@ -5,7 +5,7 @@ import type { Db } from "@/infrastructure/db/client";
 import { household, householdSetting, insurer, lamalPolicy, lcaPolicy, notificationLog, person } from "@/infrastructure/db/schema";
 import { LCA_GUARANTEE_KEYS, guaranteeInfo } from "@/domain/lca";
 import { UserError } from "./errors";
-import { createHouseholdFor, householdIdOf, requireAdmin, ownedLca, ownedPerson, ownedPolicy, findPerson, type Scope } from "./scope";
+import { createHouseholdFor, householdIdOf, requireAdmin, requireOwner, ownedLca, ownedPerson, ownedPolicy, findPerson, type Scope } from "./scope";
 
 /** Une personne seule ou un foyer de plusieurs membres : change le vocabulaire et l'accueil. */
 export type HouseholdMode = "SOLO" | "FAMILY";
@@ -87,6 +87,7 @@ export const lcaInput = z.object({
  * lettres, signatures, réglages). Les autres foyers, les primes officielles et les caisses restent.
  */
 export function resetHousehold(db: Db, scope: Scope) {
+  requireOwner(scope);
   const householdId = householdIdOf(scope);
   db.transaction((tx) => {
     tx.delete(household).where(eq(household.id, householdId)).run();

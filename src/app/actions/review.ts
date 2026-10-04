@@ -28,7 +28,7 @@ import { toActionError, chfField, rethrowForeignKey, type ActionState } from "@/
 import { db, nowIso, today } from "@/server/context";
 import { requireScope } from "@/server/auth";
 import { findLine, ownedLetter, type Scope } from "@/application/scope";
-import { pingenClient, pingenDeps } from "@/server/pingen";
+import { pingenClientFor, pingenDeps } from "@/server/pingen";
 
 /** Après un choix : la personne suivante sans choix, sinon l'étape suivante du rituel (LCA, démarches…). */
 function afterDecision(scope: Scope, year: number, lineId: number) {
@@ -300,7 +300,7 @@ export async function prepareAllAction(_: ActionState, form: FormData): Promise<
 
 export async function pingenSendAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
-  const client = pingenClient();
+  const client = pingenClientFor(scope);
   if (!client) return { error: "L'envoi par Pingen n'est pas configuré." };
   try {
     await sendLetterViaPingen(db(), scope, Number(form.get("letterId")), today(), nowIso(), pingenDeps(client));
@@ -314,7 +314,7 @@ export async function pingenSendAction(_: ActionState, form: FormData): Promise<
 
 export async function pingenRefreshAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
-  const client = pingenClient();
+  const client = pingenClientFor(scope);
   if (!client) return { error: "L'envoi par Pingen n'est pas configuré." };
   let letterId: number;
   try {

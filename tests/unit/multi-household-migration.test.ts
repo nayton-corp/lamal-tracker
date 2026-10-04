@@ -4,7 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { attemptLogin, passwordToDefine, primaryUserId, setPassword, touchSession } from "@/application/auth";
+import { pingenAllowed } from "@/application/admin";
+import { attemptLogin, legacyAdminId, login, passwordToDefine, primaryUserId, setPassword, touchSession } from "@/application/auth";
 import { getHouseholdMode, getHousehold } from "@/application/household";
 import { scopeForUser } from "@/application/scope";
 import { openDb } from "@/infrastructure/db/client";
@@ -58,8 +59,12 @@ describe("migration vers plusieurs foyers", () => {
     expect(fs.readdirSync(path.join(dir, "backups"))).toHaveLength(1);
     const userId = primaryUserId(db)!;
     const scope = scopeForUser(db, userId)!;
-    expect(scope).toEqual({ userId, householdId: hid, admin: true });
+    expect(scope).toEqual({ userId, householdId: hid, householdRole: "OWNER", admin: true });
     expect(attemptLogin(db, userId, "ancien-mot-de-passe", NOW)).toEqual({ ok: true });
+    // Sans courriel encore : connexion en laissant le champ vide ; Pingen reste ouvert à son foyer.
+    expect(legacyAdminId(db)).toBe(userId);
+    expect(login(db, { email: "", password: "ancien-mot-de-passe" }, { nowIso: NOW, mailEnabled: true })).toEqual({ kind: "ok", userId });
+    expect(pingenAllowed(db, scope)).toBe(true);
     expect(touchSession(db, token, NOW)?.userId).toBe(userId);
     expect(getHousehold(db, scope)?.name).toBe("Alex Test");
     expect(getHouseholdMode(db, scope)).toBe("SOLO");
