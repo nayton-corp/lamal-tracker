@@ -8,7 +8,7 @@ import { type ModelType } from "@/domain/lamal";
 import { changePermille } from "@/domain/money";
 import { franchisesFor } from "@/domain/parameters";
 import { pingenFailed } from "@/domain/pingen";
-import { checkLetter, lcaWarnings, type LetterCheck, type LcaWarning } from "@/domain/review";
+import { checkLetter, type LetterCheck } from "@/domain/review";
 import type { Db } from "@/infrastructure/db/client";
 import { offersFor, parametersFor } from "@/infrastructure/db/queries";
 import { insurerAddressLines, insurerLabel } from "@/domain/insurer";
@@ -31,8 +31,8 @@ export interface ReviewLineView {
   increasePermille: number | null;
   bestOffer: RankedOffer | null;
   renewalTotalRp: number | null;
-  lcaWarnings: LcaWarning[];
-  lcaCount: number;
+  /** Complémentaires LCA actives de la personne (« Hospitalisation demi-privée, Visana »). */
+  lcaProducts: string[];
   letterCheck: LetterCheck;
 }
 
@@ -103,17 +103,11 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
       increasePermille: line.renewalMonthlyRp === null ? null : changePermille(policy.billedMonthlyRp, line.renewalMonthlyRp),
       bestOffer: best,
       renewalTotalRp,
-      lcaWarnings: lcaWarnings(
-        lca.map((c) => ({ productName: c.productName, insurerName: c.insurerName, linkedInsurerId: c.linkedInsurerId })),
-        policy.insurerId,
-        insurerLabel(current),
-      ),
-      lcaCount: lca.length,
+      lcaProducts: lca.map((c) => `${c.productName}, ${c.insurerName}`),
       letterCheck: checkLetter({
         decision: line.decision,
         currentInsurerId: policy.insurerId,
         chosenInsurerId: line.chosenInsurerId,
-        lcaAckAt: line.lcaAckAt,
         insurerHasAddress: insurerAddressLines(current).length > 0,
         policyNumber: policy.policyNumber,
         affiliationRequestedAt: line.affiliationRequestedAt,
@@ -154,14 +148,11 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
       lines: lineViews.map((x) => ({
         decision: x.line.decision,
         renewalKnown: x.line.renewalMonthlyRp !== null,
-        lcaConfirmed: x.line.lcaAckAt !== null,
         affiliationRequested: x.line.affiliationRequestedAt !== null,
-        affiliationConfirmed: x.line.affiliationConfirmedAt !== null,
         letterSent: sentLineIds.has(x.line.id),
       })),
       strategyChosen: reviewRow.strategy !== null,
       needsConfirmed: reviewRow.needsConfirmedAt !== null,
-      terminationsAcknowledged: letters.filter((l) => l.kind === "TERMINATION").every((l) => l.acknowledgedAt),
     }),
   };
 }

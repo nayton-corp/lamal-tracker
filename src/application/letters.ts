@@ -128,8 +128,3 @@ export function markLetterSent(db: Db, scope: Scope, letterId: number, sentAt: s
   });
 }
 
-/** Réception confirmée par la caisse à la date `at` ; null annule la confirmation. */
-export function markLetterAcknowledged(db: Db, scope: Scope, letterId: number, at: string | null) {
-  ownedLetter(db, scope, letterId);
-  db.update(letter).set({ acknowledgedAt: at }).where(eq(letter.id, letterId)).run();
-}

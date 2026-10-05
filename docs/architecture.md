@@ -404,7 +404,9 @@ tarifs officiels par `application/policy-import.ts`. Le fichier n'est jamais enr
 
 Le rituel d'automne s'appelle `review` dans le code. Ses étapes sont typées dans
 `domain/ritual-steps.ts` ; les routes sont sous `/rituel/[year]` : page d'accueil (reconduction
-tacite), `strategie`, `besoins`, `comparer` et `personne/[lineId]`, `lca`, `lettres` (Démarches).
+tacite), `strategie`, `besoins`, `comparer` et `personne/[lineId]`, `lettres` (Démarches ; `lca` n'est
+plus qu'une redirection vers elle). Le rituel se clôt seul quand tout est envoyé
+(`syncReviewClosure`).
 L'année visée est toujours l'année prochaine (`reviewTargetYear()`). Pendant la fenêtre de
 changement (`isReviewWindowOpen` : primes publiées et échéance du 30 novembre pas encore passée),
 la page ouvre le rituel toute seule (`openReviewIfPossible`). Les statuts et transitions sont

@@ -1,10 +1,16 @@
-/** Fin du rituel : clôture (contrats de l'année suivante créés), réouverture, suppression. */
+/**
+ * Fin du rituel : clôture (contrats de l'année suivante créés), réouverture, suppression. La
+ * clôture est automatique : `syncReviewClosure` la fait dès que le dernier courrier est envoyé.
+ */
 import { and, eq, inArray } from "drizzle-orm";
+import type { IsoDate } from "@/domain/dates";
 import { type ModelType } from "@/domain/lamal";
+import { isRitualComplete } from "@/domain/ritual-steps";
 import type { Db } from "@/infrastructure/db/client";
-import { lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
+import { lamalPolicy, letter, review, reviewLine } from "@/infrastructure/db/schema";
 import { UserError } from "../errors";
 import { findReview, ownedReview, type Scope } from "../scope";
+import { getReviewView } from "./view";
 
 /** Crée les contrats de l'année cible à partir des décisions, puis clôt la revue. */
 export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: string) {
@@ -21,12 +27,8 @@ export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: stri
         .from(lamalPolicy)
         .where(and(eq(lamalPolicy.personId, l.personId), eq(lamalPolicy.coverageYear, reviewRow.targetYear)))
         .get();
-      if (existing?.source === "MANUAL") {
-        const personRow = tx.select({ firstName: person.firstName }).from(person).where(eq(person.id, l.personId)).get();
-        throw new UserError(
-          `Un contrat ${reviewRow.targetYear} saisi à la main existe déjà pour ${personRow?.firstName ?? "cette personne"} : supprimez-le ou gardez-le.`,
-        );
-      }
+      // Saisi à la main (ou importé d'un PDF de police) : c'est le vrai contrat, il est gardé tel quel.
+      if (existing?.source === "MANUAL") continue;
       const values = {
         personId: l.personId,
         coverageYear: reviewRow.targetYear,
@@ -49,11 +51,50 @@ export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: stri
 }
 
 /**
+ * Clôture ou réouverture automatique selon l'avancement : le rituel se clôt quand tout le monde a
+ * décidé et que chaque courrier nécessaire est envoyé, et se rouvre si ce n'est plus le cas (envoi
+ * annulé). Appelé après chaque action qui peut changer l'avancement ; renvoie ce qui s'est passé.
+ */
+export function syncReviewClosure(db: Db, scope: Scope, reviewId: number, today: IsoDate, nowIso: string): "closed" | "reopened" | null {
+  const reviewRow = findReview(db, scope, reviewId);
+  if (!reviewRow) return null;
+  const complete = isRitualComplete(getReviewView(db, scope, reviewId, today).steps);
+  if (complete && reviewRow.status !== "CLOSED") {
+    closeReview(db, scope, reviewId, nowIso);
+    return "closed";
+  }
+  if (!complete && reviewRow.status === "CLOSED") {
+    reopenReview(db, scope, reviewId);
+    return "reopened";
+  }
+  return null;
+}
+
+/**
  * Annule la clôture : retire les contrats de l'année cible créés par la clôture et rouvre la revue.
- * Les décisions restent, on peut les modifier puis clôturer à nouveau.
+ * Les décisions restent, on peut les modifier ; le rituel se clôt à nouveau quand tout est envoyé.
  */
 export function reopenReview(db: Db, scope: Scope, reviewId: number) {
-  const reviewRow = ownedReview(db, scope, reviewId);
+  reopenRow(db, ownedReview(db, scope, reviewId));
+}
+
+/**
+ * Une lettre confiée à Pingen a été refusée : elle redevient à envoyer, donc son rituel, s'il était
+ * clôturé, se rouvre. Appelé par la synchronisation Pingen, qui passe sur tous les foyers.
+ */
+export function reopenReviewOfFailedLetter(db: Db, letterId: number) {
+  const row = db.select({ reviewId: letter.reviewId }).from(letter).where(eq(letter.id, letterId)).get();
+  const reviewRow = row ? db.select().from(review).where(eq(review.id, row.reviewId)).get() : undefined;
+  if (!reviewRow) return;
+  try {
+    reopenRow(db, reviewRow);
+  } catch (error) {
+    // Un rituel plus récent s'appuie sur ces contrats : on laisse tel quel, la lettre reste signalée.
+    if (!(error instanceof UserError)) throw error;
+  }
+}
+
+function reopenRow(db: Db, reviewRow: typeof review.$inferSelect) {
   if (reviewRow.status !== "CLOSED") return;
   const created = createdPolicies(db, reviewRow.id, reviewRow.targetYear);
   const ids = created.map((p) => p.id);
@@ -61,7 +102,7 @@ export function reopenReview(db: Db, scope: Scope, reviewId: number) {
     const usedBy = db.select().from(reviewLine).where(inArray(reviewLine.currentPolicyId, ids)).get();
     if (usedBy) {
       const later = db.select().from(review).where(eq(review.id, usedBy.reviewId)).get()!;
-      throw new UserError(`Le rituel ${later.targetYear} s'appuie sur ces contrats : supprimez-le d'abord.`);
+      throw new UserError(`Le rituel ${later.targetYear} s'appuie sur ces contrats : recommencez-le d'abord.`);
     }
   }
   db.transaction((tx) => {

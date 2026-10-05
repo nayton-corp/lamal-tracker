@@ -20,20 +20,18 @@ import {
   savePolicy,
   setHouseholdMode,
 } from "@/application/household";
-import { deleteLetter, generateLetters, getLetter, markLetterAcknowledged, markLetterSent } from "@/application/letters";
+import { deleteLetter, generateLetters, getLetter, markLetterSent } from "@/application/letters";
 import {
   deleteOfferRequest,
   generateOfferRequests,
   getOfferRequest,
   listOfferRequests,
-  markOfferRequestAnswered,
   markOfferRequestSent,
   setLcaWishes,
 } from "@/application/offers";
 import { abandonPingen, pingenReadiness } from "@/application/pingen";
 import { applyPolicyImport } from "@/application/policy-import";
 import {
-  acknowledgeLca,
   activeReview,
   closeReview,
   confirmLineage,
@@ -44,7 +42,7 @@ import {
   keepAsIs,
   openReview,
   reopenReview,
-  setLineFlags,
+  syncReviewClosure,
   undoDecision,
 } from "@/application/review";
 import { withHousehold, type Scope } from "@/application/scope";
@@ -98,7 +96,6 @@ function makeHousehold(name: string): Fixture {
   const { reviewId } = openReview(db, scope, 2027);
   const pr = getReviewView(db, scope, reviewId, TODAY).lines[0]!;
   decide(db, scope, pr.line.id, { tariffId: pr.bestOffer!.tariffId, franchiseChf: pr.bestOffer!.franchiseChf }, NOW);
-  acknowledgeLca(db, scope, pr.line.id, NOW);
   const [offerId] = generateOfferRequests(db, scope, reviewId, TODAY);
   markOfferRequestSent(db, scope, offerId!, TODAY);
   const { created } = generateLetters(db, scope, reviewId, TODAY);
@@ -183,8 +180,6 @@ describe("cloisonnement des foyers", () => {
       ["decide", () => decide(db, s, b.lineId, { tariffId: 1, franchiseChf: 300 }, NOW)],
       ["keepAsIs", () => keepAsIs(db, s, b.lineId, NOW)],
       ["undoDecision", () => undoDecision(db, s, b.lineId)],
-      ["acknowledgeLca", () => acknowledgeLca(db, s, b.lineId, NOW)],
-      ["setLineFlags", () => setLineFlags(db, s, b.lineId, { doctorCheck: "NO" })],
       ["setLcaWishes", () => setLcaWishes(db, s, b.lineId, ["DENTAL"])],
       ["setStrategy", () => setStrategy(db, s, b.reviewId, "ECONOMY")],
       ["saveNeeds (rituel)", () => saveNeeds(db, s, b.reviewId, [], NOW)],
@@ -192,10 +187,8 @@ describe("cloisonnement des foyers", () => {
       ["generateLetters", () => generateLetters(db, s, b.reviewId, TODAY)],
       ["generateOfferRequests", () => generateOfferRequests(db, s, b.reviewId, TODAY)],
       ["markLetterSent", () => markLetterSent(db, s, b.letterId, TODAY, "X")],
-      ["markLetterAcknowledged", () => markLetterAcknowledged(db, s, b.letterId, TODAY)],
       ["abandonPingen", () => abandonPingen(db, s, b.letterId)],
       ["markOfferRequestSent", () => markOfferRequestSent(db, s, b.offerId, null)],
-      ["markOfferRequestAnswered", () => markOfferRequestAnswered(db, s, b.offerId, TODAY)],
       ["closeReview", () => closeReview(db, s, b.reviewId, NOW)],
       ["reopenReview", () => reopenReview(db, s, b.reviewId)],
     ];
@@ -206,6 +199,7 @@ describe("cloisonnement des foyers", () => {
     deleteLetter(db, s, b.letterId);
     deleteOfferRequest(db, s, b.offerId);
     deleteReview(db, s, b.reviewId);
+    expect(syncReviewClosure(db, s, b.reviewId, TODAY, NOW)).toBeNull();
     expect(snapshotOf(b)).toBe(before);
   });
 

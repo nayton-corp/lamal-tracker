@@ -2,12 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { deleteLetter, generateLetters, markLetterAcknowledged, markLetterSent } from "@/application/letters";
+import { deleteLetter, generateLetters, markLetterSent } from "@/application/letters";
 import { abandonPingen, sendLetterViaPingen, syncPingenLetters } from "@/application/pingen";
-import { deleteOfferRequest, generateOfferRequests, markOfferRequestAnswered, markOfferRequestSent, setLcaWishes } from "@/application/offers";
+import { deleteOfferRequest, generateOfferRequests, listOfferRequests, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
-  acknowledgeLca,
-  closeReview,
   deleteReview,
   confirmLineage,
   decide,
@@ -16,26 +14,35 @@ import {
   reopenReview,
   getReviewView,
   listReviewLineTabs,
-  setHealthCosts,
-  setLineFlags,
+  syncReviewClosure,
   undoDecision,
 } from "@/application/review";
 import { nextStep } from "@/app/rituel/_parts/next-step";
-import { toActionError, chfField, rethrowForeignKey, type ActionState } from "@/server/action";
+import { toActionError, rethrowForeignKey, type ActionState } from "@/server/action";
 import { db, nowIso, today } from "@/server/context";
 import { requireScope } from "@/server/auth";
-import { findLine, ownedLetter, type Scope } from "@/application/scope";
+import { findLine, findLetter, findOfferRequest, ownedLetter, type Scope } from "@/application/scope";
 import { pingenClientFor, pingenDeps } from "@/server/pingen";
 
-/** Après un choix : la personne suivante sans choix, sinon l'étape suivante du rituel (LCA, démarches…). */
+/**
+ * Après un choix : la personne suivante sans choix, sinon l'étape suivante du rituel (démarches).
+ * Si tout le monde garde son contrat, il n'y a rien à envoyer : le rituel se clôt aussitôt.
+ */
 function afterDecision(scope: Scope, year: number, lineId: number) {
   const line = findLine(db(), scope, lineId);
   if (!line) return redirectToReview(year);
   const next = listReviewLineTabs(db(), scope, line.reviewId).find((l) => l.decision === "UNDECIDED");
   if (next) return redirectToReview(year, `/personne/${next.id}`);
+  if (syncReviewClosure(db(), scope, line.reviewId, today(), nowIso()) === "closed") return redirectToReview(year);
   const step = nextStep(getReviewView(db(), scope, line.reviewId, today()));
   revalidatePath("/", "layout");
-  redirect(step.kind === "close" || step.kind === "none" ? `/rituel/${year}#ligne-${lineId}` : step.href);
+  redirect(step.kind === "none" ? `/rituel/${year}#ligne-${lineId}` : step.href);
+}
+
+/** Clôt (ou rouvre) le rituel d'un courrier selon l'avancement ; message à afficher s'il vient de se clore. */
+function syncAfterSending(scope: Scope, reviewId: number | undefined): string | null {
+  if (reviewId === undefined) return null;
+  return syncReviewClosure(db(), scope, reviewId, today(), nowIso()) === "closed" ? "Tout est envoyé : le rituel est terminé et vos nouveaux contrats sont enregistrés." : null;
 }
 
 function redirectToReview(year: number, path = "") {
@@ -105,64 +112,18 @@ export async function confirmLineageAction(_: ActionState, form: FormData): Prom
   return { ok: "Tarif de renouvellement confirmé." };
 }
 
-export async function acknowledgeLcaAction(lineId: number): Promise<ActionState> {
-  const scope = await requireScope();
-  try {
-    acknowledgeLca(db(), scope, Number(lineId), nowIso());
-  } catch (e) {
-    return toActionError(e);
-  }
-  revalidatePath("/", "layout");
-  return { ok: "Confirmé." };
-}
-
-export async function lineFlagsAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const scope = await requireScope();
-  try {
-    const doctor = form.get("doctorCheck");
-    setLineFlags(db(), scope, Number(form.get("lineId")), {
-      ...(doctor ? { doctorCheck: String(doctor) as "YES" | "NO" | "UNKNOWN" } : {}),
-      ...(form.has("affiliation") ? { affiliationRequestedAt: form.get("affiliation") === "on" ? today() : null } : {}),
-    });
-  } catch (e) {
-    return toActionError(e);
-  }
-  revalidatePath("/", "layout");
-  return { ok: "Enregistré." };
-}
-
-export async function healthCostsAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const scope = await requireScope();
-  try {
-    const amount = chfField(form.get("healthCosts"));
-    if (amount !== null) setHealthCosts(db(), scope, Number(form.get("lineId")), amount);
-  } catch (e) {
-    return toActionError(e);
-  }
-  revalidatePath("/", "layout");
-  return { ok: "Frais attendus enregistrés." };
-}
-
 export async function letterSentAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
     const date = String(form.get("sentAt") || today());
-    markLetterSent(db(), scope, Number(form.get("letterId")), date, String(form.get("tracking") ?? "").trim() || null);
+    const letterId = Number(form.get("letterId"));
+    markLetterSent(db(), scope, letterId, date, String(form.get("tracking") ?? "").trim() || null);
+    const done = syncAfterSending(scope, findLetter(db(), scope, letterId)?.reviewId);
+    revalidatePath("/", "layout");
+    return { ok: done ?? "Envoi enregistré." };
   } catch (e) {
     return toActionError(e);
   }
-  revalidatePath("/", "layout");
-  return { ok: "Envoi enregistré." };
-}
-
-export async function letterAckAction(form: FormData) {
-  const scope = await requireScope();
-  try {
-    markLetterAcknowledged(db(), scope, Number(form.get("letterId")), form.get("undo") ? null : today());
-  } catch (e) {
-    rethrowForeignKey(e, "Cette lettre est encore référencée : impossible de modifier son état.");
-  }
-  revalidatePath("/", "layout");
 }
 
 export async function deleteLetterAction(form: FormData) {
@@ -173,18 +134,6 @@ export async function deleteLetterAction(form: FormData) {
     rethrowForeignKey(e, "Cette lettre est encore référencée : supprimez d'abord ce qui s'y rapporte.");
   }
   revalidatePath("/", "layout");
-}
-
-export async function closeReviewAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const scope = await requireScope();
-  const year = Number(form.get("year"));
-  try {
-    closeReview(db(), scope, Number(form.get("reviewId")), nowIso());
-  } catch (e) {
-    return toActionError(e);
-  }
-  redirectToReview(year);
-  return null;
 }
 
 export async function reopenReviewAction(_: ActionState, form: FormData): Promise<ActionState> {
@@ -214,17 +163,9 @@ export async function deleteReviewAction(_: ActionState, form: FormData): Promis
 export async function offerSentAction(form: FormData) {
   const scope = await requireScope();
   try {
-    markOfferRequestSent(db(), scope, Number(form.get("offerId")), form.get("undo") ? null : today());
-  } catch (e) {
-    rethrowForeignKey(e, "Cette demande d'offre est encore référencée : impossible de modifier son état.");
-  }
-  revalidatePath("/", "layout");
-}
-
-export async function offerAnsweredAction(form: FormData) {
-  const scope = await requireScope();
-  try {
-    markOfferRequestAnswered(db(), scope, Number(form.get("offerId")), form.get("undo") ? null : today());
+    const offerId = Number(form.get("offerId"));
+    markOfferRequestSent(db(), scope, offerId, form.get("undo") ? null : today());
+    syncAfterSending(scope, findOfferRequest(db(), scope, offerId)?.reviewId);
   } catch (e) {
     rethrowForeignKey(e, "Cette demande d'offre est encore référencée : impossible de modifier son état.");
   }
@@ -244,12 +185,16 @@ export async function deleteOfferAction(form: FormData) {
 export async function lcaWishesAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
-    setLcaWishes(db(), scope, Number(form.get("lineId")), form.getAll("wish").map(String));
+    const lineId = Number(form.get("lineId"));
+    setLcaWishes(db(), scope, lineId, form.getAll("wish").map(String));
+    // Demandes déjà préparées : refaites pour inclure les complémentaires (celles envoyées ne bougent pas).
+    const reviewId = findLine(db(), scope, lineId)?.reviewId;
+    if (reviewId !== undefined && listOfferRequests(db(), scope, reviewId).some((o) => !o.sentAt)) generateOfferRequests(db(), scope, reviewId, today());
   } catch (e) {
     return toActionError(e);
   }
   revalidatePath("/", "layout");
-  return { ok: "Complémentaires à demander enregistrées." };
+  return { ok: "Complémentaires ajoutées à la demande." };
 }
 
 /** Prépare d'un coup les demandes aux nouvelles caisses et les lettres aux caisses actuelles. */
@@ -275,7 +220,9 @@ export async function pingenSendAction(_: ActionState, form: FormData): Promise<
   const client = pingenClientFor(scope);
   if (!client) return { error: "L'envoi par Pingen n'est pas configuré." };
   try {
-    await sendLetterViaPingen(db(), scope, Number(form.get("letterId")), today(), nowIso(), pingenDeps(client));
+    const letterId = Number(form.get("letterId"));
+    await sendLetterViaPingen(db(), scope, letterId, today(), nowIso(), pingenDeps(client));
+    syncAfterSending(scope, findLetter(db(), scope, letterId)?.reviewId);
   } catch (e) {
     revalidatePath("/", "layout");
     return toActionError(e);
@@ -303,7 +250,9 @@ export async function pingenRefreshAction(_: ActionState, form: FormData): Promi
 export async function pingenAbandonAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
-    abandonPingen(db(), scope, Number(form.get("letterId")));
+    const letterId = Number(form.get("letterId"));
+    abandonPingen(db(), scope, letterId);
+    syncAfterSending(scope, findLetter(db(), scope, letterId)?.reviewId);
   } catch (e) {
     return toActionError(e);
   }

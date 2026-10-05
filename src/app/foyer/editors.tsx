@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil, Plus } from "lucide-react";
+import { FileUp, Keyboard, Pencil, Plus } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/ui/button";
 import { Sheet } from "@/ui/sheet";
@@ -9,12 +10,21 @@ import { PolicyForm, type PolicyDefaults } from "./policy-form";
 
 type Insurers = { id: number; name: string }[];
 
+/**
+ * Ajouter ou modifier un contrat LAMal. Pour un ajout, on choisit d'abord : importer le PDF de la
+ * police (tout est pré-rempli) ou saisir à la main.
+ */
 export function PolicySheet({ personId, insurers, years, policy, label }: { personId: number; insurers: Insurers; years: number[]; policy: PolicyDefaults; label: "add" | "edit" }) {
   const [open, setOpen] = useState(false);
+  const [manual, setManual] = useState(label === "edit");
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) setManual(label === "edit");
+  };
   return (
     <Sheet
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={onOpenChange}
       title={label === "add" ? "Nouveau contrat LAMal" : `Contrat LAMal ${policy.coverageYear}`}
       trigger={
         label === "add" ? (
@@ -28,7 +38,29 @@ export function PolicySheet({ personId, insurers, years, policy, label }: { pers
         )
       }
     >
-      <PolicyForm personId={personId} insurers={insurers} years={years} policy={policy} onDone={() => setOpen(false)} />
+      {manual ? (
+        <PolicyForm personId={personId} insurers={insurers} years={years} policy={policy} onDone={() => onOpenChange(false)} />
+      ) : (
+        <div className="space-y-3">
+          <Link
+            href={`/foyer/importer?personne=${personId}`}
+            className="flex min-h-16 items-center gap-3 rounded-xl border border-primary/40 bg-primary-soft/30 p-3 hover:bg-primary-soft/60"
+          >
+            <FileUp aria-hidden className="size-6 shrink-0 text-primary" />
+            <span>
+              <span className="block font-semibold">Importer le PDF de la police</span>
+              <span className="block text-sm text-muted">Tout est rempli, vous vérifiez.</span>
+            </span>
+          </Link>
+          <button type="button" onClick={() => setManual(true)} className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-xl border border-border p-3 text-left hover:bg-surface-2">
+            <Keyboard aria-hidden className="size-6 shrink-0 text-primary" />
+            <span>
+              <span className="block font-semibold">Saisir à la main</span>
+              <span className="block text-sm text-muted">Caisse et franchise : la prime est retrouvée toute seule.</span>
+            </span>
+          </button>
+        </div>
+      )}
     </Sheet>
   );
 }

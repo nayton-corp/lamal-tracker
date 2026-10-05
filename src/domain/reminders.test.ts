@@ -4,7 +4,7 @@ import { letterReminders, type LetterProgress } from "./reminders";
 
 // Rituel 2027 : réception au lundi 30 novembre 2026, envoi conseillé au lundi 23 novembre.
 const d = reviewDeadlines(2027);
-const base: LetterProgress = { closed: false, persons: 2, keeping: 0, letters: 0, lettersSent: 0, awaiting: [] };
+const base: LetterProgress = { closed: false, persons: 2, keeping: 0, letters: 0, lettersSent: 0 };
 const on = (today: string, p: Partial<LetterProgress> = {}) => letterReminders(today, 2027, d, { ...base, ...p });
 
 describe("rappels d'envoi des courriers", () => {
@@ -43,12 +43,4 @@ describe("rappels d'envoi des courriers", () => {
     expect(on("2026-11-26", { letters: 1 })).toEqual([]);
   });
 
-  it("relance quand une caisse n'a pas confirmé après trois semaines, jusqu'à la fin de l'année", () => {
-    const awaiting = [{ key: "lettre-4", insurer: "Helsana", what: "fin du contrat" as const, sentAt: "2026-11-10" }];
-    expect(on("2026-11-30", { letters: 1, lettersSent: 1, awaiting })).toEqual([]);
-    const [follow] = on("2026-12-01", { letters: 1, lettersSent: 1, awaiting });
-    expect(follow).toMatchObject({ key: "relance-lettre-4", title: "Pas de nouvelles de Helsana ?" });
-    expect(follow!.mail?.text).not.toContain("Helsana");
-    expect(on("2027-01-02", { letters: 1, lettersSent: 1, awaiting })).toEqual([]);
-  });
 });

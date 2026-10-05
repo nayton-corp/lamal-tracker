@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { checkLetter, lcaWarnings } from "./review";
+import { checkLetter } from "./review";
 import { buildLetter } from "./letter";
 
 const line = {
   decision: "SWITCH" as const,
   currentInsurerId: 1,
   chosenInsurerId: 2,
-  lcaAckAt: "2026-10-02T10:00:00Z",
   insurerHasAddress: true,
   policyNumber: "123",
   affiliationRequestedAt: "2026-10-01",
@@ -15,12 +14,6 @@ const line = {
 describe("garde-fous", () => {
   it("autorise une résiliation complète", () => {
     expect(checkLetter(line)).toEqual({ allowed: true, blockers: [], warnings: [] });
-  });
-
-  it("bloque sans confirmation LCA", () => {
-    const c = checkLetter({ ...line, lcaAckAt: null });
-    expect(c.allowed).toBe(false);
-    expect(c.blockers.join()).toMatch(/LCA/);
   });
 
   it("bloque un faux changement et une adresse manquante", () => {
@@ -33,13 +26,6 @@ describe("garde-fous", () => {
     const c = checkLetter({ ...line, policyNumber: null, affiliationRequestedAt: null });
     expect(c.allowed).toBe(true);
     expect(c.warnings).toHaveLength(2);
-  });
-
-  it("alerte LCA du même groupe", () => {
-    const w = lcaWarnings([{ productName: "Hospitalisation", insurerName: "X SA", linkedInsurerId: 1 }], 1, "X");
-    expect(w[0]!.level).toBe("danger");
-    expect(w[0]!.text).toMatch(/Hospitalisation/);
-    expect(lcaWarnings([], 1, "X")[0]!.level).toBe("info");
   });
 });
 

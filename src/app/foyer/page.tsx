@@ -1,4 +1,4 @@
-import { ChevronRight, FileUp, KeyRound, Plus, UserRound, Users } from "lucide-react";
+import { ChevronRight, KeyRound, Plus, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getHousehold, getHouseholdMode, listLca, listPersons, listPolicies } from "@/application/household";
@@ -38,13 +38,6 @@ export default async function HouseholdPage() {
           title={solo ? "Mes contrats" : "Membres"}
           action={
             <div className="flex gap-1">
-              {persons.length > 0 && (
-                <Button asChild size="sm" variant="ghost">
-                  <Link href="/foyer/importer">
-                    <FileUp aria-hidden className="size-4" /> Importer une police
-                  </Link>
-                </Button>
-              )}
               <Button asChild size="sm" variant="ghost">
                 <Link href="/foyer/personne/nouvelle">
                   <Plus aria-hidden className="size-4" /> {solo ? "Passer en foyer" : "Ajouter une personne"}

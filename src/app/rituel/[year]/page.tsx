@@ -1,7 +1,7 @@
-import { ArrowRight, CalendarClock, Check, CircleAlert, FileText, RotateCcw, Scale, ShieldAlert, Sparkles, Trash2, Users } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, CircleAlert, FileText, Pencil, RotateCcw, Scale, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { closeReviewAction, deleteReviewAction, openReviewAction, reopenReviewAction, undoAction } from "@/app/actions/review";
+import { deleteReviewAction, openReviewAction, reopenReviewAction, undoAction } from "@/app/actions/review";
 import { getHousehold, listPersons, listPolicies } from "@/application/household";
 import { openReviewIfPossible, getReviewByYear, getReviewView, type ReviewLineView, type ReviewView } from "@/application/review";
 import { reviewDeadlines, isReviewWindowOpen } from "@/domain/deadlines";
@@ -112,6 +112,13 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
       <PageHeader title={`Rituel ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${householdRow.canton}, région ${householdRow.region}`} />
 
       <Awareness view={view} detailed={false} cta={false} />
+      {closed && (
+        <Alert tone="success" title="C'est terminé">
+          {view.lines.some((p) => p.line.decision === "SWITCH" || p.line.decision === "ADJUST")
+            ? `Tout est envoyé et vos contrats ${year} sont enregistrés. Gardez les confirmations que les caisses vous enverront.`
+            : `Rien à envoyer : vos contrats ${year} sont enregistrés.`}
+        </Alert>
+      )}
       {!closed && <Steps view={view} />}
       {!closed && view.review.strategy && (
         <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
@@ -151,41 +158,31 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
 
       {!closed && <NextAction view={view} />}
 
-      {!closed && ["confirm", "close"].includes(nextStep(view).kind) && (
-        <Section title="Clôture">
-          <Card className="space-y-3">
-            <p className="text-sm text-muted">Après réception des nouvelles polices : vos contrats {year} seront enregistrés tels que choisis.</p>
-            <ActionForm action={closeReviewAction} hidden={{ year, reviewId: view.review.id }}>
-              <SubmitButton variant="secondary" block pendingLabel="Clôture…">
-                Clôturer le rituel {year}
-              </SubmitButton>
-            </ActionForm>
-          </Card>
-        </Section>
-      )}
-
-      <Undo year={year} reviewId={view.review.id} closed={closed} />
+      <OtherActions year={year} reviewId={view.review.id} closed={closed} sentCount={view.letters.filter((l) => l.sentAt).length} />
     </Page>
   );
 }
 
-/** Revenir en arrière, même après la clôture : rouvrir (on garde les choix) ou tout effacer. */
-function Undo({ year, reviewId, closed }: { year: number; reviewId: number; closed: boolean }) {
+/**
+ * Actions rares, en bas de page : après la clôture, modifier ses choix (refus de la nouvelle caisse,
+ * erreur) ; à tout moment, recommencer le rituel à zéro.
+ */
+function OtherActions({ year, reviewId, closed, sentCount }: { year: number; reviewId: number; closed: boolean; sentCount: number }) {
   return (
-    <Section title="Revenir en arrière">
+    <Section title="Autres actions">
       <Card className="space-y-3">
         {closed && (
           <ActionForm action={reopenReviewAction} hidden={{ year, reviewId }}>
-            <p className="mb-3 text-sm text-muted">Erreur ou refus de la caisse ? Rouvrez : vos choix sont conservés.</p>
+            <p className="mb-3 text-sm text-muted">Refus de la nouvelle caisse ou erreur ? Vos choix et courriers sont conservés.</p>
             <ConfirmButton
               variant="secondary"
               block
-              message={`Rouvrir le rituel ${year} ?`}
-              confirmLabel="Rouvrir"
+              message={`Modifier vos choix ${year} ?`}
+              confirmLabel="Modifier mes choix"
               confirmVariant="primary"
-              details={<p>Les contrats {year} créés à la clôture sont retirés ; vos choix et lettres sont conservés.</p>}
+              details={<p>Les contrats {year} enregistrés sont retirés le temps de corriger ; ils reviennent dès que tout est de nouveau envoyé.</p>}
             >
-              <RotateCcw aria-hidden className="size-4" /> Rouvrir le rituel
+              <Pencil aria-hidden className="size-4" /> Modifier mes choix
             </ConfirmButton>
           </ActionForm>
         )}
@@ -193,14 +190,20 @@ function Undo({ year, reviewId, closed }: { year: number; reviewId: number; clos
           <ConfirmButton
             variant="ghost"
             block
-            className="text-increase hover:bg-increase-soft"
-            message={`Supprimer le rituel ${year} ?`}
-            confirmLabel="Supprimer le rituel"
+            message={`Recommencer le rituel ${year} ?`}
+            confirmLabel="Recommencer"
+            confirmVariant="primary"
             details={
-              <p>Choix et lettres {year} effacés{closed ? `, contrats ${year} créés à la clôture compris` : ""}. Les contrats {year - 1} restent.</p>
+              <div className="space-y-2">
+                <p>
+                  Vos choix et vos courriers {year} seront effacés{closed ? `, ainsi que les contrats ${year} enregistrés` : ""}, et le rituel repartira des nouvelles primes. Vos
+                  contrats {year - 1} ne changent pas.
+                </p>
+                <p className={sentCount > 0 ? "font-semibold" : undefined}>Les courriers déjà postés ne sont pas annulés.</p>
+              </div>
             }
           >
-            <Trash2 aria-hidden className="size-4" /> Supprimer ce rituel
+            <RotateCcw aria-hidden className="size-4" /> Recommencer à zéro
           </ConfirmButton>
         </ActionForm>
       </Card>
@@ -210,7 +213,7 @@ function Undo({ year, reviewId, closed }: { year: number; reviewId: number; clos
 
 function Steps({ view }: { view: ReviewView }) {
   return (
-    <ol className="grid grid-cols-6 gap-1" aria-label="Étapes du rituel">
+    <ol className="grid grid-cols-5 gap-1" aria-label="Étapes du rituel">
       {view.steps.map((s, i) => (
         <li key={s.key} className="flex flex-col items-center gap-1 text-center">
           <span
@@ -303,11 +306,7 @@ function PersonCard({ pr, year, closed, ready }: { pr: ReviewLineView; year: num
         )
       )}
 
-      {pr.line.decision === "SWITCH" && pr.lcaCount > 0 && !pr.line.lcaAckAt && (
-        <p className="flex items-center gap-2 rounded-lg bg-lca-soft p-2 text-sm font-medium text-lca">
-          <ShieldAlert aria-hidden className="size-4 shrink-0" /> {pr.lcaCount} complémentaire(s) LCA à protéger
-        </p>
-      )}
+
 
       {!closed && (
         <div className="flex gap-2">
@@ -329,7 +328,7 @@ function PersonCard({ pr, year, closed, ready }: { pr: ReviewLineView; year: num
 
 function NextAction({ view }: { view: ReviewView }) {
   const step = nextStep(view);
-  if (step.kind === "close" || step.kind === "none") {
+  if (step.kind === "none") {
     const needsLetters = view.lines.some((p) => p.line.decision === "SWITCH" || p.line.decision === "ADJUST");
     return needsLetters ? null : (
       <Alert tone="success" title="Rien à envoyer">
@@ -337,10 +336,10 @@ function NextAction({ view }: { view: ReviewView }) {
       </Alert>
     );
   }
-  const Icon = step.kind === "compare" ? Scale : step.kind === "lca" ? ShieldAlert : step.kind === "procedures" || step.kind === "confirm" ? FileText : ArrowRight;
+  const Icon = step.kind === "compare" ? Scale : step.kind === "procedures" ? FileText : ArrowRight;
   return (
     <div className="sticky bottom-20 z-30 lg:bottom-6">
-      <Button asChild block size="lg" variant={step.kind === "lca" ? "lca" : "primary"} className="shadow-lg">
+      <Button asChild block size="lg" className="shadow-lg">
         <Link href={step.href}>
           <Icon aria-hidden className="size-5" />
           {step.label}

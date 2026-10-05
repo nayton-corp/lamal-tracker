@@ -49,18 +49,22 @@ Dans *Foyer* :
 - **Personnes** : prénom, nom, date de naissance. Cochez « assuré contre les accidents par
   l'employeur » si la personne travaille au moins 8 heures par semaine : l'accident peut alors
   être exclu de la LAMal.
-- **Contrat LAMal** de l'année en cours, pour chaque personne : caisse, tarif officiel,
-  franchise et prime réellement facturée. Vous pouvez aussi saisir les contrats des années
+- **Contrat LAMal** de l'année en cours, pour chaque personne : *Ajouter un contrat* propose
+  d'importer le PDF de la police ou de saisir à la main la caisse, le tarif officiel, la
+  franchise et la prime réellement facturée. Vous pouvez aussi saisir les contrats des années
   passées (2010 et suivantes) : l'historique se construit à partir d'eux.
 - **Complémentaires (LCA)** : choisissez la garantie dans la liste ; l'assureur est prérempli
-  d'après la caisse LAMal. Les enregistrer est important pour le contrôle LCA de l'automne.
+  d'après la caisse LAMal. Les enregistrer permet à l'app de vous les rappeler au moment de
+  résilier la LAMal.
 
 ### Importer une police
 
-*Foyer › Importer une police* lit le PDF de votre police : caisse, personnes, tarif officiel,
-franchise, prime, numéro d'assuré (ou AVS) et complémentaires. Le fichier est lu en mémoire sur
-le serveur de l'app, sans service externe, et n'est jamais enregistré. Vous vérifiez avant
-d'enregistrer. L'import est possible à tout moment, pas seulement à l'accueil.
+Sur la fiche d'une personne, *Ajouter un contrat › Importer le PDF de la police* lit votre
+police : caisse, personnes, tarif officiel, franchise, prime, numéro d'assuré (ou AVS) et
+complémentaires. La personne de la fiche est retenue d'office ; si la police couvre toute la
+famille, les autres personnes trouvées sont proposées, décochées. Le fichier est lu en mémoire
+sur le serveur de l'app, sans service externe, et n'est jamais enregistré. Vous vérifiez avant
+d'enregistrer. L'import est aussi proposé à la première configuration.
 
 ### Partager son foyer
 
@@ -77,12 +81,12 @@ Chaque automne, l'app vous aide à vérifier que vous payez le juste prix pour l
 |---|---|
 | Fin septembre | L'OFSP publie les primes de l'an prochain. L'app les importe toute seule et envoie une notification. |
 | Dès la publication | Le rituel s'ouvre seul. L'accueil montre la **hausse** : ce que chaque personne paiera sans rien faire. |
-| Octobre – mi-novembre | Stratégie, besoins, comparaison, choix, contrôle LCA, démarches. |
-| Avant le 30 novembre | Vos lettres doivent être **reçues** par la caisse. L'app indique la date d'envoi conseillée (environ une semaine avant). |
-| Décembre – janvier | Confirmations des caisses, puis clôture. |
+| Octobre – mi-novembre | Stratégie, besoins, comparaison, choix, envoi des courriers. |
+| Avant le 30 novembre | Vos lettres doivent être **reçues** par la caisse. L'app indique la date d'envoi conseillée (environ une semaine avant). Le rituel se termine seul quand tout est envoyé. |
+| Décembre – janvier | Les caisses confirment par courrier : gardez ces confirmations. |
 
 Le rituel se trouve dans le menu *Rituel*. Une frise montre où vous en êtes :
-**Hausse → Stratégie → Besoins → Choix → Démarches → Confirmé**.
+**Hausse → Stratégie → Besoins → Choix → Envoi**.
 
 ### 1. La hausse
 
@@ -116,8 +120,6 @@ personne à l'autre. Pour chacune :
 - le **top 3** selon votre stratégie, puis toutes les autres offres de votre région ;
 - des filtres (franchise, modèles, caisses exclues) ;
 - trois coûts par offre : sans frais, attendu, année chargée ;
-- un **simulateur de franchise** qui montre à partir de quels frais une franchise basse devient
-  plus avantageuse ;
 - le portrait de chaque caisse (réserves, frais administratifs, taille, évolution de ses primes)
   et l'explication de chaque modèle ;
 - **Comparer des offres** : 2 à 4 offres côte à côte.
@@ -125,24 +127,18 @@ personne à l'autre. Pour chacune :
 Choisir une offre enregistre la décision : *Je garde*, *Je change de caisse* ou *Je change de
 franchise ou de modèle*. Pour un modèle avec liste de médecins, vérifiez que le vôtre y figure.
 
-### 5. Le contrôle LCA
-
-Pour chaque personne qui change de caisse, l'étape *Complémentaires* rappelle ce que la
-résiliation LAMal ne touche pas : vos complémentaires restent actives et facturées. Vous
-indiquez aussi les complémentaires à demander à la nouvelle caisse. **Sans cette confirmation,
-la lettre de résiliation ne peut pas être préparée.** Les alertes de cette étape sont en ambre.
-
-### 6. Les démarches
+### 5. Les démarches
 
 La page *Démarches* guide pas à pas, dans l'ordre :
 
 1. **Souscrire auprès de la nouvelle caisse** : demande d'affiliation (PDF et courriel
-   prérempli), complémentaires souhaitées comprises. Faites-la avant de résilier : l'ancienne
-   caisse ne vous libère qu'une fois la nouvelle confirmée.
+   prérempli). Faites-la avant de résilier : l'ancienne caisse ne vous libère qu'une fois la
+   nouvelle confirmée. *Demander aussi des complémentaires* ajoute à la demande les garanties
+   souhaitées (hospitalisation, dentaire…).
 2. **Résilier chez la caisse actuelle** (ou **annoncer le changement** de franchise ou de
-   modèle) : la lettre PDF est générée en un geste, au format enveloppe à fenêtre suisse.
-3. **Recevoir les confirmations** : cochez celle de la nouvelle caisse (affiliation) et celle de
-   l'ancienne (fin du contrat au 31 décembre).
+   modèle) : la lettre PDF est générée en un geste, au format enveloppe à fenêtre suisse. Un
+   rappel en ambre sous la résiliation liste vos complémentaires : la lettre ne résilie que
+   l'assurance de base, elles continuent.
 
 **Signature.** Chaque adulte peut dessiner sa signature à l'écran ; elle est apposée sur les PDF
 (pour un mineur, un parent signe). Une signature imprimée n'est pas une signature manuscrite
@@ -159,14 +155,19 @@ La page *Démarches* guide pas à pas, dans l'ordre :
   de suivi et le prix reviennent seuls dans l'app. Une lettre refusée par Pingen (adresse
   illisible, par exemple) est signalée par une notification et peut être reprise.
 
-### 7. Clôturer
+### 6. La fin du rituel
 
-Quand chaque personne a une décision, **clôturez** le rituel : les contrats de l'année suivante
-sont créés et l'historique est mis à jour. Si la prime facturée par la caisse diffère, ajustez-la
-dans le contrat.
+Le rituel se termine **tout seul** dès que le dernier courrier est marqué envoyé (ou, si tout le
+monde garde son contrat, dès le dernier choix) : les contrats de l'année suivante sont
+enregistrés et l'historique est mis à jour. Un contrat de l'année suivante déjà saisi à la main
+ou importé d'un PDF est gardé tel quel. Si la prime facturée par la caisse diffère, ajustez-la
+dans le contrat. Gardez les confirmations que les caisses vous envoient.
 
-Un rituel, même clôturé, peut être **rouvert** (les choix restent, les contrats créés sont
-retirés) ou **supprimé** (retour à l'état d'avant, lettres comprises).
+Annuler un envoi, ou une lettre refusée par Pingen, rouvre le rituel. En bas de la page,
+*Modifier mes choix* le rouvre aussi (refus de la nouvelle caisse, erreur : les choix restent,
+les contrats enregistrés sont retirés le temps de corriger), et *Recommencer à zéro* efface les
+choix et les courriers de l'année pour repartir des nouvelles primes. Les courriers déjà postés
+ne sont pas annulés.
 
 ## Rappels et notifications
 

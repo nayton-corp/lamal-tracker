@@ -3,12 +3,12 @@ import { REMINDER_OFFSETS, type ReviewDeadlines } from "./deadlines";
 
 /*
  * Rappels du rituel pour l'envoi des courriers postaux (notifications push, parfois aussi par
- * courriel) : avant la date d'envoi conseillée, juste après, puis relance sans confirmation.
+ * courriel) : avant la date d'envoi conseillée, puis juste après.
  */
 
 /** Où en est un foyer dans l'envoi de ses courriers papier, pour une année cible. */
 export interface LetterProgress {
-  /** Rituel clôturé : plus aucun rappel. */
+  /** Rituel clôturé (tout est envoyé) : plus aucun rappel. */
   closed: boolean;
   /** Personnes du foyer, et celles qui ont décidé de garder leur contrat. */
   persons: number;
@@ -16,8 +16,6 @@ export interface LetterProgress {
   /** Courriers à poster (résiliations, changements) et ceux déjà marqués envoyés. */
   letters: number;
   lettersSent: number;
-  /** Envois en attente d'une confirmation de la caisse (date d'envoi). */
-  awaiting: { key: string; insurer: string; what: "affiliation" | "fin du contrat"; sentAt: IsoDate }[];
 }
 
 export interface Reminder {
@@ -30,9 +28,6 @@ export interface Reminder {
   mail: { subject: string; text: string } | null;
 }
 
-/** Délai après lequel une caisse qui n'a pas confirmé mérite une relance. */
-export const CONFIRMATION_FOLLOW_UP_DAYS = 21; // « plus de trois semaines » dans les textes ci-dessous
-
 /** Une semaine avant la date d'envoi, le rappel part aussi par courriel (en plus de la notification). */
 export const MAIL_REMINDER_DAYS_BEFORE = 7;
 /** Dernier rappel, après la date d'envoi conseillée : un recommandé posté ce jour-là arrive encore. */
@@ -42,8 +37,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
 
 /**
  * Rappels dus aujourd'hui pour un foyer : avant la date d'envoi conseillée (seulement s'il reste
- * des courriers à poster, ou si le foyer n'a encore rien préparé), un dernier rappel juste après,
- * puis une relance par envoi resté sans confirmation de la caisse.
+ * des courriers à poster, ou si le foyer n'a encore rien préparé), puis un dernier rappel juste après.
  */
 export function letterReminders(today: IsoDate, targetYear: number, deadlines: ReviewDeadlines, p: LetterProgress): Reminder[] {
   if (p.closed || p.persons === 0) return [];
@@ -94,21 +88,5 @@ export function letterReminders(today: IsoDate, targetYear: number, deadlines: R
     });
   }
 
-  // Les confirmations arrivent d'ordinaire en deux à trois semaines, et avant la fin de l'année.
-  if (today <= deadlines.effectiveEnd) {
-    for (const a of p.awaiting) {
-      if (daysBetween(a.sentAt, today) < CONFIRMATION_FOLLOW_UP_DAYS) continue;
-      out.push({
-        key: `relance-${a.key}`,
-        title: `Pas de nouvelles de ${a.insurer} ?`,
-        body: `Envoyé il y a plus de trois semaines, toujours sans confirmation (${a.what}). Appelez la caisse pour vérifier qu'elle a bien reçu votre courrier ; le numéro de suivi le prouve.`,
-        url: `${url}/lettres`,
-        mail: {
-          subject: "Une confirmation de caisse-maladie se fait attendre",
-          text: `Bonjour,\n\nUn courrier envoyé il y a plus de trois semaines n'a pas encore de confirmation dans Primes LAMal. Si vous l'avez reçue, indiquez-le dans l'app ; sinon, appelez la caisse pour vérifier qu'elle a bien reçu votre courrier.`,
-        },
-      });
-    }
-  }
   return out;
 }

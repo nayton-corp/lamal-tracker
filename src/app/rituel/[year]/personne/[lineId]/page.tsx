@@ -20,7 +20,6 @@ import { SubmitButton } from "@/ui/submit";
 import { CompareBar, CompareToggle } from "./compare-select";
 import { FilterBar } from "./filter-bar";
 import { InsurerFacts, ModelBlock, OfferCosts } from "./offer-details";
-import { FranchiseSimulator } from "./simulator";
 import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
@@ -106,7 +105,6 @@ export default async function ReviewLinePage({ params, searchParams }: { params:
           Le coût total compte la prime et ce que vous paieriez de votre poche (franchise, 10 % de quote-part) pour des frais de santé de{" "}
           <Chf rp={view.healthCostsRp} whole /> par an.
         </p>
-        <FranchiseSimulator lineId={lineId} franchises={view.curve.franchises} points={view.curve.points} breakEvenRp={view.curve.breakEvenRp} healthCostsRp={view.healthCostsRp} />
       </Section>
       </aside>
 

@@ -99,16 +99,6 @@ export function rankOffers(
   return enriched;
 }
 
-/** Meilleure offre (prime la plus basse) par franchise, pour le simulateur. */
-export function cheapestPerFranchise(offers: readonly Offer[]): Offer[] {
-  const best = new Map<number, Offer>();
-  for (const o of offers) {
-    const current = best.get(o.franchiseChf);
-    if (!current || o.monthlyPremiumRp < current.monthlyPremiumRp) best.set(o.franchiseChf, o);
-  }
-  return [...best.values()].sort((a, b) => a.franchiseChf - b.franchiseChf);
-}
-
 export interface MarketStats {
   count: number;
   minRp: Rappen;

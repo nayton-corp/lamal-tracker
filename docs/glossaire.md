@@ -15,7 +15,7 @@ Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/rituel/2
 | Personne | `person`, `findPerson`, `ownedPerson` | `person` | `/foyer/personne/[id]`, `/foyer/personne/nouvelle` |
 | Contrat LAMal | `lamalPolicy`, `ownedPolicy`, `savePolicy` | `lamal_policy` | `/foyer/personne/[id]` |
 | Complémentaire (LCA) | `lcaPolicy`, `ownedLca`, `LcaGuarantee` | `lca_policy` | `/foyer/personne/[id]` |
-| Importer une police | `src/application/policy-import.ts`, `src/domain/policy-import.ts` | — | `/foyer/importer` |
+| Importer une police | `src/application/policy-import.ts`, `src/domain/policy-import.ts` | — | `/foyer/importer?personne=[id]` (depuis « Ajouter un contrat ») |
 | Signature | `signature`, `src/application/signatures.ts` | `signature` | `/rituel/[year]/lettres` |
 | Historique | `householdHistory` (`src/application/history.ts`) | — | `/historique` |
 | **Comptes** | | | |
@@ -53,8 +53,9 @@ Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/rituel/2
 | Comparateur | `compareForLine` (`src/application/compare.ts`), `rankForStrategy` | — | `/rituel/[year]/comparer`, `/rituel/[year]/personne/[lineId]` |
 | Comparer des offres (côte à côte) | — | — | `/rituel/[year]/personne/[lineId]/comparer` |
 | Je garde / Je change de caisse / Je change de franchise ou de modèle | `Decision` : `KEEP` / `SWITCH` / `ADJUST` (`UNDECIDED` = À décider) | `review_line.decision` | `/rituel/[year]/personne/[lineId]` |
-| Contrôle LCA (complémentaires) | `acknowledgeLca`, `lcaWarnings` | `review_line.lca_ack_at` | `/rituel/[year]/lca` |
-| Étapes Hausse → Confirmé | `RitualStepKey`, `ritualSteps` | — | `/rituel/[year]` |
+| Rappel LCA (complémentaires) | `LcaNote`, `lcaProducts` | `lca_policy` | `/rituel/[year]/lettres` |
+| Étapes Hausse → Envoi | `RitualStepKey`, `ritualSteps`, `isRitualComplete` | — | `/rituel/[year]` |
+| Clôture automatique / Modifier mes choix / Recommencer à zéro | `syncReviewClosure`, `reopenReview`, `deleteReview` | `review.status` | `/rituel/[year]` |
 | Démarches | `src/app/rituel/[year]/lettres/page.tsx` | — | `/rituel/[year]/lettres` |
 | Demande d'offre / d'affiliation | `offerRequest`, `ownedOfferRequest` | `offer_request` | `/rituel/[year]/lettres` |
 | Lettre : résiliation / changement | `letter`, `ownedLetter`, `kind` : `TERMINATION` / `CHANGE` | `letter` | `/rituel/[year]/lettres` |

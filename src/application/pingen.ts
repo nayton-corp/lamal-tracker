@@ -11,6 +11,7 @@ import { ownedLetter, type Scope } from "./scope";
 import { signaturesByName } from "./signatures";
 import { bumpUsage } from "./usage";
 import { audit } from "./audit";
+import { reopenReviewOfFailedLetter } from "./review";
 
 /*
  * Envoi des lettres par Pingen (impression et recommandé par la Poste) : conditions, envoi, suivi
@@ -110,7 +111,11 @@ export async function syncPingenLetters(db: Db, client: PingenClient, nowIso: st
         continue;
       }
       applyPingen(db, r.id, found, nowIso);
-      if (pingenPhase(found.status) === "FAILED") result.newlyFailed.push(r.id);
+      if (pingenPhase(found.status) === "FAILED") {
+        result.newlyFailed.push(r.id);
+        // La lettre est à reprendre : le rituel, clôturé dès l'envoi, se rouvre.
+        reopenReviewOfFailedLetter(db, r.id);
+      }
     } catch (error) {
       result.errors.push(error instanceof Error ? error.message : String(error));
     }

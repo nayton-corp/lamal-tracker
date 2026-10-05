@@ -1,13 +1,14 @@
-import { ArrowRight, Check, FileText, Send, Trash2 } from "lucide-react";
+import { Check, FileText, Send, ShieldCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { deleteSignatureAction } from "@/app/actions/journey";
 import { listSignatures } from "@/application/signatures";
-import { deleteLetterAction, deleteOfferAction, letterAckAction, letterSentAction, offerAnsweredAction, offerSentAction, prepareAllAction } from "@/app/actions/review";
-import { listOfferRequests } from "@/application/offers";
+import { deleteLetterAction, deleteOfferAction, lcaWishesAction, letterSentAction, offerSentAction, prepareAllAction } from "@/app/actions/review";
+import { lcaWishesFor, listOfferRequests } from "@/application/offers";
 import { getReviewByYear, getReviewView } from "@/application/review";
 import { isMinorOn } from "@/domain/age";
+import { LCA_GUARANTEES } from "@/domain/lca";
 import { formatDateLong, formatDateShort } from "@/domain/dates";
 import { displayTariffLabel, type ModelType } from "@/domain/lamal";
 import type { LetterContent } from "@/domain/letter";
@@ -20,7 +21,7 @@ import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
 import { ConfirmButton } from "@/ui/confirm-button";
-import { Input } from "@/ui/form";
+import { Checkbox, Input } from "@/ui/form";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
 import { pingenReadiness } from "@/application/pingen";
@@ -51,6 +52,20 @@ function Step({ n, title, done, children, hint }: { n: number; title: string; do
       </div>
       <div className="space-y-3 sm:pl-11">{children}</div>
     </section>
+  );
+}
+
+/** Rappel sous une résiliation : seule l'assurance de base est résiliée, les complémentaires continuent. */
+function LcaNote({ lines, insurer }: { lines: { person: { firstName: string }; lcaProducts: string[] }[]; insurer: string }) {
+  const products = lines.flatMap((p) => p.lcaProducts.map((x) => (lines.length > 1 ? `${p.person.firstName} : ${x}` : x)));
+  return (
+    <div className="flex gap-2 rounded-lg bg-lca-soft p-2 text-sm text-lca">
+      <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0" />
+      <div>
+        <p className="font-medium">Cette lettre ne résilie que l&apos;assurance de base chez {insurer}. Les complémentaires continuent.</p>
+        {products.length > 0 && <p className="text-foreground/80">{products.join(" · ")}</p>}
+      </div>
+    </div>
   );
 }
 
@@ -90,7 +105,8 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
   const terminations = view.letters.filter((l) => l.kind === "TERMINATION");
   const changes = view.letters.filter((l) => l.kind === "CHANGE");
   const warnings = [...switching, ...adjusting].flatMap((p) => p.letterCheck.warnings.filter((w) => w.code !== "AFFILIATION_FIRST").map((w) => `${p.person.firstName} : ${w.text}`));
-  const lcaPending = switching.filter((p) => !p.line.lcaAckAt);
+  const lineById = new Map(view.lines.map((p) => [p.line.id, p]));
+  const closed = view.review.status === "CLOSED";
   const nothing = switching.length === 0 && adjusting.length === 0;
 
   const requestsDone = switching.length > 0 && switching.every((p) => p.line.affiliationRequestedAt);
@@ -98,7 +114,6 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
   const failedAtPingen = (l: { pingenStatus: string | null }) => pingenFailed(l.pingenStatus);
   const lettersDone =
     [...switching, ...adjusting].length > 0 && [...terminations, ...changes].length > 0 && [...terminations, ...changes].every((l) => l.sentAt && !failedAtPingen(l));
-  const confirmDone = offers.every((o) => o.answeredAt) && terminations.every((l) => l.acknowledgedAt) && offers.length + terminations.length > 0;
   const involved = new Set([...switching, ...adjusting].map((p) => p.person.id));
   // Seules les personnes majeures signent ; les lettres le font aussi (application/letters.ts).
   const signers = listSignatures(db(), scope).filter((s) => involved.has(s.personId) && !isMinorOn(s.birthDate, today()));
@@ -108,6 +123,12 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
   return (
     <Page>
       <PageHeader title="Démarches" subtitle="Dans l'ordre." back={`/rituel/${year}`} />
+
+      {closed && (
+        <Alert tone="success" title="Tout est envoyé">
+          Le rituel {year} est terminé et vos nouveaux contrats sont enregistrés. Gardez les confirmations que les caisses vous enverront.
+        </Alert>
+      )}
 
       <Card className="space-y-2">
         <p className="font-medium">Qui change quoi</p>
@@ -133,12 +154,7 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
             </li>
           ))}
         </ul>
-        {lcaPending.length > 0 && (
-          <Alert tone="lca" title="Complémentaires à contrôler d'abord">
-            {lcaPending.map((p) => p.person.firstName).join(", ")} : <Link className="underline" href={`/rituel/${year}/lca`}>vérifiez les complémentaires</Link> avant de résilier.
-          </Alert>
-        )}
-        {!nothing && (
+        {!nothing && !closed && (
           <ActionForm action={prepareAllAction} hidden={{ reviewId: reviewRow.id }}>
             <SubmitButton block variant={offers.length + view.letters.length ? "secondary" : "primary"} pendingLabel="Préparation…">
               {offers.length + view.letters.length ? "Mettre à jour les courriers pas encore envoyés" : "Préparer tous les courriers"}
@@ -245,6 +261,21 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
               </div>
             </Card>
           ))}
+          {switching.map((p) => (
+            <details key={p.line.id} className="rounded-xl border border-border bg-surface p-3 text-sm">
+              <summary className="min-h-11 cursor-pointer content-center font-medium text-primary">
+                Demander aussi des complémentaires{switching.length > 1 ? ` pour ${p.person.firstName}` : ""} à {p.chosenInsurerName}
+              </summary>
+              <ActionForm action={lcaWishesAction} hidden={{ lineId: p.line.id }} className="mt-2 space-y-2">
+                <p className="text-muted">Elles figureront dans la demande. Gardez les actuelles jusqu&apos;à l&apos;acceptation écrite des nouvelles.</p>
+                {(() => {
+                  const wishes = new Set<string>(lcaWishesFor(db(), p.line));
+                  return LCA_GUARANTEES.map((g) => <Checkbox key={g.key} name="wish" value={g.key} defaultChecked={wishes.has(g.key)} label={g.label} />);
+                })()}
+                <SubmitButton size="sm" variant="secondary">Enregistrer</SubmitButton>
+              </ActionForm>
+            </details>
+          ))}
         </Step>
       )}
 
@@ -283,6 +314,7 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
                           : "Changement"}
                   </Badge>
                 </div>
+                {l.kind === "TERMINATION" && <LcaNote lines={l.lineIds.map((id) => lineById.get(id)).filter((p) => p !== undefined)} insurer={l.insurerName} />}
                 <PdfButtons url={`/api/letters/${l.id}/pdf`} filename={`lettre-${l.id}.pdf`} primary={!l.sentAt} />
                 {l.pingenStatus && <PingenTracking letterId={l.id} status={l.pingenStatus} priceRp={l.pingenPriceRp} checkedAt={l.pingenCheckedAt} />}
                 {l.sentAt ? (
@@ -323,46 +355,6 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
               </Card>
             );
           })}
-        </Step>
-      )}
-
-      {offers.length + terminations.length > 0 && (
-        <Step n={++n} title="Recevoir les confirmations" done={confirmDone} hint="Gardez-les : la nouvelle caisse confirme l'affiliation, l'ancienne la fin du contrat au 31 décembre.">
-          <Card className="divide-y divide-border p-0">
-            {offers.map((o) => (
-              <form key={`o${o.id}`} action={offerAnsweredAction} className="flex items-center justify-between gap-2 p-3 text-sm">
-                <input type="hidden" name="offerId" value={o.id} />
-                <span>
-                  <span className="block font-medium">{o.insurerName} : affiliation</span>
-                  <span className="text-muted">{o.answeredAt ? `Reçue le ${formatDateShort(o.answeredAt)}` : o.sentAt ? "Attendue" : "Après l'envoi de la demande"}</span>
-                </span>
-                {o.answeredAt && <input type="hidden" name="undo" value="1" />}
-                <Button size="sm" variant={o.answeredAt ? "ghost" : "secondary"} disabled={!o.sentAt}>
-                  {o.answeredAt ? "Annuler" : "Reçue"}
-                </Button>
-              </form>
-            ))}
-            {terminations.map((l) => (
-              <form key={`l${l.id}`} action={letterAckAction} className="flex items-center justify-between gap-2 p-3 text-sm">
-                <input type="hidden" name="letterId" value={l.id} />
-                <span>
-                  <span className="block font-medium">{l.insurerName} : fin du contrat</span>
-                  <span className="text-muted">{l.acknowledgedAt ? `Reçue le ${formatDateShort(l.acknowledgedAt)}` : l.sentAt ? "Attendue" : "Après l'envoi de la résiliation"}</span>
-                </span>
-                {l.acknowledgedAt && <input type="hidden" name="undo" value="1" />}
-                <Button size="sm" variant={l.acknowledgedAt ? "ghost" : "secondary"} disabled={!l.sentAt}>
-                  {l.acknowledgedAt ? "Annuler" : "Reçue"}
-                </Button>
-              </form>
-            ))}
-          </Card>
-          {confirmDone && (
-            <Button asChild block>
-              <Link href={`/rituel/${year}`}>
-                Clôturer le rituel <ArrowRight aria-hidden className="size-4" />
-              </Link>
-            </Button>
-          )}
         </Step>
       )}
     </Page>
