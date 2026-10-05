@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminNeedsFactor, passwordToDefine, touchSession } from "@/application/auth";
 import { db, nowIso } from "@/server/context";
+import { COOKIE, cookieVariants } from "@/server/cookie-names";
 
 /**
  * Contrôle d'accès de chaque requête : aucun compte → création du premier ; pas de session →
@@ -9,7 +10,6 @@ import { db, nowIso } from "@/server/context";
  * légales passent sans session. Sans session, « / » affiche la présentation publique.
  */
 const PUBLIC = /^\/(login|inscription|verifier|presentation|confidentialite|conditions|mentions-legales)(\/|$)/;
-const SESSION_COOKIES = ["__Host-lamal_session", "lamal_session"];
 
 /**
  * Politique de contenu stricte : seuls les scripts portant le nonce de la requête s'exécutent
@@ -59,7 +59,7 @@ export function proxy(request: NextRequest) {
   if (PUBLIC.test(pathname)) return next(request);
   // En HTTPS, seul le cookie préfixé `__Host-` compte (voir readCookie).
   const https = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https";
-  const token = (https ? SESSION_COOKIES.slice(0, 1) : SESSION_COOKIES).map((n) => request.cookies.get(n)?.value).find(Boolean);
+  const token = (https ? cookieVariants(COOKIE.session).slice(0, 1) : cookieVariants(COOKIE.session)).map((n) => request.cookies.get(n)?.value).find(Boolean);
   const session = touchSession(db(), token, nowIso());
   if (session) {
     if (!pathname.startsWith("/compte") && !pathname.startsWith("/api/") && adminNeedsFactor(db(), session.userId)) {

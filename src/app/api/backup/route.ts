@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const scope = await currentScope();
-  if (!scope?.admin || adminNeedsFactor(db(), scope.userId)) return new Response("Non autorisé", { status: 403 });
+  if (!scope?.isAdmin || adminNeedsFactor(db(), scope.userId)) return new Response("Non autorisé", { status: 403 });
   if (!isFreshSession(db(), scope.sessionId, nowIso())) return new Response(null, { status: 303, headers: { Location: "/compte/donnees" } });
   // Nom imprévisible : le dossier temporaire est partagé avec les autres processus.
   const target = path.join(os.tmpdir(), `lamal-${randomUUID()}.db`);

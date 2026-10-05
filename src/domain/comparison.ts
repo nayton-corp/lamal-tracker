@@ -4,6 +4,12 @@ import { requiresDoctorCheck } from "./lamal";
 import type { Rappen } from "./money";
 import { coinsuranceMaxFor, type LamalParameters } from "./parameters";
 
+/*
+ * Comparateur : filtre les offres de l'année cible, les classe par coût total attendu ou par
+ * prime, et calcule les statistiques du marché (min, médiane, max).
+ */
+
+/** Une prime officielle : tarif d'une caisse × franchise × couverture accident, pour un profil donné. */
 export interface Offer {
   tariffId: number;
   insurerId: number;
@@ -40,6 +46,7 @@ export interface RankedOffer extends Offer {
   doctorCheck: boolean;
 }
 
+/** Un filtre absent ou vide ne restreint rien ; les caisses exclues sont toujours écartées. */
 export function filterOffers(offers: readonly Offer[], filters: OfferFilters): Offer[] {
   return offers.filter(
     (o) =>
@@ -49,6 +56,7 @@ export function filterOffers(offers: readonly Offer[], filters: OfferFilters): O
   );
 }
 
+/** Coût annuel attendu d'une offre pour la personne (plafond de quote-part selon sa classe d'âge). */
 export function costOf(offer: Pick<Offer, "monthlyPremiumRp" | "franchiseChf">, ctx: Omit<RankingContext, "referenceTotalRp">): CostBreakdown {
   return annualCost({
     monthlyPremiumRp: offer.monthlyPremiumRp,
@@ -108,6 +116,7 @@ export interface MarketStats {
   maxRp: Rappen;
 }
 
+/** Statistiques d'une liste de primes (médiane arrondie au centime) ; null si la liste est vide. */
 export function marketStats(premiumsRp: readonly Rappen[]): MarketStats | null {
   if (premiumsRp.length === 0) return null;
   const sorted = [...premiumsRp].sort((a, b) => a - b);
@@ -115,13 +124,6 @@ export function marketStats(premiumsRp: readonly Rappen[]): MarketStats | null {
   const median =
     sorted.length % 2 === 1 ? sorted[mid]! : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
   return { count: sorted.length, minRp: sorted[0]!, medianRp: median, maxRp: sorted.at(-1)! };
-}
-
-/** Rang (1 = moins cher) d'une prime dans le marché, en percentile entier 0–100. */
-export function percentileOf(premiumRp: Rappen, premiumsRp: readonly Rappen[]): number | null {
-  if (premiumsRp.length === 0) return null;
-  const cheaper = premiumsRp.filter((p) => p < premiumRp).length;
-  return Math.round((cheaper * 100) / premiumsRp.length);
 }
 
 /**

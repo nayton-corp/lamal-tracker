@@ -22,8 +22,10 @@ const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
 const TAG_BYTES = 16;
 
+/** Valeur déjà chiffrée (préfixe de format « v1. ») ? */
 export const isSealed = (value: string) => value.startsWith(PREFIX);
 
+/** Chiffre (AES-256-GCM, nonce aléatoire) ; il faudra le même `context` pour déchiffrer. */
 export function seal(key: Buffer, plaintext: string, context: string): string {
   const nonce = randomBytes(NONCE_BYTES);
   const cipher = createCipheriv("aes-256-gcm", key, nonce);
@@ -104,6 +106,7 @@ function dataKey(db: Db, householdId: number, create: boolean): Buffer | null {
 
 const householdContext = (householdId: number, context: string) => `h${householdId}|${context}`;
 
+/** Chiffre une donnée d'un foyer avec la clé du foyer (créée au premier usage). */
 export function sealForHousehold(db: Db, householdId: number, plaintext: string, context: string): string {
   return seal(dataKey(db, householdId, true)!, plaintext, householdContext(householdId, context));
 }
@@ -144,6 +147,7 @@ export function sealSecret(db: Db, plaintext: string, context: string): string {
   return seal(masterKey(db), plaintext, context);
 }
 
+/** Secret déchiffré ; une valeur encore en clair (d'avant le chiffrement) est rendue telle quelle ; null si illisible. */
 export function openSecret(db: Db, sealed: string, context: string): string | null {
   if (!isSealed(sealed)) return sealed;
   try {

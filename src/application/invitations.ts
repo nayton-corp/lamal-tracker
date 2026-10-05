@@ -48,6 +48,7 @@ export function createSignupInvitation(db: Db, scope: Scope, input: z.input<type
   return code;
 }
 
+/** Invitations d'inscription pour l'administration (sans le code : seule son empreinte est gardée). */
 export function listSignupInvitations(db: Db, scope: Scope) {
   requireAdmin(scope);
   return db
@@ -95,7 +96,7 @@ export function listHouseholdInvitations(db: Db, scope: Scope, nowIso: string) {
 /** Révocation : l'administrateur pour les inscriptions, le propriétaire pour son foyer. */
 export function revokeInvitation(db: Db, scope: Scope, id: number, nowIso: string) {
   const row = db.select().from(invitation).where(eq(invitation.id, id)).get();
-  const allowed = row && (row.kind === "SIGNUP" ? scope.admin : row.householdId === scope.householdId && scope.householdRole === "OWNER");
+  const allowed = row && (row.kind === "SIGNUP" ? scope.isAdmin : row.householdId === scope.householdId && scope.householdRole === "OWNER");
   if (!row || !allowed) throw new NotFoundError("Invitation");
   db.update(invitation).set({ revokedAt: nowIso }).where(eq(invitation.id, id)).run();
   audit(db, scope.userId, "INVITE_REVOKED", { householdId: row.householdId, nowIso });
@@ -140,6 +141,7 @@ export function claimInvitation(tx: Tx, row: Invitation, nowIso: string) {
 
 // ───────────────────────── Membres du foyer ─────────────────────────
 
+/** Comptes membres du foyer de l'appelant, propriétaire d'abord ; `you` désigne l'appelant. */
 export function householdMembers(db: Db, scope: Scope) {
   const householdId = householdIdOf(scope);
   return db
@@ -147,7 +149,8 @@ export function householdMembers(db: Db, scope: Scope) {
     .from(householdMember)
     .innerJoin(appUser, eq(appUser.id, householdMember.userId))
     .where(eq(householdMember.householdId, householdId))
-    .orderBy(asc(householdMember.createdAt), asc(householdMember.userId))
+    // Propriétaire d'abord (« OWNER » > « MEMBER »), puis par ancienneté.
+    .orderBy(desc(householdMember.role), asc(householdMember.createdAt), asc(householdMember.userId))
     .all()
     .map((m) => ({ ...m, you: m.userId === scope.userId }));
 }

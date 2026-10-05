@@ -85,16 +85,16 @@ interface JsonApiLetter {
 
 function toLetter(data: JsonApiLetter | undefined): PingenLetter {
   const id = typeof data?.id === "string" ? data.id : null;
-  const a = data?.attributes ?? {};
-  if (!id || typeof a.status !== "string") throw new PingenError("Réponse de Pingen illisible (lettre sans identifiant ni statut).");
-  const price = a.price_value === null || a.price_value === undefined ? NaN : Number(a.price_value);
+  const attributes = data?.attributes ?? {};
+  if (!id || typeof attributes.status !== "string") throw new PingenError("Réponse de Pingen illisible (lettre sans identifiant ni statut).");
+  const price = attributes.price_value === null || attributes.price_value === undefined ? NaN : Number(attributes.price_value);
   return {
     id,
-    status: a.status,
-    fileName: typeof a.file_original_name === "string" ? a.file_original_name : null,
-    trackingNumber: typeof a.tracking_number === "string" && a.tracking_number.trim() ? a.tracking_number.trim() : null,
+    status: attributes.status,
+    fileName: typeof attributes.file_original_name === "string" ? attributes.file_original_name : null,
+    trackingNumber: typeof attributes.tracking_number === "string" && attributes.tracking_number.trim() ? attributes.tracking_number.trim() : null,
     // Frontière de l'API : Pingen donne un prix décimal, converti une fois en centimes entiers.
-    priceRp: Number.isFinite(price) && a.price_currency === "CHF" ? Math.round(price * 100) : null,
+    priceRp: Number.isFinite(price) && attributes.price_currency === "CHF" ? Math.round(price * 100) : null,
   };
 }
 
@@ -102,9 +102,9 @@ function toLetter(data: JsonApiLetter | undefined): PingenLetter {
 async function errorDetail(r: Response): Promise<string> {
   const text = await r.text().catch(() => "");
   try {
-    const j = JSON.parse(text) as { errors?: { title?: string; detail?: string; code?: string }[]; error_description?: string; message?: string };
-    const e = j.errors?.[0];
-    const detail = e?.detail || e?.title || e?.code || j.error_description || j.message;
+    const json = JSON.parse(text) as { errors?: { title?: string; detail?: string; code?: string }[]; error_description?: string; message?: string };
+    const firstError = json.errors?.[0];
+    const detail = firstError?.detail || firstError?.title || firstError?.code || json.error_description || json.message;
     if (detail) return String(detail).slice(0, 300);
   } catch {
     // corps non JSON
@@ -114,6 +114,7 @@ async function errorDetail(r: Response): Promise<string> {
 
 const tokens = new Map<string, { token: string; expiresAt: number }>();
 
+/** Client Pingen ; le jeton OAuth est gardé en mémoire et renouvelé une minute avant son expiration. */
 export function createPingenClient(config: PingenConfig, fetchImpl: Fetch = fetch): PingenClient {
   const cacheKey = `${config.identityUrl}|${config.clientId}`;
 
@@ -124,9 +125,9 @@ export function createPingenClient(config: PingenConfig, fetchImpl: Fetch = fetc
   async function accessToken(): Promise<string> {
     const cached = tokens.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt - 60_000) return cached.token;
-    let r: Response;
+    let response: Response;
     try {
-      r = await call(`${config.identityUrl}/auth/access-tokens`, {
+      response = await call(`${config.identityUrl}/auth/access-tokens`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
         body: new URLSearchParams({ grant_type: "client_credentials", client_id: config.clientId, client_secret: config.clientSecret }),
@@ -134,11 +135,11 @@ export function createPingenClient(config: PingenConfig, fetchImpl: Fetch = fetc
     } catch {
       throw new PingenError("Pingen injoignable : vérifiez la connexion du serveur.");
     }
-    if (!r.ok) throw new PingenError(`Connexion à Pingen refusée (${r.status}) : vérifiez PINGEN_CLIENT_ID et PINGEN_CLIENT_SECRET.`, r.status);
-    const j = (await r.json().catch(() => ({}))) as { access_token?: unknown; expires_in?: unknown };
-    if (typeof j.access_token !== "string" || !j.access_token) throw new PingenError("Pingen n'a pas fourni de jeton d'accès.");
-    tokens.set(cacheKey, { token: j.access_token, expiresAt: Date.now() + (Number(j.expires_in) || 3600) * 1000 });
-    return j.access_token;
+    if (!response.ok) throw new PingenError(`Connexion à Pingen refusée (${response.status}) : vérifiez PINGEN_CLIENT_ID et PINGEN_CLIENT_SECRET.`, response.status);
+    const json = (await response.json().catch(() => ({}))) as { access_token?: unknown; expires_in?: unknown };
+    if (typeof json.access_token !== "string" || !json.access_token) throw new PingenError("Pingen n'a pas fourni de jeton d'accès.");
+    tokens.set(cacheKey, { token: json.access_token, expiresAt: Date.now() + (Number(json.expires_in) || 3600) * 1000 });
+    return json.access_token;
   }
 
   /** Appel authentifié ; un jeton expiré (401) est renouvelé une fois. */
@@ -146,12 +147,12 @@ export function createPingenClient(config: PingenConfig, fetchImpl: Fetch = fetc
     const token = await accessToken();
     const headers: Record<string, string> = { Authorization: `Bearer ${token}`, Accept: JSON_API };
     if (body !== undefined) headers["Content-Type"] = JSON_API;
-    const r = await call(`${config.apiUrl}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-    if (r.status === 401 && retry) {
+    const response = await call(`${config.apiUrl}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    if (response.status === 401 && retry) {
       tokens.delete(cacheKey);
       return api(method, path, body, false);
     }
-    return r;
+    return response;
   }
 
   async function readJson<T>(r: Response, what: string): Promise<T> {
@@ -169,8 +170,8 @@ export function createPingenClient(config: PingenConfig, fetchImpl: Fetch = fetc
       let upload: { data?: { attributes?: { url?: unknown; url_signature?: unknown } } };
       try {
         upload = await readJson(await api("GET", "/file-upload"), "dépôt du fichier");
-      } catch (e) {
-        if (e instanceof PingenError) throw e;
+      } catch (firstError) {
+        if (firstError instanceof PingenError) throw firstError;
         throw new PingenError("Pingen injoignable : vérifiez la connexion du serveur.");
       }
       const url = upload.data?.attributes?.url;
@@ -199,26 +200,26 @@ export function createPingenClient(config: PingenConfig, fetchImpl: Fetch = fetc
           },
         },
       };
-      let r: Response;
+      let response: Response;
       try {
-        r = await api("POST", letters, payload);
+        response = await api("POST", letters, payload);
       } catch (e) {
         if (e instanceof PingenError) throw e;
         throw new PingenNoAnswerError("Pingen n'a pas répondu à la demande d'envoi : la lettre est peut-être partie.");
       }
-      if (r.status >= 500) throw new PingenNoAnswerError(`Pingen a répondu par une erreur ${r.status} : la lettre est peut-être partie.`);
-      const created = await readJson<{ data?: JsonApiLetter }>(r, "envoi de la lettre");
+      if (response.status >= 500) throw new PingenNoAnswerError(`Pingen a répondu par une erreur ${response.status} : la lettre est peut-être partie.`);
+      const created = await readJson<{ data?: JsonApiLetter }>(response, "envoi de la lettre");
       return toLetter(created.data);
     },
 
     async getLetter(id) {
-      const r = await api("GET", `${letters}/${encodeURIComponent(id)}`);
-      return toLetter((await readJson<{ data?: JsonApiLetter }>(r, "lecture de la lettre")).data);
+      const response = await api("GET", `${letters}/${encodeURIComponent(id)}`);
+      return toLetter((await readJson<{ data?: JsonApiLetter }>(response, "lecture de la lettre")).data);
     },
 
     async findByFileName(fileName) {
-      const r = await api("GET", letters);
-      const list = await readJson<{ data?: JsonApiLetter[] }>(r, "liste des lettres");
+      const response = await api("GET", letters);
+      const list = await readJson<{ data?: JsonApiLetter[] }>(response, "liste des lettres");
       const hit = (list.data ?? []).find((d) => d.attributes?.file_original_name === fileName);
       return hit ? toLetter(hit) : null;
     },

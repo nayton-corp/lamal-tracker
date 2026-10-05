@@ -12,7 +12,7 @@ import { and, count, eq } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
 import { appUser, passkey } from "@/infrastructure/db/schema";
 import { audit } from "./audit";
-import { verifyPassword } from "./auth";
+import { requirePassword } from "./auth";
 import { UserError } from "./errors";
 import { consumeToken, issueToken } from "./tokens";
 
@@ -54,6 +54,7 @@ export async function passkeyRegistrationOptions(db: Db, userId: number, rp: Rel
   return { options, token };
 }
 
+/** Vérifie la réponse de l'appareil au défi (jeton du cookie, à usage unique) et enregistre la passkey. */
 export async function finishPasskeyRegistration(
   db: Db,
   userId: number,
@@ -165,14 +166,9 @@ export async function finishPasskeyConfirm(db: Db, userId: number, token: string
   return key !== null && key.userId === userId;
 }
 
-export function renamePasskey(db: Db, userId: number, id: string, name: string) {
-  const res = db.update(passkey).set({ name: name.trim().slice(0, 80) }).where(and(eq(passkey.id, id), eq(passkey.userId, userId))).run();
-  if (res.changes !== 1) throw new UserError("Passkey introuvable.");
-}
-
 /** Retire une passkey ; l'administrateur garde toujours au moins un second facteur. */
 export function removePasskey(db: Db, userId: number, id: string, password: string, nowIso: string) {
-  if (!verifyPassword(db, userId, password)) throw new UserError("Mot de passe incorrect.");
+  requirePassword(db, userId, password, nowIso);
   const user = db.select().from(appUser).where(eq(appUser.id, userId)).get();
   const keys = db.select({ n: count() }).from(passkey).where(eq(passkey.userId, userId)).get()!.n;
   if (user?.role === "ADMIN" && !user.totpEnabledAt && keys <= 1) throw new UserError("L'administrateur doit garder un second facteur : activez d'abord le double facteur.");

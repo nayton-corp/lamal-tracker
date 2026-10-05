@@ -17,6 +17,11 @@ import { insurer } from "@/infrastructure/db/schema";
 import type { Scope } from "./scope";
 import { effectiveNeeds, lineContext, picksFor, type StrategyPick } from "./strategy";
 
+/*
+ * Comparateur d'une ligne de revue (une personne du rituel) : offres de l'année cible filtrées
+ * selon ses besoins, classées, avec scénarios de coût, courbe des franchises et portrait des caisses.
+ */
+
 export interface CompareOptions {
   /** Modèles retenus ; absent = besoins de la personne, vide = tous. */
   models?: ModelType[];
@@ -26,7 +31,7 @@ export interface CompareOptions {
   /** « strategy » : classement de la stratégie du rituel (par défaut quand elle est choisie). */
   sort?: SortKey | "strategy";
   /** Ignore les exclusions et modèles préférés de la personne. */
-  all?: boolean;
+  ignorePersonPreferences?: boolean;
   /** Toutes les offres de chaque caisse, au lieu de sa meilleure seulement. */
   everyOffer?: boolean;
 }
@@ -44,6 +49,14 @@ export interface DetailedOffer extends RankedOffer {
   standardMonthlyRp: number | null;
 }
 
+/**
+ * Courbe « coût total selon les frais de santé » : jusqu'à CHF 4'000 de frais pour un enfant,
+ * CHF 10'000 pour un adulte, en `CURVE_POINTS` pas égaux.
+ */
+const CURVE_MAX_HEALTH_COSTS_RP = { KID: 400_000, OTHER: 1_000_000 } as const;
+const CURVE_POINTS = 40;
+
+/** Identifiant d'une offre dans l'interface : un tarif a une prime par franchise. */
 export const offerKey = (o: { tariffId: number; franchiseChf: number }) => `${o.tariffId}-${o.franchiseChf}`;
 
 export interface CompareView {
@@ -71,18 +84,22 @@ export interface CompareView {
   strategy: Strategy | null;
   sort: SortKey | "strategy";
   /** Filtres appliqués (après besoins et paramètres d'URL). */
-  effective: { models: ModelType[]; franchiseChf: number | null };
+  appliedFilters: { models: ModelType[]; franchiseChf: number | null };
   /** Points de solidité de chaque caisse (−3 à +3), pour l'équilibre. */
   quality: Record<number, number>;
   /** Meilleure offre selon chacune des trois stratégies. */
   picks: StrategyPick[];
 }
 
+/**
+ * Tout ce qu'affiche le comparateur pour une personne du rituel. Les options (paramètres d'URL)
+ * priment sur les besoins enregistrés ; la courbe des franchises ne suit que `opts.models`.
+ */
 export function compareForLine(db: Db, scope: Scope, lineId: number, opts: CompareOptions = {}): CompareView {
   const c = lineContext(db, scope, lineId, opts.healthCostsRp);
-  const { line, review: r, person: p, policy, ctx, allowedFranchises } = c;
-  const params = ctx.params;
-  const healthCostsRp = ctx.healthCostsRp;
+  const { line, review: r, person: p, policy, costContext, allowedFranchises } = c;
+  const params = costContext.params;
+  const healthCostsRp = costContext.healthCostsRp;
   const all = c.offers;
 
   const renewal =
@@ -96,15 +113,15 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
         };
 
   const needs = effectiveNeeds(c);
-  const models = opts.models ?? (opts.all ? [] : needs.models);
+  const models = opts.models ?? (opts.ignorePersonPreferences ? [] : needs.models);
   const franchises = opts.franchises ?? (needs.franchiseChf === null ? [] : [needs.franchiseChf]);
   const filtered = filterOffers(all, {
     models,
     franchises,
-    excludedInsurerIds: opts.all ? [] : p.excludedInsurerIds,
+    excludedInsurerIds: opts.ignorePersonPreferences ? [] : p.excludedInsurerIds,
   });
   const sort = opts.sort ?? (r.strategy ? "strategy" : "total");
-  const byCost = rankOffers(filtered, { ...ctx, referenceTotalRp: renewal?.totalRp ?? null }, sort === "premium" ? "premium" : "total");
+  const byCost = rankOffers(filtered, { ...costContext, referenceTotalRp: renewal?.totalRp ?? null }, sort === "premium" ? "premium" : "total");
   const rankedAll = sort === "strategy" && r.strategy ? rankForStrategy(byCost, r.strategy, c.quality) : byCost;
   const ranked = opts.everyOffer ? rankedAll : bestPerInsurer(rankedAll);
 
@@ -140,7 +157,7 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     coinsuranceMaxRp,
     co2AnnualRp: params.co2AnnualRp,
   };
-  const maxH = line.targetAgeClass === "KID" ? 400_000 : 1_000_000;
+  const curveMaxRp = line.targetAgeClass === "KID" ? CURVE_MAX_HEALTH_COSTS_RP.KID : CURVE_MAX_HEALTH_COSTS_RP.OTHER;
   return {
     lineId,
     targetYear: r.targetYear,
@@ -157,8 +174,8 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     currentInsurerId: policy.insurerId,
     curve: {
       franchises: cheapest.map((o) => o.franchiseChf),
-      points: franchiseCurve(cheapest, base, maxH, maxH / 40),
-      breakEvenRp: breakEvenRp(cheapest, base, maxH * 2),
+      points: franchiseCurve(cheapest, base, curveMaxRp, curveMaxRp / CURVE_POINTS),
+      breakEvenRp: breakEvenRp(cheapest, base, curveMaxRp * 2),
     },
     renewalCandidates: [...new Map(
       all
@@ -170,7 +187,7 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     market: marketStats(all.filter((o) => o.franchiseChf === (renewal?.franchiseChf ?? policy.franchiseChf)).map((o) => o.monthlyPremiumRp)),
     strategy: r.strategy,
     sort,
-    effective: { models, franchiseChf: franchises.length === 1 ? franchises[0]! : null },
+    appliedFilters: { models, franchiseChf: franchises.length === 1 ? franchises[0]! : null },
     quality: c.qualityById,
     picks: picksFor(c),
   };

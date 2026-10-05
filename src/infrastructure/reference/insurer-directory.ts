@@ -106,6 +106,7 @@ function findDirectorySheet(sheets: readonly Sheet[]): Sheet | undefined {
   );
 }
 
+/** Lit le classeur de l'annuaire ; erreur si la feuille des caisses reconnues est introuvable. */
 export function parseInsurerDirectory(sheets: readonly Sheet[]): Directory {
   const sheet = findDirectorySheet(sheets);
   if (!sheet) throw new Error("Annuaire des assureurs : feuille « Zugelassene Krankenversicherer » introuvable.");

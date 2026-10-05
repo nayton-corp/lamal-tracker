@@ -15,7 +15,7 @@ export interface Scope {
   householdId: number | null;
   /** Propriétaire (tout, y compris inviter et supprimer) ou membre (consulter, préparer, signer). */
   householdRole: "OWNER" | "MEMBER" | null;
-  admin: boolean;
+  isAdmin: boolean;
 }
 
 /** Portée d'un compte : son foyer et son rôle. Null si le compte n'existe plus ou est suspendu. */
@@ -23,7 +23,7 @@ export function scopeForUser(db: Db, userId: number): Scope | null {
   const user = db.select({ id: appUser.id, role: appUser.role, disabledAt: appUser.disabledAt }).from(appUser).where(eq(appUser.id, userId)).get();
   if (!user || user.disabledAt) return null;
   const member = db.select({ householdId: householdMember.householdId, role: householdMember.role }).from(householdMember).where(eq(householdMember.userId, userId)).get();
-  return { userId: user.id, householdId: member?.householdId ?? null, householdRole: member?.role ?? null, admin: user.role === "ADMIN" };
+  return { userId: user.id, householdId: member?.householdId ?? null, householdRole: member?.role ?? null, isAdmin: user.role === "ADMIN" };
 }
 
 /** Le même compte, propriétaire du foyer qu'il vient de créer. */
@@ -38,7 +38,7 @@ export function householdIdOf(scope: Scope): number {
 }
 
 export function requireAdmin(scope: Scope) {
-  if (!scope.admin) throw new UserError("Réservé à l'administrateur.");
+  if (!scope.isAdmin) throw new UserError("Réservé à l'administrateur.");
 }
 
 /** Inviter, retirer un membre, tout effacer : réservé au propriétaire du foyer. */
@@ -59,10 +59,14 @@ export function createHouseholdFor(db: Db, scope: Scope, values: typeof househol
 
 // ───────────────────────── Propriété des objets ─────────────────────────
 
-const mine = (scope: Scope) => scope.householdId ?? -1;
+/*
+ * find* : l'objet s'il appartient au foyer de l'appelant, sinon null. owned* : idem, mais lève
+ * NotFoundError (même réponse qu'un objet inexistant). Sans foyer, l'id -1 ne correspond à rien.
+ */
+const householdIdOrNone = (scope: Scope) => scope.householdId ?? -1;
 
 export function findPerson(db: Db, scope: Scope, personId: number) {
-  return db.select().from(person).where(and(eq(person.id, personId), eq(person.householdId, mine(scope)))).get() ?? null;
+  return db.select().from(person).where(and(eq(person.id, personId), eq(person.householdId, householdIdOrNone(scope)))).get() ?? null;
 }
 
 export function ownedPerson(db: Db, scope: Scope, personId: number) {
@@ -72,7 +76,7 @@ export function ownedPerson(db: Db, scope: Scope, personId: number) {
 }
 
 export function findReview(db: Db, scope: Scope, reviewId: number) {
-  return db.select().from(review).where(and(eq(review.id, reviewId), eq(review.householdId, mine(scope)))).get() ?? null;
+  return db.select().from(review).where(and(eq(review.id, reviewId), eq(review.householdId, householdIdOrNone(scope)))).get() ?? null;
 }
 
 export function ownedReview(db: Db, scope: Scope, reviewId: number) {
@@ -87,7 +91,7 @@ export function findLine(db: Db, scope: Scope, lineId: number) {
       .select({ line: reviewLine })
       .from(reviewLine)
       .innerJoin(review, eq(review.id, reviewLine.reviewId))
-      .where(and(eq(reviewLine.id, lineId), eq(review.householdId, mine(scope))))
+      .where(and(eq(reviewLine.id, lineId), eq(review.householdId, householdIdOrNone(scope))))
       .get()?.line ?? null
   );
 }
@@ -104,7 +108,7 @@ export function findLetter(db: Db, scope: Scope, letterId: number) {
       .select({ letter })
       .from(letter)
       .innerJoin(review, eq(review.id, letter.reviewId))
-      .where(and(eq(letter.id, letterId), eq(review.householdId, mine(scope))))
+      .where(and(eq(letter.id, letterId), eq(review.householdId, householdIdOrNone(scope))))
       .get()?.letter ?? null
   );
 }
@@ -121,7 +125,7 @@ export function findOfferRequest(db: Db, scope: Scope, id: number) {
       .select({ request: offerRequest })
       .from(offerRequest)
       .innerJoin(review, eq(review.id, offerRequest.reviewId))
-      .where(and(eq(offerRequest.id, id), eq(review.householdId, mine(scope))))
+      .where(and(eq(offerRequest.id, id), eq(review.householdId, householdIdOrNone(scope))))
       .get()?.request ?? null
   );
 }
@@ -137,7 +141,7 @@ export function ownedPolicy(db: Db, scope: Scope, policyId: number) {
     .select({ policy: lamalPolicy })
     .from(lamalPolicy)
     .innerJoin(person, eq(person.id, lamalPolicy.personId))
-    .where(and(eq(lamalPolicy.id, policyId), eq(person.householdId, mine(scope))))
+    .where(and(eq(lamalPolicy.id, policyId), eq(person.householdId, householdIdOrNone(scope))))
     .get();
   if (!row) throw new NotFoundError("Contrat");
   return row.policy;
@@ -148,7 +152,7 @@ export function ownedLca(db: Db, scope: Scope, lcaId: number) {
     .select({ lca: lcaPolicy })
     .from(lcaPolicy)
     .innerJoin(person, eq(person.id, lcaPolicy.personId))
-    .where(and(eq(lcaPolicy.id, lcaId), eq(person.householdId, mine(scope))))
+    .where(and(eq(lcaPolicy.id, lcaId), eq(person.householdId, householdIdOrNone(scope))))
     .get();
   if (!row) throw new NotFoundError("Complémentaire");
   return row.lca;

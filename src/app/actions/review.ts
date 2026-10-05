@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { generateLetters } from "@/application/letters";
+import { deleteLetter, generateLetters, markLetterAcknowledged, markLetterSent } from "@/application/letters";
 import { abandonPingen, sendLetterViaPingen, syncPingenLetters } from "@/application/pingen";
 import { deleteOfferRequest, generateOfferRequests, markOfferRequestAnswered, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
@@ -11,14 +11,11 @@ import {
   deleteReview,
   confirmLineage,
   decide,
-  deleteLetter,
   keepAsIs,
-  markLetterAcknowledged,
-  markLetterSent,
   openReview,
   reopenReview,
   getReviewView,
-  reviewMembers,
+  listReviewLineTabs,
   setHealthCosts,
   setLineFlags,
   undoDecision,
@@ -33,15 +30,15 @@ import { pingenClientFor, pingenDeps } from "@/server/pingen";
 /** Après un choix : la personne suivante sans choix, sinon l'étape suivante du rituel (LCA, démarches…). */
 function afterDecision(scope: Scope, year: number, lineId: number) {
   const line = findLine(db(), scope, lineId);
-  if (!line) return done(year);
-  const next = reviewMembers(db(), scope, line.reviewId).find((l) => l.decision === "UNDECIDED");
-  if (next) return done(year, `/personne/${next.id}`);
+  if (!line) return redirectToReview(year);
+  const next = listReviewLineTabs(db(), scope, line.reviewId).find((l) => l.decision === "UNDECIDED");
+  if (next) return redirectToReview(year, `/personne/${next.id}`);
   const step = nextStep(getReviewView(db(), scope, line.reviewId, today()));
   revalidatePath("/", "layout");
   redirect(step.kind === "close" || step.kind === "none" ? `/rituel/${year}#ligne-${lineId}` : step.href);
 }
 
-function done(year: number, path = "") {
+function redirectToReview(year: number, path = "") {
   revalidatePath("/", "layout");
   redirect(`/rituel/${year}${path}`);
 }
@@ -58,7 +55,7 @@ export async function openReviewAction(_: ActionState, form: FormData): Promise<
   } catch (e) {
     return toActionError(e);
   }
-  done(year);
+  redirectToReview(year);
   return null;
 }
 
@@ -146,20 +143,6 @@ export async function healthCostsAction(_: ActionState, form: FormData): Promise
   return { ok: "Frais attendus enregistrés." };
 }
 
-export async function generateLettersAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const scope = await requireScope();
-  try {
-    const res = generateLetters(db(), scope, Number(form.get("reviewId")), today());
-    revalidatePath("/", "layout");
-    if (res.blocked.length) {
-      return { error: res.blocked.map((b) => `${b.person} : ${b.reasons.join(" ")}`).join("\n") };
-    }
-    return { ok: res.created.length ? `${res.created.length} lettre(s) prête(s).` : "Aucune lettre à générer." };
-  } catch (e) {
-    return toActionError(e);
-  }
-}
-
 export async function letterSentAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
@@ -200,7 +183,7 @@ export async function closeReviewAction(_: ActionState, form: FormData): Promise
   } catch (e) {
     return toActionError(e);
   }
-  done(year);
+  redirectToReview(year);
   return null;
 }
 
@@ -212,7 +195,7 @@ export async function reopenReviewAction(_: ActionState, form: FormData): Promis
   } catch (e) {
     return toActionError(e);
   }
-  done(year);
+  redirectToReview(year);
   return null;
 }
 
@@ -224,19 +207,8 @@ export async function deleteReviewAction(_: ActionState, form: FormData): Promis
   } catch (e) {
     return toActionError(e);
   }
-  done(year);
+  redirectToReview(year);
   return null;
-}
-
-export async function generateOffersAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const scope = await requireScope();
-  try {
-    const ids = generateOfferRequests(db(), scope, Number(form.get("reviewId")), today());
-    revalidatePath("/", "layout");
-    return { ok: ids.length ? `${ids.length} demande(s) prête(s).` : "Aucune nouvelle caisse choisie." };
-  } catch (e) {
-    return toActionError(e);
-  }
 }
 
 export async function offerSentAction(form: FormData) {

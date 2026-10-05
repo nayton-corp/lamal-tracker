@@ -6,6 +6,7 @@ import type { MailDeps } from "./account-mail";
 import { audit } from "./audit";
 import { UserError } from "./errors";
 import { requireAdmin, type Scope } from "./scope";
+import { logMailError } from "@/infrastructure/mail/mailer";
 
 /*
  * Avis envoyés depuis l'app : ils arrivent dans l'administration, et l'administrateur reçoit un
@@ -23,6 +24,7 @@ const input = z.object({
   page: z.string().trim().max(200).regex(/^\/[^\s]*$/).nullable().catch(null),
 });
 
+/** Enregistre un avis (au plus `FEEDBACK_PER_DAY` sur 24 heures glissantes) et prévient les administrateurs, sans le texte. */
 export async function sendFeedback(db: Db, scope: Scope, raw: { kind: unknown; message: unknown; page: unknown }, mail: MailDeps | null, nowIso: string): Promise<void> {
   const parsed = input.safeParse(raw);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Avis incomplet.");
@@ -41,7 +43,7 @@ export async function sendFeedback(db: Db, scope: Scope, raw: { kind: unknown; m
         subject: `Nouvel avis : ${FEEDBACK_KINDS[kind].toLowerCase()}`,
         text: `Bonjour,\n\nUn avis vient d'arriver dans Primes LAMal. Lisez-le dans l'administration :\n\n${mail.appUrl}/admin#avis\n\n— Primes LAMal`,
       })
-      .catch((e) => console.error("[courriel] avis :", e instanceof Error ? e.message : e));
+      .catch(logMailError("avis"));
   }
 }
 
@@ -55,6 +57,7 @@ export interface FeedbackRow {
   read: boolean;
 }
 
+/** Derniers avis pour l'administration, avec le courriel de leur auteur. */
 export function listFeedback(db: Db, scope: Scope, limit = 50): FeedbackRow[] {
   requireAdmin(scope);
   return db

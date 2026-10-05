@@ -1,5 +1,10 @@
 import ExcelJS from "exceljs";
 
+/*
+ * Lecture des classeurs Excel des référentiels officiels (annuaire des caisses, données de
+ * surveillance) : cellules ramenées à du texte, feuilles sous forme de tableaux.
+ */
+
 /** Texte d'une cellule ExcelJS (texte enrichi, formule, date…), sans espaces superflus en bout. */
 export function cellText(v: unknown): string {
   if (v === null || v === undefined) return "";

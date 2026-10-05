@@ -2,10 +2,9 @@ import { CheckCircle2, ChevronRight, Download, FolderLock, Landmark, MessageSqua
 import Link from "next/link";
 import { listInsurers } from "@/application/household";
 import type { ValidationReport } from "@/domain/ofsp/report";
-import { listDatasets, listParameters } from "@/application/reference-data";
-import { getSetting } from "@/infrastructure/db/settings";
+import { lastDataChecks, listDatasets, listParameters } from "@/application/reference-data";
 import { subscriptionCount } from "@/infrastructure/push/push";
-import { db, today } from "@/server/context";
+import { currentYear, db } from "@/server/context";
 import { importJob } from "@/server/jobs";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -13,9 +12,8 @@ import { Card, Section } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
 import { Co2Form } from "./co2-form";
 import { refreshReferenceAction } from "@/app/actions/data";
-import { formatDateLong } from "@/domain/dates";
+import { formatDateLong, formatTimestamp } from "@/domain/dates";
 import { officialCo2 } from "@/infrastructure/reference/apply";
-import type { ReferenceCheck } from "@/server/reference";
 import { ActionForm } from "@/ui/action-form";
 import { SubmitButton } from "@/ui/submit";
 import { ImportPanel } from "./import-panel";
@@ -37,30 +35,29 @@ const STATUS = {
 export default async function DataPage() {
   const scope = await pageScope();
   const datasets = listDatasets(db());
-  const currentYear = Number(today().slice(0, 4));
+  const year = currentYear();
   const activeYears = new Set(datasets.filter((d) => d.status === "ACTIVE").map((d) => d.year));
   // CO2 : années utiles seulement (primes importées, année en cours et suivante).
   const params = listParameters(db())
-    .filter((p) => activeYears.has(p.year) || p.year >= currentYear);
+    .filter((p) => activeYears.has(p.year) || p.year >= year);
   const visibleDatasets = datasets.filter((d) => d.status !== "SUPERSEDED");
   const insurers = listInsurers(db());
   const customAddresses = insurers.filter((i) => i.terminationAddress?.trim()).length;
   const directoryDate = insurers.map((i) => i.directoryDate).filter(Boolean).sort().at(-1);
-  const reference = getSetting<ReferenceCheck>(db(), "reference.lastCheck");
-  const lastCheck = getSetting<{ at: string; ok: boolean }>(db(), "ofsp.lastCheck");
+  const { reference, premiums: lastCheck } = lastDataChecks(db());
 
   return (
     <Page wide>
       <PageHeader title="Réglages" subtitle="Tout se met à jour tout seul : vous n'avez en principe rien à faire ici." />
 
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
-        {scope.admin && (
+        {scope.isAdmin && (
         <div className="space-y-6">
           <Section title="Primes officielles">
             <Card className="space-y-4">
               <p className="text-sm text-muted">
                 Publiées fin septembre par l&apos;OFSP, téléchargées automatiquement.
-                {lastCheck && ` Dernière vérification : ${new Date(lastCheck.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" })}${lastCheck.ok ? "" : " (échec, nouvel essai prévu)"}.`}
+                {lastCheck && ` Dernière vérification : ${formatTimestamp(lastCheck.at, "dateTime")}${lastCheck.ok ? "" : " (échec, nouvel essai prévu)"}.`}
               </p>
               {visibleDatasets.length > 0 && (
                 <ul className="divide-y divide-border rounded-xl border border-border">
@@ -114,7 +111,7 @@ export default async function DataPage() {
         )}
 
         <div className="space-y-6">
-          {scope.admin && (
+          {scope.isAdmin && (
             <>
           <Section title="Caisses-maladie">
             <Link href="/donnees/caisses" className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
@@ -134,7 +131,7 @@ export default async function DataPage() {
             <Card className="space-y-3">
               <p className="text-sm text-muted">
                 Adresses des caisses, indicateurs (réserves, frais) et redistribution CO2 sont vérifiés chaque semaine auprès de l&apos;OFSP et de l&apos;OFEV.
-                {reference && ` Dernière vérification : ${new Date(reference.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" })}${reference.ok ? "" : " (en partie impossible, nouvel essai prévu)"}.`}
+                {reference && ` Dernière vérification : ${formatTimestamp(reference.at, "dateTime")}${reference.ok ? "" : " (en partie impossible, nouvel essai prévu)"}.`}
               </p>
               <ActionForm action={refreshReferenceAction}>
                 <SubmitButton variant="secondary" size="sm" pendingLabel="Vérification…">
@@ -156,7 +153,7 @@ export default async function DataPage() {
             <div className="space-y-3">
               <SettingsLink href="/compte" icon={<UserRoundCog aria-hidden className="size-5 text-primary" />} title="Mon compte" text="Courriel, mot de passe, passkeys, double facteur, appareils connectés." />
               <SettingsLink href="/compte/donnees" icon={<FolderLock aria-hidden className="size-5 text-primary" />} title="Mes données" text={scope.householdRole === "OWNER" ? "Télécharger une copie, supprimer le foyer ou le compte." : "Télécharger une copie, supprimer le compte."} />
-              {scope.admin && <SettingsLink href="/admin" icon={<ShieldCheck aria-hidden className="size-5 text-primary" />} title="Administration" text="Invitations, comptes, avis reçus, chiffres d'usage." />}
+              {scope.isAdmin && <SettingsLink href="/admin" icon={<ShieldCheck aria-hidden className="size-5 text-primary" />} title="Administration" text="Invitations, comptes, avis reçus, chiffres d'usage." />}
             </div>
           </Section>
 
@@ -171,7 +168,7 @@ export default async function DataPage() {
             </div>
           </Section>
 
-          {scope.admin && (
+          {scope.isAdmin && (
           <Section title="Sauvegarde">
             <Card className="space-y-3">
               <p className="text-sm text-muted">Une copie de toute la base, tous foyers compris, après confirmation de votre identité.</p>

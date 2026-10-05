@@ -7,7 +7,7 @@ export const CO2_PAGE_URL = "https://www.bafu.admin.ch/de/co2-abgabe-private";
 
 /**
  * Montants annoncés sur une page ou un mémento de l'OFEV : « im Jahr 2025 CHF 61.80 »,
- * « Jahr 2027 Fr. 57.– », « en 2026, 61.80 francs ». Les montants hors bornes plausibles
+ * « Jahr 2027 Fr. 57.– ». Les montants hors bornes plausibles
  * (10 à 200 CHF) sont ignorés.
  */
 export function scanCo2Amounts(text: string): Map<number, number> {

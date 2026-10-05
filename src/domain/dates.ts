@@ -16,6 +16,7 @@ export function addDays(d: IsoDate, days: number): IsoDate {
   return fromUtc(date);
 }
 
+/** Nombre de jours de `from` à `to` ; négatif si `to` est avant `from`. */
 export function daysBetween(from: IsoDate, to: IsoDate): number {
   return Math.round((toUtc(to).getTime() - toUtc(from).getTime()) / 86_400_000);
 }
@@ -31,13 +32,42 @@ const MONTHS = [
 ];
 const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 
+/** « 1er janvier 2027 » (« vendredi 1er janvier 2027 » avec `withWeekday`), pour les textes et les lettres. */
 export function formatDateLong(d: IsoDate, withWeekday = false): string {
   const date = toUtc(d);
   const base = `${date.getUTCDate()}${date.getUTCDate() === 1 ? "er" : ""} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
   return withWeekday ? `${WEEKDAYS[date.getUTCDay()]} ${base}` : base;
 }
 
+/** « 31.12.2026 » : format court suisse. */
 export function formatDateShort(d: IsoDate): string {
   const [y, m, day] = d.split("-");
   return `${day}.${m}.${y}`;
+}
+
+/** Fuseau dans lequel les instants sont affichés (l'app ne sert que la Suisse). */
+export const DISPLAY_TIME_ZONE = "Europe/Zurich";
+
+const TIMESTAMP_STYLES = {
+  /** « 5 oct. 2026 » */
+  date: { day: "numeric", month: "short", year: "numeric" },
+  /** « 5 octobre 2026 » */
+  dateLong: { day: "numeric", month: "long", year: "numeric" },
+  /** « 05.10.26 14:30 » */
+  dateTime: { dateStyle: "short", timeStyle: "short" },
+  /** « 5 octobre 2026 à 14:30 » */
+  dateTimeLong: { dateStyle: "long", timeStyle: "short" },
+  /** « 14:30 » */
+  time: { hour: "2-digit", minute: "2-digit" },
+} satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+export type TimestampStyle = keyof typeof TIMESTAMP_STYLES;
+
+/**
+ * Affiche un instant (ISO 8601 avec heure, ex. `createdAt`) à l'heure suisse.
+ * Pour une date civile sans heure (`IsoDate`), utiliser `formatDateLong` ou `formatDateShort`.
+ */
+export function formatTimestamp(iso: string | Date, style: TimestampStyle): string {
+  const date = typeof iso === "string" ? new Date(iso) : iso;
+  return date.toLocaleString("fr-CH", { timeZone: DISPLAY_TIME_ZONE, ...TIMESTAMP_STYLES[style] });
 }

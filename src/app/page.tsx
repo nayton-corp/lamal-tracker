@@ -3,11 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Awareness } from "@/app/rituel/_parts/awareness";
 import { getHousehold, getHouseholdMode, listPersons, listPolicies } from "@/application/household";
-import { ensureReview, getReviewView } from "@/application/review";
+import { openReviewIfPossible, getReviewView } from "@/application/review";
 import { daysBetween, formatDateLong } from "@/domain/dates";
-import { reviewDeadlines, ritualWindowOpen } from "@/domain/deadlines";
-import { activeDataset, insurerLabel, parametersFor } from "@/infrastructure/db/queries";
-import { db, ritualYear, today } from "@/server/context";
+import { reviewDeadlines, isReviewWindowOpen } from "@/domain/deadlines";
+import { legalParameters, premiumsAvailable } from "@/application/reference-data";
+import { insurerLabel } from "@/domain/insurer";
+import { db, reviewTargetYear, today } from "@/server/context";
 import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
 import { Chf, Delta } from "@/ui/money";
@@ -18,17 +19,17 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const scope = await pageScope();
-  const h = getHousehold(db(), scope);
+  const householdRow = getHousehold(db(), scope);
   const t = today();
   const year = Number(t.slice(0, 4));
-  const target = ritualYear();
+  const target = reviewTargetYear();
 
   // Première connexion : l'accueil guide la configuration (pour qui, adresse, personnes, contrats).
-  if (!h) redirect("/bienvenue");
+  if (!householdRow) redirect("/bienvenue");
   const solo = getHouseholdMode(db(), scope) === "SOLO";
 
-  const persons = listPersons(db(), h.id);
-  const params = parametersFor(db(), year);
+  const persons = listPersons(db(), householdRow.id);
+  const params = legalParameters(db(), year);
   const co2Monthly = params.co2AnnualRp === null ? 0 : Math.round(params.co2AnnualRp / 12);
   const rows = persons.map((p) => {
     const policies = listPolicies(db(), p.id);
@@ -42,18 +43,18 @@ export default async function Home() {
 
   if (persons.length === 0) redirect("/bienvenue?etape=membres");
 
-  const dataset = activeDataset(db(), target);
+  const published = premiumsAvailable(db(), target);
   const deadlines = reviewDeadlines(target);
-  const windowOpen = ritualWindowOpen(t, target, Boolean(dataset));
+  const windowOpen = isReviewWindowOpen(t, target, published);
   // Pendant la fenêtre du rituel, l'analyse s'ouvre d'elle-même : l'accueil montre tout de suite
   // ce que coûtera l'année prochaine sans rien faire.
-  const reviewId = windowOpen ? ensureReview(db(), scope, target) : null;
+  const reviewId = windowOpen ? openReviewIfPossible(db(), scope, target) : null;
   const reviewView = reviewId ? getReviewView(db(), scope, reviewId, t) : null;
 
   return (
     <Page wide>
       <header className="pt-4 lg:pt-0">
-        <p className="text-sm text-muted">{h.name}</p>
+        <p className="text-sm text-muted">{householdRow.name}</p>
         <h1 className="text-2xl font-bold">Bonjour{solo ? ` ${persons[0]!.firstName}` : ""}</h1>
       </header>
       <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-8 lg:space-y-0">
@@ -71,7 +72,7 @@ export default async function Home() {
             </div>
           </Card>
         </Link>
-      ) : dataset && windowOpen ? (
+      ) : published && windowOpen ? (
         <Card className="space-y-3 border-primary/30">
           <p className="flex items-center gap-2 font-semibold text-primary">
             <Sparkles aria-hidden className="size-5" /> Les primes {target} sont publiées

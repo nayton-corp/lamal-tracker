@@ -16,6 +16,21 @@ export const CKAN_PACKAGE_URL =
 export const FALLBACK_PREMIUMS_URL =
   "https://opendata.bagnet.ch/?r=/download&path=L1ByYWVtaWVuL1Byw6RtaWVuX0NILnhsc3g%3D";
 
+/**
+ * Hôtes officiels d'où l'app accepte de télécharger des primes. Les URL viennent du catalogue
+ * CKAN : sans cette liste, un catalogue détourné ferait télécharger n'importe quoi au serveur.
+ * `OFSP_PREMIUMS_URL`, posée par l'exploitant, reste permise telle quelle.
+ */
+export function isOfficialUrl(url: string): boolean {
+  if (process.env.OFSP_PREMIUMS_URL && url === process.env.OFSP_PREMIUMS_URL) return true;
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && (u.hostname === "opendata.bagnet.ch" || u.hostname === "opendata.swiss" || u.hostname.endsWith(".admin.ch"));
+  } catch {
+    return false;
+  }
+}
+
 // admin.ch et bagnet refusent les requêtes sans User-Agent de navigateur.
 const HEADERS = {
   "User-Agent":
@@ -58,7 +73,7 @@ export function pickPremiumResource(payload: unknown): string | null {
       const score = (isPremiumCh ? 10 : 0) + (format.includes("xlsx") || /\.xlsx/i.test(text) ? 2 : format.includes("csv") ? 1 : 0);
       return { url, score };
     })
-    .filter((r) => r.url && r.score >= 10)
+    .filter((r) => r.url && r.score >= 10 && isOfficialUrl(r.url))
     .sort((a, b) => b.score - a.score);
   return scored[0]?.url ?? null;
 }
@@ -86,7 +101,7 @@ export function pickArchiveResources(payload: unknown): ArchiveResource[] {
     const url = r.download_url || r.url || "";
     const text = `${label(r.name)} ${label(r.title)} ${url} ${decodedPath(url)}`;
     const m = /archiv[^0-9]{0,20}(20\d\d)/i.exec(text);
-    if (url && m && Number(m[1]) >= MIN_ARCHIVE_YEAR) found.set(Number(m[1]), url);
+    if (url && m && Number(m[1]) >= MIN_ARCHIVE_YEAR && isOfficialUrl(url)) found.set(Number(m[1]), url);
   }
   return [...found.entries()].sort((a, b) => b[0] - a[0]).map(([year, url]) => ({ year, url, listed: true }));
 }
@@ -112,6 +127,7 @@ export async function listArchives(fetchImpl: typeof fetch = fetch): Promise<Arc
   return [year, year - 1, year - 2].map((y) => ({ year: y, url: guessedArchiveUrl(y), listed: false }));
 }
 
+/** URL du fichier de primes courant : OFSP_PREMIUMS_URL si posée, sinon le catalogue CKAN, sinon l'URL connue. */
 export async function resolvePremiumsUrl(fetchImpl: typeof fetch = fetch): Promise<string> {
   if (process.env.OFSP_PREMIUMS_URL) return process.env.OFSP_PREMIUMS_URL;
   try {
@@ -158,9 +174,16 @@ async function* capped(body: AsyncIterable<Uint8Array>, max: number, url: string
   }
 }
 
+/**
+ * Télécharge un fichier officiel dans `dir` et renvoie son chemin. Refusé hors des sources
+ * officielles et au-delà de `MAX_DOWNLOAD_BYTES` ; écrit d'abord un `.part`, jamais un fichier tronqué.
+ */
 export async function download(url: string, dir: string): Promise<string> {
   fs.mkdirSync(dir, { recursive: true });
+  if (!isOfficialUrl(url)) throw new Error(`Téléchargement refusé : ${url} n'est pas une source officielle.`);
   const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(10 * 60_000) });
+  // L'hébergeur peut rediriger vers son stockage (hôte inconnu d'avance) : HTTPS exigé au moins.
+  if (res.url && !res.url.startsWith("https://") && !isOfficialUrl(res.url)) throw new Error("Téléchargement refusé : redirigé hors HTTPS.");
   if (!res.ok || !res.body) throw new Error(`Téléchargement ${url} : HTTP ${res.status}`);
   const announced = Number(res.headers.get("content-length"));
   if (announced > MAX_DOWNLOAD_BYTES) throw new Error(`Téléchargement ${url} : ${Math.round(announced / 1048576)} Mo annoncés, refusé.`);
@@ -179,6 +202,7 @@ export async function download(url: string, dir: string): Promise<string> {
   return target;
 }
 
+/** Empreinte SHA-256 du fichier, calculée en flux : reconnaît un fichier déjà importé. */
 export async function sha256File(file: string): Promise<string> {
   const hash = createHash("sha256");
   await pipeline(fs.createReadStream(file), hash);

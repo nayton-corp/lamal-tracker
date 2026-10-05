@@ -3,12 +3,17 @@ import { eq } from "drizzle-orm";
 import { pingenAllowed } from "@/application/admin";
 import { syncPingenLetters, type PingenDeps } from "@/application/pingen";
 import type { Scope } from "@/application/scope";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { insurer, letter, review } from "@/infrastructure/db/schema";
 import { createPingenClient, pingenConfig, type PingenClient } from "@/infrastructure/pingen/client";
 import { renderLetterPdf } from "@/infrastructure/pdf/letter-pdf";
-import { householdKey, notify } from "@/infrastructure/push/push";
+import { householdNotificationKey, notify } from "@/infrastructure/push/push";
 import { db, nowIso } from "./context";
+
+/*
+ * Branchement de Pingen côté serveur : client configuré par l'environnement, autorisation par
+ * foyer, rendu PDF en mise en page Pingen et suivi des lettres par le planificateur.
+ */
 
 const globalForPingen = globalThis as unknown as { __pingen?: { key: string; client: PingenClient } };
 
@@ -26,6 +31,7 @@ export function pingenClientFor(scope: Scope): PingenClient | null {
   return pingenAllowed(db(), scope) ? pingenClient() : null;
 }
 
+/** Dépendances d'un envoi : le client et un rendu PDF dont l'adresse tombe dans la zone lue par Pingen. */
 export function pingenDeps(client: PingenClient): PingenDeps {
   return { client, render: (content, signed) => renderLetterPdf(content, signed, "pingen") };
 }
@@ -48,7 +54,7 @@ export async function pingenTick(): Promise<void> {
       db(),
       { householdId: row.householdId },
       { title: "Lettre non envoyée par Pingen", body: `Le courrier à ${insurerLabel(row.insurer)} doit être repris : ouvrez les démarches.`, url: `/rituel/${row.year}/lettres` },
-      householdKey(row.householdId, `pingen-echec-${id}`),
+      householdNotificationKey(row.householdId, `pingen-echec-${id}`),
     );
   }
   if (result.errors.length) console.error("[pingen]", result.errors.join(" ; "));

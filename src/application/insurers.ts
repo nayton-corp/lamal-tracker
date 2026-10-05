@@ -5,6 +5,12 @@ import type { Db } from "@/infrastructure/db/client";
 import { activeDataset, offersFor } from "@/infrastructure/db/queries";
 import { insurer, insurerIndicator } from "@/infrastructure/db/schema";
 
+/*
+ * Portraits des caisses affichés dans le comparateur : réserves, frais de gestion et évolution des
+ * primes, comparés au reste du marché (voir domain/insurer-profile.ts).
+ */
+
+/** Profil de primes de la personne (où, quel âge, quelle couverture) pour l'année cible. */
 export interface ProfileScope {
   canton: string;
   region: number;

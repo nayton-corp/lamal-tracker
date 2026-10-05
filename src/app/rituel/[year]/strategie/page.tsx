@@ -21,9 +21,9 @@ const ICONS: Record<Strategy, typeof PiggyBank> = { ECONOMY: PiggyBank, KEEP: Re
 export default async function StrategyPage({ params }: { params: Promise<{ year: string }> }) {
   const scope = await pageScope();
   const year = Number((await params).year);
-  const r = getReviewByYear(db(), scope, year);
-  if (!r || r.status === "CLOSED") redirect(`/rituel/${year}`);
-  const overview = strategyOverview(db(), scope, r.id);
+  const reviewRow = getReviewByYear(db(), scope, year);
+  if (!reviewRow || reviewRow.status === "CLOSED") redirect(`/rituel/${year}`);
+  const overview = strategyOverview(db(), scope, reviewRow.id);
   const several = overview[0]!.persons.length > 1;
 
   return (
@@ -37,10 +37,10 @@ export default async function StrategyPage({ params }: { params: Promise<{ year:
         {overview.map((o) => {
           const info = STRATEGY_INFO[o.strategy];
           const Icon = ICONS[o.strategy];
-          const active = r.strategy === o.strategy;
+          const active = reviewRow.strategy === o.strategy;
           return (
             <li key={o.strategy}>
-              <ActionForm action={chooseStrategyAction} hidden={{ year, reviewId: r.id, strategy: o.strategy }}>
+              <ActionForm action={chooseStrategyAction} hidden={{ year, reviewId: reviewRow.id, strategy: o.strategy }}>
                 <article className={cn("space-y-3 rounded-2xl border-2 bg-surface p-4 shadow-card", active ? "border-primary" : "border-border")} aria-labelledby={`strategie-${o.strategy}`}>
                   <div className="flex items-start gap-3">
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">

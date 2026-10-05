@@ -29,16 +29,26 @@ interface StoredPassword {
   cost: number;
 }
 
-const COST = 2 ** 15;
+/**
+ * Coût scrypt (N). Chaque hachage demande 128 × N × r octets de mémoire : 64 Mo à 2^16. Plus haut,
+ * quelques connexions simultanées satureraient le conteneur (768 Mo). Les anciennes empreintes
+ * (2^15) sont refaites au coût actuel à la connexion suivante.
+ */
+const COST = 2 ** 16;
 
 function hashPassword(password: string, salt: Buffer, cost: number): Buffer {
-  return scryptSync(password.normalize("NFKC"), salt, 32, { N: cost, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+  return scryptSync(password.normalize("NFKC"), salt, 32, { N: cost, r: 8, p: 1, maxmem: 80 * 1024 * 1024 });
 }
 
-export function storedPassword(password: string): StoredPassword {
-  validatePassword(password);
+function hashed(password: string): StoredPassword {
   const salt = randomBytes(16);
   return { salt: salt.toString("base64"), hash: hashPassword(password, salt, COST).toString("base64"), cost: COST };
+}
+
+/** Hachage scrypt (sel et coût inclus) d'un nouveau mot de passe, après contrôle de sa longueur. */
+export function storedPassword(password: string): StoredPassword {
+  validatePassword(password);
+  return hashed(password);
 }
 
 /** Vérification d'un mot de passe dans les fuites connues (null : service muet, on n'empêche rien). */
@@ -68,6 +78,7 @@ export function passwordToDefine(db: Db): boolean {
   return !db.select({ password: appUser.password }).from(appUser).where(eq(appUser.id, id)).get()!.password.hash;
 }
 
+/** Contrôle de longueur seul, sans réseau ; `checkNewPassword` y ajoute les fuites connues. */
 export function validatePassword(password: string) {
   if (password.length < MIN_PASSWORD_LENGTH) throw new UserError(`Le mot de passe doit compter au moins ${MIN_PASSWORD_LENGTH} caractères.`);
   if (password.length > 200) throw new UserError("Mot de passe trop long.");
@@ -115,6 +126,7 @@ export function userEmail(db: Db, userId: number): string | null {
   return db.select({ email: appUser.email }).from(appUser).where(eq(appUser.id, userId)).get()?.email ?? null;
 }
 
+/** `email` doit être déjà normalisé (`normalizeEmail`) : la recherche est exacte. */
 export function findUserByEmail(db: Db, email: string) {
   return db.select().from(appUser).where(eq(appUser.email, email)).get() ?? null;
 }
@@ -124,10 +136,12 @@ export function primaryUserId(db: Db): number | null {
   return db.select({ id: appUser.id }).from(appUser).where(eq(appUser.role, "ADMIN")).orderBy(asc(appUser.id)).limit(1).get()?.id ?? null;
 }
 
+/** Remplace le mot de passe et lève le verrouillage ; les sessions ouvertes restent (à l'appelant de les fermer). */
 export function setPassword(db: Db, userId: number, password: string) {
   db.update(appUser).set({ password: storedPassword(password), failedLogins: 0, lockedUntil: null }).where(eq(appUser.id, userId)).run();
 }
 
+/** Comparaison en temps constant, sans compter d'échec : la connexion passe par `attemptLogin`. */
 export function verifyPassword(db: Db, userId: number, password: string): boolean {
   const user = db.select({ password: appUser.password }).from(appUser).where(eq(appUser.id, userId)).get();
   if (!user) return false;
@@ -154,7 +168,10 @@ export function attemptLogin(db: Db, userId: number, password: string, nowIso: s
   const locked = lockSeconds(db, userId, nowIso);
   if (locked > 0) return { ok: false, lockedSeconds: locked };
   if (verifyPassword(db, userId, password)) {
-    db.update(appUser).set({ failedLogins: 0, lockedUntil: null }).where(eq(appUser.id, userId)).run();
+    const stored = db.select({ password: appUser.password }).from(appUser).where(eq(appUser.id, userId)).get()?.password;
+    // Empreinte d'un ancien coût : refaite maintenant que le mot de passe est connu (sans revalider ses règles).
+    const upgrade = stored && stored.cost < COST ? { password: hashed(password) } : {};
+    db.update(appUser).set({ failedLogins: 0, lockedUntil: null, ...upgrade }).where(eq(appUser.id, userId)).run();
     return { ok: true };
   }
   const user = db.select({ failedLogins: appUser.failedLogins }).from(appUser).where(eq(appUser.id, userId)).get();
@@ -212,7 +229,7 @@ export function login(db: Db, input: { email: string; password: string }, option
 
 /** Nouveau mot de passe choisi depuis le compte : les autres appareils sont déconnectés. */
 export async function changePassword(db: Db, userId: number, current: string, next: string, pwned: PwnedCheck, keepSessionId: string, nowIso: string) {
-  if (!verifyPassword(db, userId, current)) throw new UserError("Mot de passe actuel incorrect.");
+  requirePassword(db, userId, current, nowIso, "Mot de passe actuel incorrect.");
   await checkNewPassword(next, pwned);
   setPassword(db, userId, next);
   closeOtherSessions(db, userId, keepSessionId);
@@ -261,13 +278,17 @@ export function markActive(db: Db, userId: number, nowIso: string) {
   db.update(appUser).set({ lastActiveAt: nowIso, inactivityNotices: 0, inactivityNoticeAt: null }).where(eq(appUser.id, userId)).run();
 }
 
-/** Ouvre une session et renvoie le jeton à placer dans le cookie (jamais conservé en clair). */
-export function openSession(db: Db, userId: number, device: string, nowIso: string): { id: string; token: string; expiresAt: string } {
+/**
+ * Ouvre une session et renvoie le jeton à placer dans le cookie (jamais conservé en clair).
+ * `confirmed` : l'identité vient d'être prouvée (mot de passe, passkey), la session est
+ * « fraîche » quelques minutes ; un lien de courriel, lui, ne prouve que l'accès à la boîte.
+ */
+export function openSession(db: Db, userId: number, device: string, nowIso: string, confirmed = true): { id: string; token: string; expiresAt: string } {
   purgeExpiredSessions(db, nowIso);
   const token = randomBytes(32).toString("base64url");
   const id = randomBytes(8).toString("hex");
   const expiresAt = new Date(Date.parse(nowIso) + SESSION_DAYS * 86_400_000).toISOString();
-  db.insert(session).values({ id, userId, tokenHash: tokenHash(token), device: device.slice(0, 200), createdAt: nowIso, lastSeenAt: nowIso, expiresAt }).run();
+  db.insert(session).values({ id, userId, tokenHash: tokenHash(token), device: device.slice(0, 200), createdAt: nowIso, lastSeenAt: nowIso, expiresAt, confirmedAt: confirmed ? nowIso : NEVER_CONFIRMED }).run();
   markActive(db, userId, nowIso);
   return { id, token, expiresAt };
 }
@@ -306,6 +327,7 @@ export function touchSession(db: Db, token: string | undefined, nowIso: string):
   return { id: row.id, userId: row.userId, device: row.device, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt };
 }
 
+/** Déconnexion : supprime la session de ce jeton (sans effet s'il est absent). */
 export function closeSession(db: Db, token: string | undefined) {
   if (!token) return;
   db.delete(session).where(eq(session.tokenHash, tokenHash(token))).run();
@@ -314,6 +336,9 @@ export function closeSession(db: Db, token: string | undefined) {
 /** Durée pendant laquelle une identité confirmée ouvre les actions sensibles. */
 export const CONFIRM_MINUTES = 10;
 
+/** Date de confirmation d'une session ouverte sans preuve d'identité (lien de courriel). */
+const NEVER_CONFIRMED = new Date(0).toISOString();
+
 /**
  * Fin de la période de confirmation de cette session : ouverture (le mot de passe vient d'être
  * saisi) ou dernière confirmation par mot de passe ou passkey. Null si elle est passée.
@@ -321,7 +346,7 @@ export const CONFIRM_MINUTES = 10;
 export function confirmedUntil(db: Db, sessionId: string, nowIso: string, minutes = CONFIRM_MINUTES): string | null {
   const row = db.select({ createdAt: session.createdAt, confirmedAt: session.confirmedAt }).from(session).where(eq(session.id, sessionId)).get();
   if (!row) return null;
-  const last = row.confirmedAt && row.confirmedAt > row.createdAt ? row.confirmedAt : row.createdAt;
+  const last = row.confirmedAt ?? row.createdAt;
   const until = new Date(Date.parse(last) + minutes * 60_000).toISOString();
   return until > nowIso ? until : null;
 }
@@ -343,13 +368,21 @@ export function markConfirmed(db: Db, sessionId: string, nowIso: string) {
 
 /** Confirmation par mot de passe ; les échecs comptent pour le verrouillage du compte. */
 export function confirmWithPassword(db: Db, userId: number, sessionId: string, password: string, nowIso: string) {
-  const res = attemptLogin(db, userId, password, nowIso);
-  if (!res.ok) {
-    audit(db, userId, res.lockedSeconds > 0 ? "LOCKED" : "LOGIN_FAILED", { nowIso });
-    if (res.lockedSeconds > 0) throw new UserError(`Trop d'essais : réessayez dans ${Math.ceil(res.lockedSeconds / 60)} min.`);
-    throw new UserError("Mot de passe incorrect.");
-  }
+  requirePassword(db, userId, password, nowIso);
   markConfirmed(db, sessionId, nowIso);
+}
+
+/**
+ * Mot de passe redemandé dans le compte (changer de courriel, ajouter un facteur…). Les échecs
+ * comptent comme des échecs de connexion : verrou, journal. Une session volée ne permet donc pas
+ * de deviner le mot de passe à l'infini.
+ */
+export function requirePassword(db: Db, userId: number, password: string, nowIso: string, wrongMessage = "Mot de passe incorrect.") {
+  const res = attemptLogin(db, userId, password, nowIso);
+  if (res.ok) return;
+  audit(db, userId, res.lockedSeconds > 0 ? "LOCKED" : "LOGIN_FAILED", { nowIso });
+  if (res.lockedSeconds > 0) throw new UserError(`Trop d'essais : réessayez dans ${Math.ceil(res.lockedSeconds / 60)} min.`);
+  throw new UserError(wrongMessage);
 }
 
 /** Ferme toutes les sessions d'un compte (réinitialisation du mot de passe, suspension). */
@@ -362,6 +395,7 @@ export function closeOtherSessions(db: Db, userId: number, keepId: string) {
   db.delete(session).where(and(eq(session.userId, userId), ne(session.id, keepId))).run();
 }
 
+/** Sessions actives du compte (les expirées sont purgées au passage), la plus récemment utilisée d'abord. */
 export function listSessions(db: Db, userId: number, nowIso: string): Omit<SessionInfo, "userId">[] {
   purgeExpiredSessions(db, nowIso);
   return db

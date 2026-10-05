@@ -6,11 +6,17 @@ import { MODEL_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal"
 import { buildOfferRequest, letterPlainText, type LetterContent } from "@/domain/letter";
 import { formatChf } from "@/domain/money";
 import type { Db } from "@/infrastructure/db/client";
-import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
+import { insurerLabel, insurerRecipient } from "@/domain/insurer";
 import { household, insurer, lcaPolicy, offerRequest, review, reviewLine } from "@/infrastructure/db/schema";
-import { getReviewView, UserError } from "./review";
+import { UserError } from "./errors";
+import { getReviewView } from "./review";
 import { bumpUsage } from "./usage";
 import { findOfferRequest, ownedLine, ownedOfferRequest, ownedReview, type Scope } from "./scope";
+
+/*
+ * Demandes d'offre : un courrier par nouvelle caisse choisie, qui vaut demande d'affiliation, avec
+ * les complémentaires LCA à y demander. Contenu figé à la génération, comme une lettre.
+ */
 
 /** Complémentaires à demander pour une ligne : celles choisies, sinon celles en cours. */
 export function lcaWishesFor(db: Db, line: { personId: number; lcaWishes: string[] | null }): LcaGuarantee[] {
@@ -23,6 +29,7 @@ export function lcaWishesFor(db: Db, line: { personId: number; lcaWishes: string
   return [...new Set(active.map((a) => a.guarantee).filter((g): g is LcaGuarantee => (LCA_GUARANTEE_KEYS as string[]).includes(g ?? "")))];
 }
 
+/** Complémentaires à demander (clés inconnues ignorées). Une liste vide = n'en demander aucune. */
 export function setLcaWishes(db: Db, scope: Scope, lineId: number, keys: string[]) {
   ownedLine(db, scope, lineId);
   const valid = keys.filter((k) => (LCA_GUARANTEE_KEYS as string[]).includes(k));
@@ -35,31 +42,31 @@ export function setLcaWishes(db: Db, scope: Scope, lineId: number, keys: string[
  */
 export function generateOfferRequests(db: Db, scope: Scope, reviewId: number, today: IsoDate): number[] {
   const view = getReviewView(db, scope, reviewId, today);
-  const h = db.select().from(household).where(eq(household.id, view.review.householdId)).get();
-  if (!h) throw new UserError("Foyer non configuré.");
+  const householdRow = db.select().from(household).where(eq(household.id, view.review.householdId)).get();
+  if (!householdRow) throw new UserError("Foyer non configuré.");
   const sent = new Set(listOfferRequests(db, scope, reviewId).filter((o) => o.sentAt).flatMap((o) => o.lineIds));
-  const groups = new Map<number, typeof view.persons>();
-  for (const pr of view.persons) {
-    if (pr.line.decision !== "SWITCH" || !pr.line.chosenInsurerId || sent.has(pr.line.id)) continue;
-    groups.set(pr.line.chosenInsurerId, [...(groups.get(pr.line.chosenInsurerId) ?? []), pr]);
+  const groups = new Map<number, typeof view.lines>();
+  for (const lineView of view.lines) {
+    if (lineView.line.decision !== "SWITCH" || !lineView.line.chosenInsurerId || sent.has(lineView.line.id)) continue;
+    groups.set(lineView.line.chosenInsurerId, [...(groups.get(lineView.line.chosenInsurerId) ?? []), lineView]);
   }
 
-  const wishes = new Map(view.persons.map((pr) => [pr.line.id, lcaWishesFor(db, pr.line)]));
+  const wishes = new Map(view.lines.map((pr) => [pr.line.id, lcaWishesFor(db, pr.line)]));
   const created: number[] = [];
   db.transaction((tx) => {
     // Toute demande non envoyée est obsolète (une décision a pu être annulée) : on repart de zéro.
     tx.delete(offerRequest).where(and(eq(offerRequest.reviewId, reviewId), isNull(offerRequest.sentAt))).run();
     for (const [insurerId, members] of groups) {
-      const ins = tx.select().from(insurer).where(eq(insurer.id, insurerId)).get()!;
+      const insurerRow = tx.select().from(insurer).where(eq(insurer.id, insurerId)).get()!;
       const adults = members.filter((m) => m.line.targetAgeClass !== "KID");
       const sender = adults[0]?.person ?? members[0]!.person;
       const content = buildOfferRequest({
-        senderLines: [`${sender.firstName} ${sender.lastName}`, h.street, `${h.postalCode} ${h.city}`].filter((l) => l.trim()),
-        insurerLines: insurerRecipient(ins),
-        place: h.city || "",
+        senderLines: [`${sender.firstName} ${sender.lastName}`, householdRow.street, `${householdRow.postalCode} ${householdRow.city}`].filter((l) => l.trim()),
+        insurerLines: insurerRecipient(insurerRow),
+        place: householdRow.city || "",
         date: today,
         targetYear: view.review.targetYear,
-        domicile: `à ${[h.street, `${h.postalCode} ${h.city}`].filter((l) => l.trim()).join(", ")}`,
+        domicile: `à ${[householdRow.street, `${householdRow.postalCode} ${householdRow.city}`].filter((l) => l.trim()).join(", ")}`,
         persons: members.map((m) => {
           const model = (m.line.chosenModelType ?? "OTHER") as ModelType;
           const wish = [
@@ -84,6 +91,7 @@ export function generateOfferRequests(db: Db, scope: Scope, reviewId: number, to
   return created;
 }
 
+/** Demandes d'offre d'un rituel, avec un lien `mailto:` prérempli quand la caisse publie une adresse. */
 export function listOfferRequests(db: Db, scope: Scope, reviewId: number) {
   ownedReview(db, scope, reviewId);
   return db
@@ -106,6 +114,7 @@ export function listOfferRequests(db: Db, scope: Scope, reviewId: number) {
     });
 }
 
+/** Demande du foyer ; null si elle n'existe pas ou appartient à un autre foyer. */
 export function getOfferRequest(db: Db, scope: Scope, id: number) {
   const row = findOfferRequest(db, scope, id);
   return row ? { ...row, content: row.content as LetterContent } : null;
@@ -134,6 +143,7 @@ export function markOfferRequestAnswered(db: Db, scope: Scope, id: number, at: I
   });
 }
 
+/** Supprime une demande pas encore envoyée ; une demande envoyée reste, sans erreur. */
 export function deleteOfferRequest(db: Db, scope: Scope, id: number) {
   if (!findOfferRequest(db, scope, id)) return;
   db.delete(offerRequest).where(and(eq(offerRequest.id, id), isNull(offerRequest.sentAt))).run();
@@ -143,7 +153,7 @@ export function deleteOfferRequest(db: Db, scope: Scope, id: number) {
 export function offerDocument(db: Db, scope: Scope, id: number) {
   const row = getOfferRequest(db, scope, id);
   if (!row) return null;
-  const ins = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
+  const insurerRow = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
   const r = db.select({ targetYear: review.targetYear }).from(review).where(eq(review.id, row.reviewId)).get()!;
-  return { ...row, insurerName: insurerLabel(ins), targetYear: r.targetYear };
+  return { ...row, insurerName: insurerLabel(insurerRow), targetYear: r.targetYear };
 }

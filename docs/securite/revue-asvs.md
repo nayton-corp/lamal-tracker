@@ -1,34 +1,22 @@
+> Instantané daté du 4 octobre 2026, non tenu à jour : l'état actuel est dans [README.md](README.md).
+
 # Revue de sécurité OWASP ASVS 4.0.3 — Primes LAMal
 
 Date : 4 octobre 2026. Code revu : `main` au commit `7e6c6ee`, plus les travaux du lot 5 alors en cours.
 Périmètre : niveau 1 sur toute l'app ; niveau 2 pour V2 (authentification), V3 (sessions) et V4 (contrôle d'accès).
 Revue en lecture seule, faite avant les corrections (voir le suivi ci-dessous).
 
-## Suivi des corrections (lot 5)
+## Suivi des corrections
 
-| # | Gravité | État | Correction |
-|---|---|---|---|
-| F1 | élevée | **corrigé** | Administrateur sans TOTP mais avec passkey : le mot de passe seul est refusé, la passkey est exigée (`login`, `auth.ts`). |
-| F2 | moyenne | **corrigé** | Sauvegarde : second facteur exigé, identité confirmée depuis moins de 10 minutes (bouton déplacé dans *Mes données*), événement `BACKUP_DOWNLOADED` au journal, `Cache-Control: no-store`. |
-| F3 | moyenne | **corrigé** | `safeNext` refuse caractères de contrôle, espaces et barres obliques inverses, puis vérifie l'origine avec `new URL`. |
-| F4 | moyenne | **corrigé** | 10 codes erronés par compte et par 24 h, toutes étapes confondues (connexion, réinitialisation), puis passkey seule ; 5 essais par lien de réinitialisation ; code vérifié avant l'appel à HIBP. |
-| F5 | faible | **corrigé** | `clientIpFrom` : sans mandataire de confiance, l'en-tête est ignoré (clé unique) ; derrière Caddy, entrée posée par Caddy ; IPv6 ramenée au /64. |
-| F6 | moyenne | **corrigé** | `SETUP_TOKEN` obligatoire dès que `APP_URL` est en HTTPS ; après redéfinition du mot de passe d'un compte déjà protégé d'un second facteur, retour à la connexion au lieu d'ouvrir la session. |
-| F13 | faible | **corrigé** | En HTTPS, seul le cookie `__Host-` est lu (proxy et `readCookie`). |
-| F14 | faible | **corrigé** en partie | Import de police et abonnement aux notifications : message générique, détail au journal du serveur. Les erreurs Pingen restent affichées (foyer de l'administrateur seulement). |
-| F15 | faible | **corrigé** | Journal : autorisation Pingen d'un foyer, révocation d'invitation, suppression d'avis, sauvegarde. |
-| F7 | faible | ouvert | Courriel au titulaire lors d'un changement de mot de passe, de courriel, de facteur. À faire avant d'ouvrir largement. |
-| F8 | faible | ouvert | Lien de confirmation qui ouvre une session (24 h). |
-| F9, F10 | faible | accepté | Énumération par le message de verrouillage, blocage d'une adresse par la limite par courriel : à revoir ensemble (même mécanisme). |
-| F11 | faible | ouvert | Codes de secours plus longs et hachage salé. |
-| F12 | faible | accepté | Sessions de 30 jours sans activité : choix d'usage (app installée sur le téléphone), compensé par la confirmation d'identité de 10 minutes pour les actions sensibles. |
-| F16 | faible | ouvert | Limites par compte sur l'import de PDF et d'archives. |
-| F17 | faible | ouvert | Coût scrypt à relever (2^17) avec ré-hachage à la connexion. |
+Le suivi à jour est dans [README.md](README.md#état-des-constats). En bref, au 5 octobre 2026 :
+F1 à F8, F11, F13, F15, F16 et F17 sont corrigés, F14 l'est en partie, F9, F10 et F12 sont
+acceptés. Les corrections faites après cette revue (F7, F8, F11, F16, F17 et les points « À
+vérifier » 3, 4 et 8) sont décrites dans les messages des commits « Sécurité : … » (`git log`).
+Reste ouvert : le plafond de taille décompressée d'une archive importée (« À vérifier » n° 5).
 
-Aucune faille élevée ni moyenne n'est ouverte. Contrôles automatiques ajoutés à la CI : `pnpm audit`
-(prod, haute et critique), TruffleHog (secrets dans tout l'historique), Trivy (image, failles
-hautes et critiques corrigibles), scan ZAP passif des pages publiques (avertissements connus
-justifiés dans `.zap/rules.tsv`), Dependabot.
+Contrôles automatiques de la CI : `pnpm audit` (prod, haute et critique), TruffleHog (secrets dans
+tout l'historique), Trivy (image, failles hautes et critiques corrigibles), scan ZAP passif des
+pages publiques (avertissements connus justifiés dans `.zap/rules.tsv`), Dependabot.
 
 ## Méthode et réserves
 

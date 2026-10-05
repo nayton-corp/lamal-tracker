@@ -12,6 +12,11 @@ import { ownedLine, ownedReview, type Scope } from "./scope";
 import { insurerProfiles } from "./insurers";
 import { NotFoundError, UserError } from "./errors";
 
+/*
+ * Stratégie du rituel et questionnaire des besoins. `lineContext` rassemble ce qu'il faut pour
+ * classer les offres d'une personne ; le comparateur (compare.ts) s'en sert aussi.
+ */
+
 type LineRow = typeof reviewLine.$inferSelect;
 type ReviewRow = typeof review.$inferSelect;
 type PersonRow = typeof person.$inferSelect;
@@ -30,26 +35,30 @@ export interface LineContext {
   profiles: Map<number, InsurerProfile>;
   allowedFranchises: number[];
   renewalTotalRp: number | null;
-  ctx: Parameters<typeof costOf>[1];
+  costContext: Parameters<typeof costOf>[1];
 }
 
+/**
+ * Contexte de calcul d'une personne du rituel (vérifie que la ligne appartient au foyer).
+ * `healthCostsRp` remplace les frais enregistrés, pour une simulation dans le comparateur.
+ */
 export function lineContext(db: Db, scope: Scope, lineId: number, healthCostsRp?: number): LineContext {
   const line = ownedLine(db, scope, lineId);
   const r = db.select().from(review).where(eq(review.id, line.reviewId)).get()!;
-  const p = db.select().from(person).where(eq(person.id, line.personId)).get()!;
+  const personRow = db.select().from(person).where(eq(person.id, line.personId)).get()!;
   const policy = db.select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
-  const h = db.select().from(household).where(eq(household.id, r.householdId)).get()!;
+  const householdRow = db.select().from(household).where(eq(household.id, r.householdId)).get()!;
   const params = parametersFor(db, r.targetYear);
   const allowedFranchises = franchisesFor(params, line.targetAgeClass);
-  const ctx = { ageClass: line.targetAgeClass, params, healthCostsRp: healthCostsRp ?? p.healthCostsRp };
-  const profile = { canton: h.canton, region: h.region, ageClass: line.targetAgeClass, accident: line.accident, subgroup: line.subgroup };
+  const ctx = { ageClass: line.targetAgeClass, params, healthCostsRp: healthCostsRp ?? personRow.healthCostsRp };
+  const profile = { canton: householdRow.canton, region: householdRow.region, ageClass: line.targetAgeClass, accident: line.accident, subgroup: line.subgroup };
   const offers = offersFor(db, { datasetId: r.datasetId, ...profile }).filter((o) => allowedFranchises.includes(o.franchiseChf));
   const profiles = insurerProfiles(db, { ...profile, targetYear: r.targetYear });
   const qualityById: Record<number, number> = {};
   for (const [id, profile] of profiles) qualityById[id] = qualityPoints(profile);
   const renewalTotalRp =
     line.renewalMonthlyRp === null ? null : costOf({ monthlyPremiumRp: line.renewalMonthlyRp, franchiseChf: line.renewalFranchiseChf }, ctx).totalRp;
-  return { line, review: r, person: p, policy, offers, quality: (id) => qualityById[id] ?? 0, qualityById, profiles, allowedFranchises, renewalTotalRp, ctx };
+  return { line, review: r, person: personRow, policy, offers, quality: (id) => qualityById[id] ?? 0, qualityById, profiles, allowedFranchises, renewalTotalRp, costContext: ctx };
 }
 
 /**
@@ -70,7 +79,7 @@ export function rankedForStrategy(c: LineContext, strategy: Strategy, overrides:
     franchises: franchise === null ? undefined : [franchise],
     excludedInsurerIds: c.person.excludedInsurerIds,
   });
-  const ranked = rankOffers(filtered, { ...c.ctx, referenceTotalRp: c.renewalTotalRp });
+  const ranked = rankOffers(filtered, { ...c.costContext, referenceTotalRp: c.renewalTotalRp });
   return bestPerInsurer(rankForStrategy(ranked, strategy, c.quality));
 }
 
@@ -113,9 +122,9 @@ export function strategyOverview(db: Db, scope: Scope, reviewId: number): Strate
 }
 
 function openReviewRow(db: Db, scope: Scope, reviewId: number) {
-  const r = ownedReview(db, scope, reviewId);
-  if (r.status === "CLOSED") throw new UserError("Ce rituel est clôturé.");
-  return r;
+  const reviewRow = ownedReview(db, scope, reviewId);
+  if (reviewRow.status === "CLOSED") throw new UserError("Ce rituel est clôturé.");
+  return reviewRow;
 }
 
 /**
@@ -123,10 +132,10 @@ function openReviewRow(db: Db, scope: Scope, reviewId: number) {
  * réglages de la stratégie (ils restent modifiables à l'étape suivante).
  */
 export function setStrategy(db: Db, scope: Scope, reviewId: number, strategy: Strategy) {
-  const r = openReviewRow(db, scope, reviewId);
+  const reviewRow = openReviewRow(db, scope, reviewId);
   db.transaction((tx) => {
-    tx.update(review).set({ strategy, needsConfirmedAt: null }).where(eq(review.id, r.id)).run();
-    const lines = tx.select().from(reviewLine).where(and(eq(reviewLine.reviewId, r.id), eq(reviewLine.decision, "UNDECIDED"))).all();
+    tx.update(review).set({ strategy, needsConfirmedAt: null }).where(eq(review.id, reviewRow.id)).run();
+    const lines = tx.select().from(reviewLine).where(and(eq(reviewLine.reviewId, reviewRow.id), eq(reviewLine.decision, "UNDECIDED"))).all();
     for (const l of lines) {
       const policy = tx.select().from(lamalPolicy).where(eq(lamalPolicy.id, l.currentPolicyId)).get()!;
       const d = strategyDefaults(strategy, { modelType: policy.modelType as ModelType, franchiseChf: l.renewalFranchiseChf });
@@ -147,16 +156,17 @@ export interface NeedsInput {
 
 /** Enregistre le questionnaire des besoins de chaque personne et ouvre le comparateur. */
 export function saveNeeds(db: Db, scope: Scope, reviewId: number, needs: NeedsInput[], nowIso: string) {
-  const r = openReviewRow(db, scope, reviewId);
+  const reviewRow = openReviewRow(db, scope, reviewId);
   db.transaction((tx) => {
     for (const n of needs) {
       const line = tx.select().from(reviewLine).where(eq(reviewLine.id, n.lineId)).get();
-      if (!line || line.reviewId !== r.id) throw new NotFoundError("Personne");
+      if (!line || line.reviewId !== reviewRow.id) throw new NotFoundError("Personne");
       const models = n.models.filter((m): m is ModelType => (MODEL_TYPES as readonly string[]).includes(m));
-      if (n.healthCostsRp < 0) throw new UserError("Frais de santé invalides.");
+      if (!Number.isInteger(n.healthCostsRp) || n.healthCostsRp < 0) throw new UserError("Frais de santé invalides.");
+      if ((n.doctorName?.length ?? 0) > 200) throw new UserError("Nom du médecin trop long (200 caractères au plus).");
       tx.update(reviewLine).set({ wishFranchiseChf: n.franchiseChf, wishModels: models }).where(eq(reviewLine.id, line.id)).run();
       tx.update(person).set({ healthCostsRp: n.healthCostsRp, doctorName: n.doctorName }).where(eq(person.id, line.personId)).run();
     }
-    tx.update(review).set({ needsConfirmedAt: nowIso }).where(eq(review.id, r.id)).run();
+    tx.update(review).set({ needsConfirmedAt: nowIso }).where(eq(review.id, reviewRow.id)).run();
   });
 }

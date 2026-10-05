@@ -1,4 +1,5 @@
 # Déploiement sur le Raspberry Pi : `mkdir -p data && sudo chown 1000:1000 data && docker compose up -d`
+# Mode d'emploi : docs/exploitation/raspberry-pi.md ; variables : docs/exploitation/configuration.md.
 services:
   lamal:
     image: ghcr.io/nayton-corp/lamal-tracker:latest
@@ -7,10 +8,17 @@ services:
     # build: .
     container_name: lamal-tracker
     restart: unless-stopped
+    # Racine en lecture seule, aucun privilège : seul /data est inscriptible (comme deploy/compose.yml).
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     ports:
+      # Ouvert à tout le réseau local, en HTTP. Si l'app n'est jointe qu'à travers Tailscale
+      # (`tailscale serve`), n'écoutez que localement : "127.0.0.1:3000:3000".
       - "3000:3000"
-      # Si l'app n'est jointe qu'à travers Tailscale (`tailscale serve`), n'écoutez que localement :
-      # - "127.0.0.1:3000:3000"
     volumes:
       # Le dossier doit appartenir à l'utilisateur 1000 (node) du conteneur : `sudo chown 1000:1000 data`.
       - ./data:/data
@@ -19,11 +27,13 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    # Variables sensibles (ex. VAPID_SUBJECT) dans un fichier `.env` en `chmod 600` plutôt qu'ici :
+    # Secrets (MASTER_KEY, SMTP_URL, PINGEN_*…) dans un fichier `.env` en `chmod 600` plutôt qu'ici :
     # env_file: .env
     environment:
       TZ: Europe/Zurich
-      # Le mot de passe d'accès se choisit dans l'application au premier démarrage (plus de variable APP_PASSWORD).
+      # Le compte administrateur se crée dans l'application au premier démarrage. Sur un réseau
+      # partagé, exigez un code d'installation pour que personne d'autre ne le crée avant vous :
+      # SETUP_TOKEN: "un-code-long-au-hasard"   (openssl rand -hex 16)
       # Restreindre l'import à certains cantons pour économiser de la place :
       # IMPORT_CANTONS: "VD"
       # Adresse de contact transmise aux services de notification push :

@@ -3,6 +3,11 @@ import type { Db } from "../db/client";
 import { appUser, person, signature } from "../db/schema";
 import { isSealed, sealForHousehold, sealSecret } from "./vault";
 
+/*
+ * Reprise des données d'avant le chiffrement (signatures, secrets du double facteur), et contextes
+ * de chiffrement de ces valeurs. Appelé à l'ouverture de la base (db/client.ts).
+ */
+
 /** Contextes authentifiés des valeurs chiffrées (une valeur ne s'ouvre qu'à sa place). */
 export const signatureContext = (personId: number) => `signature:${personId}`;
 export const totpContext = (userId: number) => `totp:${userId}`;

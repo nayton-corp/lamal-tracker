@@ -7,6 +7,7 @@ import { listSignatures } from "@/application/signatures";
 import { deleteLetterAction, deleteOfferAction, letterAckAction, letterSentAction, offerAnsweredAction, offerSentAction, prepareAllAction } from "@/app/actions/review";
 import { listOfferRequests } from "@/application/offers";
 import { getReviewByYear, getReviewView } from "@/application/review";
+import { isMinorOn } from "@/domain/age";
 import { formatDateLong, formatDateShort } from "@/domain/dates";
 import { displayTariffLabel, type ModelType } from "@/domain/lamal";
 import type { LetterContent } from "@/domain/letter";
@@ -73,22 +74,22 @@ function PdfButtons({ url, filename, mailto, primary }: { url: string; filename:
   );
 }
 
-export default async function ProceduresPage({ params }: { params: Promise<{ year: string }> }) {
+export default async function LettersPage({ params }: { params: Promise<{ year: string }> }) {
   const scope = await pageScope();
   const year = Number((await params).year);
-  const r = getReviewByYear(db(), scope, year);
-  if (!r) redirect(`/rituel/${year}`);
-  const view = getReviewView(db(), scope, r.id, today());
-  const switching = view.persons.filter((p) => p.line.decision === "SWITCH");
-  const adjusting = view.persons.filter((p) => p.line.decision === "ADJUST");
-  const keeping = view.persons.filter((p) => p.line.decision === "KEEP");
-  const undecided = view.persons.filter((p) => p.line.decision === "UNDECIDED");
+  const reviewRow = getReviewByYear(db(), scope, year);
+  if (!reviewRow) redirect(`/rituel/${year}`);
+  const view = getReviewView(db(), scope, reviewRow.id, today());
+  const switching = view.lines.filter((p) => p.line.decision === "SWITCH");
+  const adjusting = view.lines.filter((p) => p.line.decision === "ADJUST");
+  const keeping = view.lines.filter((p) => p.line.decision === "KEEP");
+  const undecided = view.lines.filter((p) => p.line.decision === "UNDECIDED");
   // Aucune décision prise : les démarches n'ont pas encore de sens.
-  if (undecided.length === view.persons.length) redirect(`/rituel/${year}`);
-  const offers = listOfferRequests(db(), scope, r.id);
+  if (undecided.length === view.lines.length) redirect(`/rituel/${year}`);
+  const offers = listOfferRequests(db(), scope, reviewRow.id);
   const terminations = view.letters.filter((l) => l.kind === "TERMINATION");
   const changes = view.letters.filter((l) => l.kind === "CHANGE");
-  const warnings = [...switching, ...adjusting].flatMap((p) => p.letterCheck.warnings.filter((w) => !/Demandez d'abord/.test(w)).map((w) => `${p.person.firstName} : ${w}`));
+  const warnings = [...switching, ...adjusting].flatMap((p) => p.letterCheck.warnings.filter((w) => w.code !== "AFFILIATION_FIRST").map((w) => `${p.person.firstName} : ${w.text}`));
   const lcaPending = switching.filter((p) => !p.line.lcaAckAt);
   const nothing = switching.length === 0 && adjusting.length === 0;
 
@@ -99,7 +100,8 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
     [...switching, ...adjusting].length > 0 && [...terminations, ...changes].length > 0 && [...terminations, ...changes].every((l) => l.sentAt && !failedAtPingen(l));
   const confirmDone = offers.every((o) => o.answeredAt) && terminations.every((l) => l.acknowledgedAt) && offers.length + terminations.length > 0;
   const involved = new Set([...switching, ...adjusting].map((p) => p.person.id));
-  const signers = listSignatures(db(), scope).filter((s) => involved.has(s.personId) && year - 1 - Number(s.birthDate.slice(0, 4)) >= 18);
+  // Seules les personnes majeures signent ; les lettres le font aussi (application/letters.ts).
+  const signers = listSignatures(db(), scope).filter((s) => involved.has(s.personId) && !isMinorOn(s.birthDate, today()));
   const pingen = pingenClientFor(scope);
   let n = 0;
 
@@ -112,12 +114,12 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
         <ul className="space-y-1 text-sm">
           {switching.map((p) => (
             <li key={p.line.id}>
-              <strong>{p.person.firstName}</strong> quitte {p.currentInsurer} pour <strong>{p.chosenInsurer}</strong> : demande à {p.chosenInsurer}, puis résiliation chez {p.currentInsurer}.
+              <strong>{p.person.firstName}</strong> quitte {p.currentInsurerName} pour <strong>{p.chosenInsurerName}</strong> : demande à {p.chosenInsurerName}, puis résiliation chez {p.currentInsurerName}.
             </li>
           ))}
           {adjusting.map((p) => (
             <li key={p.line.id}>
-              <strong>{p.person.firstName}</strong> reste chez {p.currentInsurer} avec {displayTariffLabel(p.line.chosenLabel, (p.line.chosenModelType ?? "OTHER") as ModelType)}, franchise {p.line.chosenFranchiseChf} : un courrier de changement.
+              <strong>{p.person.firstName}</strong> reste chez {p.currentInsurerName} avec {displayTariffLabel(p.line.chosenLabel, (p.line.chosenModelType ?? "OTHER") as ModelType)}, franchise {p.line.chosenFranchiseChf} : un courrier de changement.
             </li>
           ))}
           {keeping.map((p) => (
@@ -137,7 +139,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
           </Alert>
         )}
         {!nothing && (
-          <ActionForm action={prepareAllAction} hidden={{ reviewId: r.id }}>
+          <ActionForm action={prepareAllAction} hidden={{ reviewId: reviewRow.id }}>
             <SubmitButton block variant={offers.length + view.letters.length ? "secondary" : "primary"} pendingLabel="Préparation…">
               {offers.length + view.letters.length ? "Mettre à jour les courriers pas encore envoyés" : "Préparer tous les courriers"}
             </SubmitButton>

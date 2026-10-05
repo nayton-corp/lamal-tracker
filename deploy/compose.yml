@@ -1,5 +1,5 @@
 # Serveur public (VPS suisse) : production, staging, HTTPS et sauvegarde continue.
-# Mode d'emploi complet : docs/mise-en-ligne.md. Rien de secret ici : les valeurs sont dans
+# Mode d'emploi complet : docs/exploitation/serveur-public.md. Rien de secret ici : les valeurs sont dans
 # .env (variables de ce fichier), prod.env, staging.env, backup.env et secrets/ (chmod 600).
 name: primes-lamal
 

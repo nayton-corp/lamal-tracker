@@ -5,8 +5,8 @@ import { resetCo2Action, saveCo2Action } from "@/app/actions/data";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/form";
 import { SubmitButton } from "@/ui/submit";
+import { rpToInput } from "@/domain/money";
 
-const chf = (rp: number) => (rp / 100).toFixed(2);
 
 /**
  * Montant d'une année : officiel par défaut (repris de l'OFEV), modifiable au besoin. Une saisie
@@ -26,7 +26,7 @@ export function Co2Form({ year, amountRp, source, officialRp }: { year: number; 
       <form action={action} className="grid grid-cols-[3.5rem_1fr_auto_auto] items-center gap-2">
         <input type="hidden" name="year" value={year} />
         <span className="font-semibold tabular">{year}</span>
-        <Input name="co2Annual" inputMode="decimal" autoFocus aria-label={`Redistribution CO2 ${year} en CHF par personne et par an`} defaultValue={amountRp === null ? "" : chf(amountRp)} />
+        <Input name="co2Annual" inputMode="decimal" autoFocus aria-label={`Redistribution CO2 ${year} en CHF par personne et par an`} defaultValue={amountRp === null ? "" : rpToInput(amountRp)} />
         <SubmitButton size="sm" pendingLabel="…">
           OK
         </SubmitButton>
@@ -45,7 +45,7 @@ export function Co2Form({ year, amountRp, source, officialRp }: { year: number; 
           <span className="text-muted">pas encore publié</span>
         ) : (
           <>
-            <span className="font-medium tabular">CHF {chf(amountRp)}</span>{" "}
+            <span className="font-medium tabular">CHF {rpToInput(amountRp)}</span>{" "}
             <span className="text-sm text-muted">{source === "USER" ? "· votre montant" : "· officiel"}</span>
           </>
         )}
@@ -57,7 +57,7 @@ export function Co2Form({ year, amountRp, source, officialRp }: { year: number; 
         <form action={reset} className="w-full pl-17">
           <input type="hidden" name="year" value={year} />
           <SubmitButton size="sm" variant="ghost" pendingLabel="…">
-            Revenir au montant officiel (CHF {chf(officialRp)})
+            Revenir au montant officiel (CHF {rpToInput(officialRp)})
           </SubmitButton>
         </form>
       )}

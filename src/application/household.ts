@@ -1,6 +1,6 @@
 import { and, asc, eq, like } from "drizzle-orm";
 import { z } from "zod";
-import { MODEL_TYPES, CANTONS } from "@/domain/lamal";
+import { CANTONS, DEFAULT_HEALTH_COSTS_RP, DEFAULT_KID_SUBGROUP, MODEL_TYPES } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
 import { household, householdMember, householdSetting, insurer, lamalPolicy, lcaPolicy, notificationLog, person } from "@/infrastructure/db/schema";
 import { audit } from "./audit";
@@ -8,9 +8,15 @@ import { LCA_GUARANTEE_KEYS, guaranteeInfo } from "@/domain/lca";
 import { UserError } from "./errors";
 import { createHouseholdFor, householdIdOf, requireAdmin, requireOwner, ownedLca, ownedPerson, ownedPolicy, findPerson, type Scope } from "./scope";
 
+/*
+ * Foyer : adresse (canton et région de primes), personnes, contrats LAMal par année et
+ * complémentaires LCA. Tout objet désigné par son identifiant est vérifié par scope.ts.
+ */
+
 /** Une personne seule ou un foyer de plusieurs membres : change le vocabulaire et l'accueil. */
 export type HouseholdMode = "SOLO" | "FAMILY";
 
+/** Mode choisi à l'accueil ; null tant qu'il n'est pas choisi (ou sans foyer). */
 export function getHouseholdMode(db: Db, scope: Scope): HouseholdMode | null {
   if (scope.householdId === null) return null;
   const row = db
@@ -30,12 +36,18 @@ export function setHouseholdMode(db: Db, scope: Scope, mode: HouseholdMode) {
     .run();
 }
 
+/** Longueurs maximales des champs saisis : un texte de plusieurs Mo alourdirait chaque page et chaque PDF. */
+const SHORT_TEXT = 200;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const text = () => z.string().trim().max(SHORT_TEXT, `${SHORT_TEXT} caractères au plus`);
+
+/** `region` : région de primes de la commune (0 à 3) ; `bfsNumber` : numéro OFS de la commune. */
 export const householdInput = z.object({
-  name: z.string().trim().default(""),
-  street: z.string().trim().default(""),
-  postalCode: z.string().trim().default(""),
-  city: z.string().trim().default(""),
-  commune: z.string().trim().default(""),
+  name: text().default(""),
+  street: text().default(""),
+  postalCode: text().default(""),
+  city: text().default(""),
+  commune: text().default(""),
   bfsNumber: z.coerce.number().int().positive().optional().nullable(),
   canton: z.enum(CANTONS),
   region: z.coerce.number().int().min(0).max(3),
@@ -43,15 +55,15 @@ export const householdInput = z.object({
 
 export const personInput = z.object({
   id: z.coerce.number().int().positive().optional(),
-  firstName: z.string().trim().min(1, "Prénom requis"),
-  lastName: z.string().trim().min(1, "Nom requis"),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date au format AAAA-MM-JJ"),
-  kidSubgroup: z.string().trim().toUpperCase().default("K1"),
+  firstName: text().min(1, "Prénom requis"),
+  lastName: text().min(1, "Nom requis"),
+  birthDate: z.string().regex(ISO_DATE, "Date au format AAAA-MM-JJ"),
+  kidSubgroup: text().toUpperCase().default(DEFAULT_KID_SUBGROUP),
   employedAccidentCover: z.coerce.boolean().default(false),
-  healthCostsRp: z.coerce.number().int().min(0).default(50000),
-  allowedModels: z.array(z.enum(MODEL_TYPES as [string, ...string[]])).default([]),
-  excludedInsurerIds: z.array(z.coerce.number().int()).default([]),
-  doctorName: z.string().trim().optional().nullable(),
+  healthCostsRp: z.coerce.number().int().min(0).default(DEFAULT_HEALTH_COSTS_RP),
+  allowedModels: z.array(z.enum(MODEL_TYPES as [string, ...string[]])).max(MODEL_TYPES.length).default([]),
+  excludedInsurerIds: z.array(z.coerce.number().int()).max(100).default([]),
+  doctorName: text().optional().nullable(),
 });
 
 export const policyInput = z.object({
@@ -59,9 +71,9 @@ export const policyInput = z.object({
   personId: z.coerce.number().int().positive(),
   coverageYear: z.coerce.number().int().min(2000).max(2100),
   insurerId: z.coerce.number().int().positive(),
-  policyNumber: z.string().trim().optional().nullable(),
-  tariffCode: z.string().trim().optional().nullable(),
-  tariffLabel: z.string().trim().optional().nullable(),
+  policyNumber: text().optional().nullable(),
+  tariffCode: text().optional().nullable(),
+  tariffLabel: text().optional().nullable(),
   modelType: z.enum(MODEL_TYPES as [string, ...string[]]),
   franchiseChf: z.coerce.number().int().min(0).max(5000),
   accident: z.coerce.boolean(),
@@ -71,14 +83,14 @@ export const policyInput = z.object({
 export const lcaInput = z.object({
   id: z.coerce.number().int().positive().optional(),
   personId: z.coerce.number().int().positive(),
-  insurerName: z.string().trim().min(1, "Assureur requis"),
+  insurerName: text().min(1, "Assureur requis"),
   linkedInsurerId: z.coerce.number().int().positive().optional().nullable(),
   guarantee: z.enum(LCA_GUARANTEE_KEYS, { message: "Garantie requise" }),
   /** Nom commercial du produit ; à défaut, le libellé de la garantie. */
-  productName: z.string().trim().optional().nullable(),
-  policyNumber: z.string().trim().optional().nullable(),
+  productName: text().optional().nullable(),
+  policyNumber: text().optional().nullable(),
   monthlyRp: z.coerce.number().int().min(0).optional().nullable(),
-  minTermEnd: z.string().optional().nullable(),
+  minTermEnd: z.string().regex(ISO_DATE, "Date au format AAAA-MM-JJ").optional().nullable(),
   noticeMonths: z.coerce.number().int().min(0).max(24).optional().nullable(),
   active: z.coerce.boolean().default(true),
 });
@@ -106,6 +118,7 @@ export function resetHousehold(db: Db, scope: Scope, nowIso = new Date().toISOSt
   for (const m of members) audit(db, m.userId, "HOUSEHOLD_DELETED", { nowIso });
 }
 
+/** Foyer de l'appelant ; null tant que l'accueil ne l'a pas créé. */
 export function getHousehold(db: Db, scope: Scope) {
   if (scope.householdId === null) return null;
   return db.select().from(household).where(eq(household.id, scope.householdId)).get() ?? null;
@@ -133,6 +146,7 @@ export function getPerson(db: Db, scope: Scope, id: number) {
   return findPerson(db, scope, id);
 }
 
+/** Crée une personne, ou modifie celle désignée par `id` (qui doit appartenir au foyer). Renvoie son id. */
 export function savePerson(db: Db, scope: Scope, input: z.input<typeof personInput>) {
   const householdId = householdIdOf(scope);
   const { id, ...data } = personInput.parse(input);
@@ -144,6 +158,7 @@ export function savePerson(db: Db, scope: Scope, input: z.input<typeof personInp
   return db.insert(person).values({ ...data, householdId }).returning().get().id;
 }
 
+/** Supprime une personne ; ses contrats, complémentaires, signature et lignes de rituel partent avec (cascade). */
 export function deletePerson(db: Db, scope: Scope, id: number) {
   ownedPerson(db, scope, id);
   db.delete(person).where(eq(person.id, id)).run();
@@ -160,6 +175,10 @@ export function listPolicies(db: Db, personId: number) {
     .all();
 }
 
+/**
+ * Crée ou modifie un contrat LAMal. Sans `id`, un contrat existant de la même personne pour la
+ * même année est remplacé (un seul par année). `source` : d'où vient le contrat (saisie, clôture…).
+ */
 export function savePolicy(db: Db, scope: Scope, input: z.input<typeof policyInput>, source: "MANUAL" | "OFSP" | "REVIEW" = "MANUAL") {
   const { id, ...data } = policyInput.parse(input);
   ownedPerson(db, scope, data.personId);
@@ -188,6 +207,7 @@ export function listLca(db: Db, personId: number) {
   return db.select().from(lcaPolicy).where(eq(lcaPolicy.personId, personId)).orderBy(asc(lcaPolicy.id)).all();
 }
 
+/** Crée ou modifie une complémentaire ; la catégorie découle de la garantie choisie. */
 export function saveLca(db: Db, scope: Scope, input: z.input<typeof lcaInput>) {
   const { id, guarantee, productName, ...rest } = lcaInput.parse(input);
   ownedPerson(db, scope, rest.personId);
@@ -206,6 +226,7 @@ export function deleteLca(db: Db, scope: Scope, id: number) {
   db.delete(lcaPolicy).where(eq(lcaPolicy.id, id)).run();
 }
 
+/** Toutes les caisses (référentiel partagé), par raison sociale. */
 export function listInsurers(db: Db) {
   return db.select().from(insurer).orderBy(asc(insurer.name)).all();
 }

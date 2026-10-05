@@ -5,17 +5,16 @@ import { revalidatePath } from "next/cache";
 import QRCode from "qrcode";
 import { requestEmailChange } from "@/application/account";
 import { audit } from "@/application/audit";
-import { changePassword, closeOtherSessions, describeDevice, isFreshSession, verifyPassword } from "@/application/auth";
+import { changePassword, closeOtherSessions, confirmWithPassword, describeDevice, isFreshSession } from "@/application/auth";
 import { confirmTotpSetup, disableTotp, regenerateRecoveryCodes, startTotpSetup } from "@/application/mfa";
 import { finishPasskeyRegistration, passkeyRegistrationOptions, removePasskey } from "@/application/passkeys";
 import { accountDeps, clientIp, deleteCookie, mailDeps, rateLimit, readCookie, relyingParty, writeCookie } from "@/server/accounts";
 import { toActionError, type ActionState } from "@/server/action";
-import { requireScope } from "@/server/auth";
+import { notifyUserSecurityChange, requireScope } from "@/server/auth";
 import { db, nowIso } from "@/server/context";
 import { headers } from "next/headers";
+import { COOKIE } from "@/server/cookie-names";
 
-const TOTP_COOKIE = "lamal_totp";
-const WEBAUTHN_COOKIE = "lamal_wa";
 
 /** Toute action sensible du compte est limitée en débit, par compte. */
 async function guard(name: string) {
@@ -30,6 +29,7 @@ export async function changePasswordAction(_: ActionState, form: FormData): Prom
   try {
     const scope = await guard("password");
     await changePassword(db(), scope.userId, String(form.get("current") ?? ""), next, accountDeps().pwned, scope.sessionId, nowIso());
+    await notifyUserSecurityChange(scope.userId, "Le mot de passe de votre compte a été changé");
   } catch (e) {
     return toActionError(e);
   }
@@ -67,12 +67,13 @@ export async function totpSetupAction(_: TotpSetupState, form: FormData): Promis
     const scope = await guard("totp");
     if (form.get("step") === "confirm") {
       // Pas de revalidation ici : la page se rafraîchit quand les codes ont été notés.
-      const codes = confirmTotpSetup(db(), scope.userId, await readCookie(TOTP_COOKIE), String(form.get("code") ?? ""), Date.now(), nowIso());
-      await deleteCookie(TOTP_COOKIE);
+      const codes = confirmTotpSetup(db(), scope.userId, await readCookie(COOKIE.totp), String(form.get("code") ?? ""), Date.now(), nowIso());
+      await deleteCookie(COOKIE.totp);
+      await notifyUserSecurityChange(scope.userId, "Le double facteur (codes à usage unique) a été activé sur votre compte");
       return { codes };
     }
     const setup = startTotpSetup(db(), scope.userId, String(form.get("password") ?? ""), nowIso());
-    await writeCookie(TOTP_COOKIE, setup.token, 15 * 60);
+    await writeCookie(COOKIE.totp, setup.token, 15 * 60);
     return { secret: setup.secret, qr: await QRCode.toDataURL(setup.uri, { margin: 1, width: 220 }) };
   } catch (e) {
     const err = toActionError(e)?.error;
@@ -86,6 +87,7 @@ export async function disableTotpAction(_: ActionState, form: FormData): Promise
   try {
     const scope = await guard("totp");
     disableTotp(db(), scope.userId, String(form.get("password") ?? ""), nowIso());
+    await notifyUserSecurityChange(scope.userId, "Le double facteur a été désactivé sur votre compte");
   } catch (e) {
     return toActionError(e);
   }
@@ -97,6 +99,7 @@ export async function regenerateCodesAction(_: TotpSetupState, form: FormData): 
   try {
     const scope = await guard("totp");
     const codes = regenerateRecoveryCodes(db(), scope.userId, String(form.get("password") ?? ""), nowIso());
+    await notifyUserSecurityChange(scope.userId, "De nouveaux codes de secours ont été créés ; les anciens ne valent plus");
     return { codes };
   } catch (e) {
     return { error: toActionError(e)?.error };
@@ -114,10 +117,14 @@ export async function passkeyRegistrationOptionsAction(password: string | null):
     const scope = await guard("passkey");
     if (!isFreshSession(db(), scope.sessionId, nowIso())) {
       if (password === null) return { needPassword: true };
-      if (!verifyPassword(db(), scope.userId, password)) return { needPassword: true, error: "Mot de passe incorrect." };
+      try {
+        confirmWithPassword(db(), scope.userId, scope.sessionId, password, nowIso());
+      } catch (e) {
+        return { needPassword: true, error: toActionError(e)?.error };
+      }
     }
     const { options, token } = await passkeyRegistrationOptions(db(), scope.userId, await relyingParty(), nowIso());
-    await writeCookie(WEBAUTHN_COOKIE, token, 5 * 60);
+    await writeCookie(COOKIE.webauthn, token, 5 * 60);
     return { options };
   } catch (e) {
     return { error: toActionError(e)?.error };
@@ -127,10 +134,11 @@ export async function passkeyRegistrationOptionsAction(password: string | null):
 export async function passkeyRegisterAction(response: RegistrationResponseJSON): Promise<{ error?: string }> {
   try {
     const scope = await guard("passkey");
-    const token = await readCookie(WEBAUTHN_COOKIE);
-    await deleteCookie(WEBAUTHN_COOKIE);
+    const token = await readCookie(COOKIE.webauthn);
+    await deleteCookie(COOKIE.webauthn);
     const name = describeDevice((await headers()).get("user-agent"));
     await finishPasskeyRegistration(db(), scope.userId, token, response, await relyingParty(), name, nowIso());
+    await notifyUserSecurityChange(scope.userId, `Une passkey a été ajoutée à votre compte (${name})`);
   } catch (e) {
     return { error: toActionError(e)?.error };
   }
@@ -142,6 +150,7 @@ export async function removePasskeyAction(_: ActionState, form: FormData): Promi
   try {
     const scope = await guard("passkey");
     removePasskey(db(), scope.userId, String(form.get("id") ?? ""), String(form.get("password") ?? ""), nowIso());
+    await notifyUserSecurityChange(scope.userId, "Une passkey a été retirée de votre compte");
   } catch (e) {
     return toActionError(e);
   }

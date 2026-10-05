@@ -1,5 +1,10 @@
 import { addDays, daysBetween, isWeekend, type IsoDate } from "./dates";
 
+/*
+ * Échéances du rituel : délai de résiliation (lettre reçue au 30 novembre), date d'envoi
+ * conseillée, niveau d'urgence et jours de rappel. La date du jour est toujours fournie.
+ */
+
 export interface ReviewDeadlines {
   /** Fin de l'année en cours : date d'effet de la résiliation. */
   effectiveEnd: IsoDate;
@@ -11,6 +16,11 @@ export interface ReviewDeadlines {
   insurerNoticeBy: IsoDate;
 }
 
+/** Marge entre l'envoi recommandé et la réception : acheminement et délai de retrait au guichet. */
+export const POSTAL_MARGIN_DAYS = 7;
+/** En deçà de ce nombre de jours avant la date d'envoi conseillée, l'échéance devient « bientôt ». */
+export const SOON_THRESHOLD_DAYS = 14;
+
 /**
  * Échéances pour changer d'assurance de base au 1er janvier de targetYear.
  * Prudence : si le 30 novembre tombe un week-end, on vise le vendredi précédent.
@@ -19,7 +29,7 @@ export function reviewDeadlines(targetYear: number): ReviewDeadlines {
   const year = targetYear - 1;
   let receipt: IsoDate = `${year}-11-30`;
   while (isWeekend(receipt)) receipt = addDays(receipt, -1);
-  let sendBy = addDays(receipt, -7);
+  let sendBy = addDays(receipt, -POSTAL_MARGIN_DAYS);
   while (isWeekend(sendBy)) sendBy = addDays(sendBy, -1);
   return {
     effectiveEnd: `${year}-12-31`,
@@ -31,17 +41,22 @@ export function reviewDeadlines(targetYear: number): ReviewDeadlines {
 
 export type Urgency = "calm" | "soon" | "urgent" | "late";
 
+/**
+ * late : délai de réception dépassé ; urgent : date d'envoi conseillée dépassée (encore possible
+ * de justesse) ; soon : envoi conseillé dans `SOON_THRESHOLD_DAYS` jours au plus.
+ */
 export function urgency(today: IsoDate, deadlines: ReviewDeadlines): Urgency {
   if (daysBetween(today, deadlines.receiptDeadline) < 0) return "late";
   const toSend = daysBetween(today, deadlines.sendBy);
   if (toSend < 0) return "urgent";
-  if (toSend <= 14) return "soon";
+  if (toSend <= SOON_THRESHOLD_DAYS) return "soon";
   return "calm";
 }
 
 /** Jours de rappel avant la date d'envoi recommandée. */
 export const REMINDER_OFFSETS = [30, 14, 7, 3, 1] as const;
 
+/** Jours restants avant la date d'envoi si aujourd'hui est un jour de rappel (`REMINDER_OFFSETS`), sinon null. */
 export function dueReminder(today: IsoDate, deadlines: ReviewDeadlines): number | null {
   const left = daysBetween(today, deadlines.sendBy);
   return (REMINDER_OFFSETS as readonly number[]).includes(left) ? left : null;
@@ -51,6 +66,6 @@ export function dueReminder(today: IsoDate, deadlines: ReviewDeadlines): number 
  * Fenêtre du rituel : les primes de l'année prochaine sont publiées et le délai de résiliation
  * (réception au 30 novembre) n'est pas passé. C'est le moment où l'app met le rituel en avant.
  */
-export function ritualWindowOpen(today: IsoDate, targetYear: number, premiumsPublished: boolean): boolean {
+export function isReviewWindowOpen(today: IsoDate, targetYear: number, premiumsPublished: boolean): boolean {
   return premiumsPublished && daysBetween(today, reviewDeadlines(targetYear).receiptDeadline) >= 0;
 }

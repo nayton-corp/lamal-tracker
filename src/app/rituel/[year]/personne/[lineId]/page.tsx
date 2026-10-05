@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/review";
 import { compareForLine, offerKey, type CompareView, type DetailedOffer } from "@/application/compare";
-import { insurerLabel } from "@/infrastructure/db/queries";
-import { lineOverview, reviewMembers } from "@/application/review";
+import { insurerLabel } from "@/domain/insurer";
+import { lineOverview, listReviewLineTabs } from "@/application/review";
 import { STRATEGY_INFO } from "@/domain/strategy";
 import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { db } from "@/server/context";
@@ -28,7 +28,7 @@ export const metadata = { title: "Comparateur" };
 
 type Search = { m?: string; f?: string; sort?: string; all?: string; n?: string; every?: string };
 
-export default async function ComparePage({ params, searchParams }: { params: Promise<{ year: string; lineId: string }>; searchParams: Promise<Search> }) {
+export default async function ReviewLinePage({ params, searchParams }: { params: Promise<{ year: string; lineId: string }>; searchParams: Promise<Search> }) {
   const scope = await pageScope();
   const { year: y, lineId: l } = await params;
   const sp = await searchParams;
@@ -45,12 +45,12 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
     models,
     franchises: sp.f === undefined ? undefined : sp.f === "all" ? [] : [Number(sp.f)],
     sort: sp.sort === "premium" || sp.sort === "total" || sp.sort === "strategy" ? sp.sort : undefined,
-    all: sp.all === "1",
+    ignorePersonPreferences: sp.all === "1",
     everyOffer: sp.every === "1",
   });
   const every = sp.every === "1";
   const limit = sp.n === "all" ? view.offers.length : 30;
-  const members = reviewMembers(db(), scope, line.reviewId);
+  const members = listReviewLineTabs(db(), scope, line.reviewId);
   const strategyLabel = view.strategy ? STRATEGY_INFO[view.strategy].label : null;
   const top = view.offers.slice(0, 3);
   const rest = view.offers.slice(3, limit);
@@ -101,7 +101,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
       </Card>
 
       <Section title="Filtrer les offres">
-        <FilterBar franchises={view.allowedFranchises} activeFranchise={view.effective.franchiseChf} activeModels={view.effective.models} sort={view.sort} strategyLabel={strategyLabel} />
+        <FilterBar franchises={view.allowedFranchises} activeFranchise={view.appliedFilters.franchiseChf} activeModels={view.appliedFilters.models} sort={view.sort} strategyLabel={strategyLabel} />
         <p className="text-sm text-muted">
           Le coût total compte la prime et ce que vous paieriez de votre poche (franchise, 10 % de quote-part) pour des frais de santé de{" "}
           <Chf rp={view.healthCostsRp} whole /> par an.

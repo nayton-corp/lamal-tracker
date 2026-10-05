@@ -1,7 +1,13 @@
 import type { Offer } from "./comparison";
 import type { ModelType } from "./lamal";
+import { foldForSearch } from "./text";
 
-export interface CurrentContract {
+/*
+ * Renouvellement : retrouve, dans les primes de l'année cible, le tarif qui succède au contrat
+ * actuel chez la même caisse (code tarif, correspondance confirmée par le foyer, libellé, modèle).
+ */
+
+export interface RenewalSourcePolicy {
   insurerId: number;
   tariffCode: string | null;
   tariffLabel?: string | null;
@@ -9,6 +15,10 @@ export interface CurrentContract {
   franchiseChf: number;
 }
 
+/**
+ * MATCHED : certain (code identique ou correspondance confirmée) ; PROBABLE : déduit du libellé ou
+ * du modèle, à faire confirmer ; AMBIGUOUS : plusieurs candidats ; MISSING : aucune offre de la caisse.
+ */
 export type RenewalStatus = "MATCHED" | "PROBABLE" | "AMBIGUOUS" | "MISSING";
 
 export interface RenewalResult {
@@ -21,6 +31,7 @@ export interface RenewalResult {
   alternatives: Offer[];
 }
 
+/** Franchise autorisée la plus proche (la plus basse à égalité), quand l'actuelle n'existe plus (passage enfant → adulte). */
 export function nearestFranchise(current: number, allowed: readonly number[]): number {
   if (allowed.includes(current)) return current;
   return [...allowed].sort((a, b) => Math.abs(a - current) - Math.abs(b - current) || a - b)[0] ?? current;
@@ -28,10 +39,7 @@ export function nearestFranchise(current: number, allowed: readonly number[]): n
 
 /** « Bestcare (BESTCARE) » → « bestcare bestcare » ; accents, casse et ponctuation ignorés. */
 export function normalizeTariff(s: string | null | undefined): string {
-  return (s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
+  return foldForSearch(s ?? "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
@@ -78,7 +86,7 @@ function uniqueByCode(offers: readonly Offer[]): Offer[] {
  * `candidates` : offres déjà filtrées sur canton, région, classe d'âge cible, accident, sous-groupe.
  */
 export function findRenewal(
-  contract: CurrentContract,
+  contract: RenewalSourcePolicy,
   candidates: readonly Offer[],
   allowedFranchises: readonly number[],
   confirmedCode: string | null = null,

@@ -6,6 +6,7 @@ import { LCA_GUARANTEES } from "@/domain/lca";
 import { Alert } from "@/ui/alert";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
 import { SubmitButton } from "@/ui/submit";
+import { rpToInput } from "@/domain/money";
 
 export interface LcaDefaults {
   id?: number;
@@ -45,12 +46,12 @@ export function LcaForm({
   useEffect(() => {
     if (state?.ok) onDone?.();
   }, [state, onDone]);
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
   return (
     <form action={action} className="space-y-4">
       {lca?.id && <input type="hidden" name="id" value={lca.id} />}
       <input type="hidden" name="personId" value={personId} />
-      <Field label="Garantie" htmlFor="guarantee" error={fe.guarantee}>
+      <Field label="Garantie" htmlFor="guarantee" error={fieldErrors.guarantee}>
         <Select id="guarantee" name="guarantee" required defaultValue={lca?.guarantee ?? ""}>
           <option value="" disabled>
             Choisir…
@@ -80,7 +81,7 @@ export function LcaForm({
           ))}
         </Select>
       </Field>
-      <Field label="Assureur LCA" htmlFor="insurerName" error={fe.insurerName} hint="Prérempli d'après la caisse LAMal ; précisez la société de votre police si elle diffère.">
+      <Field label="Assureur LCA" htmlFor="insurerName" error={fieldErrors.insurerName} hint="Prérempli d'après la caisse LAMal ; précisez la société de votre police si elle diffère.">
         <Input
           id="insurerName"
           name="insurerName"
@@ -97,7 +98,7 @@ export function LcaForm({
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Prime mensuelle (CHF, facultatif)" htmlFor="monthly">
-          <Input id="monthly" name="monthly" inputMode="decimal" defaultValue={lca?.monthlyRp ? (lca.monthlyRp / 100).toFixed(2) : ""} />
+          <Input id="monthly" name="monthly" inputMode="decimal" defaultValue={lca?.monthlyRp ? rpToInput(lca.monthlyRp) : ""} />
         </Field>
         <Field label="N° de police" htmlFor="lcaPolicyNumber">
           <Input id="lcaPolicyNumber" name="policyNumber" defaultValue={lca?.policyNumber ?? ""} />

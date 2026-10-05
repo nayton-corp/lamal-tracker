@@ -1,11 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { confirmEmail, signUp } from "@/application/account";
+import { confirmEmail, signUp, type EmailConfirmation } from "@/application/account";
 import { hasStrongFactor } from "@/application/auth";
 import { accountDeps, clientIp, rateLimit } from "@/server/accounts";
 import { toActionError, type ActionState } from "@/server/action";
-import { completeLogin } from "@/server/auth";
+import { completeLogin, notifySecurityChange } from "@/server/auth";
 import { db, nowIso } from "@/server/context";
 
 export async function signUpAction(_: ActionState, form: FormData): Promise<ActionState> {
@@ -34,14 +34,16 @@ export async function signUpAction(_: ActionState, form: FormData): Promise<Acti
  * compte déjà protégé par un second facteur repasse par la connexion.
  */
 export async function confirmEmailAction(_: ActionState, form: FormData): Promise<ActionState> {
-  let userId: number;
+  let confirmation: EmailConfirmation;
   try {
     rateLimit([`verify-ip:${await clientIp()}`], 20, 60);
-    userId = confirmEmail(db(), String(form.get("t") ?? ""), nowIso());
+    confirmation = confirmEmail(db(), String(form.get("t") ?? ""), nowIso());
   } catch (e) {
     return toActionError(e);
   }
-  if (hasStrongFactor(db(), userId)) redirect("/login?confirme=1");
-  await completeLogin(userId);
+  const { userId, autoLogin, previousEmail } = confirmation;
+  if (previousEmail) await notifySecurityChange(previousEmail, `L'adresse de connexion de votre compte a été remplacée par une autre`);
+  if (!autoLogin || hasStrongFactor(db(), userId)) redirect("/login?confirme=1");
+  await completeLogin(userId, { viaEmailLink: true });
   redirect("/compte/passkey");
 }

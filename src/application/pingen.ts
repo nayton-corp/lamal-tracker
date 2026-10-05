@@ -12,6 +12,11 @@ import { signaturesByName } from "./signatures";
 import { bumpUsage } from "./usage";
 import { audit } from "./audit";
 
+/*
+ * Envoi des lettres par Pingen (impression et recommandé par la Poste) : conditions, envoi, suivi
+ * du statut par le planificateur, abandon pour reprendre la lettre à la main.
+ */
+
 export interface PingenDeps {
   client: PingenClient;
   /** Rendu PDF de la lettre, mise en page Pingen, signatures dessinées apposées. */

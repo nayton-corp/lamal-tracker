@@ -29,6 +29,7 @@ export interface UsageSummary {
   years: { year: number; reviews: number; closed: number; letters: number; lettersSent: number }[];
 }
 
+/** Statistiques de l'instance pour l'administrateur : compteurs cumulés et totaux par année de rituel. */
 export function usageSummary(db: Db, scope: Scope): UsageSummary {
   requireAdmin(scope);
   const counters = new Map(db.select().from(usageCounter).all().map((c) => [c.key, c.value]));

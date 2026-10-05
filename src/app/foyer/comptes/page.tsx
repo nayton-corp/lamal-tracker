@@ -10,11 +10,11 @@ import { ConfirmButton } from "@/ui/confirm-button";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
 import { InvitePanel } from "./invite-panel";
+import { formatTimestamp } from "@/domain/dates";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Accès au foyer" };
 
-const dateFmt = (iso: string) => new Date(iso).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" });
 
 /**
  * Comptes qui partagent le foyer. Le propriétaire invite et retire ; un membre consulte, prépare
@@ -65,7 +65,7 @@ export default async function HouseholdAccessPage() {
               <ul className="divide-y divide-border rounded-xl border border-border text-sm">
                 {invites.map((i) => (
                   <li key={i.id} className="flex min-h-11 items-center gap-2 px-3 py-2">
-                    <span className="flex-1">Invitation en attente, valable jusqu&apos;au {dateFmt(i.expiresAt)}</span>
+                    <span className="flex-1">Invitation en attente, valable jusqu&apos;au {formatTimestamp(i.expiresAt, "dateTime")}</span>
                     <ActionForm action={revokeHouseholdInviteAction} hidden={{ id: i.id }}>
                       <SubmitButton variant="ghost" size="sm" pendingLabel="…">Annuler</SubmitButton>
                     </ActionForm>

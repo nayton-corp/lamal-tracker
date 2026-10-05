@@ -2,6 +2,7 @@ import { formatDateLong, type IsoDate } from "@/domain/dates";
 import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import { guaranteeInfo } from "@/domain/lca";
 import { formatChf } from "@/domain/money";
+import type { Decision, ReviewStatus } from "@/domain/review";
 import type { Report, ReportSection } from "@/infrastructure/pdf/report-pdf";
 import type { DataExport } from "./data-rights";
 
@@ -14,9 +15,11 @@ const day = (iso: string | null | undefined) => (iso ? formatDateLong(iso.slice(
 const yesNo = (v: boolean) => (v ? "oui" : "non");
 const chf = (rp: number | null | undefined) => (rp === null || rp === undefined ? "—" : formatChf(rp));
 
-const DECISION: Record<string, string> = { UNDECIDED: "pas décidé", KEEP: "garder", SWITCH: "changer de caisse", ADJUST: "adapter le contrat" };
-const REVIEW_STATUS: Record<string, string> = { OPEN: "en cours", DECIDED: "décidé", LETTERS_SENT: "lettres envoyées", CLOSED: "clôturé" };
+// Formes courtes, pour un tableau (les libellés de l'interface sont dans DECISION_LABEL).
+const DECISION_SHORT_LABEL: Record<Decision, string> = { UNDECIDED: "pas décidé", KEEP: "garder", SWITCH: "changer de caisse", ADJUST: "adapter le contrat" };
+const REVIEW_STATUS: Record<ReviewStatus, string> = { OPEN: "en cours", DECIDED: "décidé", LETTERS_SENT: "lettres envoyées", CLOSED: "clôturé" };
 
+/** Sections du PDF récapitulatif, construites à partir de l'export JSON du compte (data-rights.ts). */
 export function exportReport(data: DataExport): Report {
   const sections: ReportSection[] = [];
   const c = data.compte;
@@ -104,7 +107,7 @@ export function exportReport(data: DataExport): Report {
           head: ["Personne", "Décision", "Caisse choisie", "Franchise", "Prime / mois"],
           rows: r.decisions.map((d) => [
             names.get(d.personId) ?? "—",
-            DECISION[d.decision] ?? d.decision,
+            DECISION_SHORT_LABEL[d.decision] ?? d.decision,
             d.caisseChoisie ?? "—",
             d.chosenFranchiseChf === null ? "—" : `CHF ${d.chosenFranchiseChf}`,
             chf(d.chosenMonthlyRp),

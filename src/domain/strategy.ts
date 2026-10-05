@@ -1,5 +1,5 @@
 import type { RankedOffer } from "./comparison";
-import type { Level, TrendLevel } from "./insurer-profile";
+import type { TercileLevel, TrendLevel } from "./insurer-profile";
 import type { ModelType } from "./lamal";
 import type { Rappen } from "./money";
 
@@ -41,13 +41,17 @@ export const STRATEGY_INFO: Record<Strategy, StrategyInfo> = {
   },
 };
 
-export interface CurrentContract {
+export interface StrategyBaseline {
   modelType: ModelType;
   franchiseChf: number;
 }
 
-/** Réglages proposés d'office pour une stratégie (la personne peut les modifier ensuite). */
-export function strategyDefaults(strategy: Strategy, current: CurrentContract): { franchiseChf: number | null; models: ModelType[] | null } {
+/**
+ * Réglages proposés d'office pour une stratégie (la personne peut les modifier ensuite).
+ * `franchiseChf` null = l'app choisit la franchise la plus avantageuse ; `models` [] = tous les
+ * modèles, null = les modèles acceptés par la personne.
+ */
+export function strategyDefaults(strategy: Strategy, current: StrategyBaseline): { franchiseChf: number | null; models: ModelType[] | null } {
   switch (strategy) {
     case "KEEP":
       return { franchiseChf: current.franchiseChf, models: [current.modelType] };
@@ -59,8 +63,8 @@ export function strategyDefaults(strategy: Strategy, current: CurrentContract): 
 }
 
 export interface QualitySignals {
-  reservesLevel: Level | null;
-  adminLevel: Level | null;
+  reservesLevel: TercileLevel | null;
+  adminLevel: TercileLevel | null;
   trendLevel: TrendLevel | null;
 }
 
@@ -108,7 +112,7 @@ export const USAGE_INFO: Record<UsageProfile, { label: string; example: string; 
   HEAVY: { label: "Traitement lourd", example: "Opération prévue, maladie chronique, grossesse.", healthCostsRp: 1_000_000 },
 };
 
-/** Profil le plus proche d'un montant de frais (pour pré-cocher le questionnaire). */
+/** Profil dont le montant de frais est exactement celui-ci (pour pré-cocher le questionnaire) ; null sinon. */
 export function usageFor(healthCostsRp: Rappen): UsageProfile | null {
   return USAGE_PROFILES.find((u) => USAGE_INFO[u].healthCostsRp === healthCostsRp) ?? null;
 }

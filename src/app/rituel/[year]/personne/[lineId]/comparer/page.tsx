@@ -11,11 +11,11 @@ import { Chf, Saving } from "@/ui/money";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
 import { pageScope } from "@/server/auth";
+import { formatPermille } from "@/domain/money";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Comparer des offres" };
 
-const pct = (permille: number) => `${permille >= 0 ? "+" : ""}${(permille / 10).toFixed(1)} %`;
 
 export default async function ComparePage({ params, searchParams }: { params: Promise<{ year: string; lineId: string }>; searchParams: Promise<{ c?: string }> }) {
   const scope = await pageScope();
@@ -25,7 +25,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
   const keys = ((await searchParams).c ?? "").split(",").filter(Boolean);
   let view;
   try {
-    view = compareForLine(db(), scope, lineId, { all: true, everyOffer: true });
+    view = compareForLine(db(), scope, lineId, { ignorePersonPreferences: true, everyOffer: true });
   } catch {
     notFound();
   }
@@ -120,7 +120,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
             }, (o) => view.insurers[o.insurerId]?.profile?.adminPerInsuredRp ?? Infinity)}
             {row("Hausse des primes / an", (o) => {
               const t = view.insurers[o.insurerId]?.profile?.trend;
-              return t ? `${pct(t.insurerPermille)} (marché ${pct(t.marketPermille)}), ${t.fromYear}–${t.toYear}` : "—";
+              return t ? `${formatPermille(t.insurerPermille)} (marché ${formatPermille(t.marketPermille)}), ${t.fromYear}–${t.toYear}` : "—";
             }, (o) => view.insurers[o.insurerId]?.profile?.trend?.insurerPermille ?? Infinity)}
             {row("Contact", (o) => {
               const c = view.insurers[o.insurerId];

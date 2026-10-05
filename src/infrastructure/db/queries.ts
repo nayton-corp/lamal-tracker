@@ -5,7 +5,13 @@ import { defaultParameters, type LamalParameters } from "@/domain/parameters";
 import type { Db } from "./client";
 import { insurer, lamalParameters, premium, tariff, tariffDataset } from "./schema";
 
-export interface OfferScope {
+/*
+ * Requêtes du référentiel partagées par plusieurs cas d'usage : offres d'un profil de primes, jeu
+ * de primes actif d'une année, paramètres légaux d'une année.
+ */
+
+/** Ce qui détermine une prime : jeu de primes, lieu (canton, région), classe d'âge, accident, sous-groupe. */
+export interface PremiumProfile {
   datasetId: number;
   canton: string;
   region: number;
@@ -15,7 +21,7 @@ export interface OfferScope {
 }
 
 /** Toutes les offres d'un profil (canton, région, classe d'âge, accident, sous-groupe). */
-export function offersFor(db: Db, scope: OfferScope): Offer[] {
+export function offersFor(db: Db, scope: PremiumProfile): Offer[] {
   return db
     .select({
       tariffId: tariff.id,
@@ -50,6 +56,7 @@ export function offersFor(db: Db, scope: OfferScope): Offer[] {
     }));
 }
 
+/** Jeu de primes actif de l'année (le dernier fichier importé avec succès) ; undefined si aucun. */
 export function activeDataset(db: Db, year: number) {
   return db
     .select()
@@ -58,6 +65,7 @@ export function activeDataset(db: Db, year: number) {
     .get();
 }
 
+/** Année la plus récente qui a des primes actives ; null avant tout import. */
 export function latestActiveYear(db: Db): number | null {
   return (
     db
@@ -69,6 +77,7 @@ export function latestActiveYear(db: Db): number | null {
   );
 }
 
+/** Paramètres légaux de l'année : la ligne de `lamal_parameters`, sinon la loi en vigueur (CO2 inconnu). */
 export function parametersFor(db: Db, year: number): LamalParameters {
   const row = db.select().from(lamalParameters).where(eq(lamalParameters.year, year)).get();
   if (!row) return defaultParameters(year);
@@ -81,21 +90,4 @@ export function parametersFor(db: Db, year: number): LamalParameters {
     coinsuranceMaxKidRp: row.coinsuranceMaxKidRp,
     co2AnnualRp: row.co2AnnualRp,
   };
-}
-
-export function insurerLabel(row: { name: string; displayName: string | null }): string {
-  return row.displayName || row.name;
-}
-
-type InsurerAddressRow = { name: string; legalNameFr?: string | null; terminationAddress: string | null; officialAddress?: string | null };
-
-/** Adresse de résiliation : celle saisie par l'utilisateur, sinon celle de l'annuaire officiel. */
-export function insurerAddressLines(row: InsurerAddressRow): string[] {
-  const raw = row.terminationAddress?.trim() ? row.terminationAddress : (row.officialAddress ?? "");
-  return raw.split("\n").map((l) => l.trim()).filter(Boolean);
-}
-
-/** Destinataire complet d'une lettre en français : raison sociale puis adresse. */
-export function insurerRecipient(row: InsurerAddressRow): string[] {
-  return [row.legalNameFr || row.name, ...insurerAddressLines(row)];
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { getSetting, setSetting } from "@/infrastructure/db/settings";
+import { getSetting, setSetting, SETTING_KEYS } from "@/infrastructure/db/settings";
 import { applyCo2, applyDirectory, applySupervisory } from "@/infrastructure/reference/apply";
 import { CO2_PAGE_URL, scanCo2Amounts } from "@/infrastructure/reference/co2";
 import { fetchBuffer, fetchText } from "@/infrastructure/reference/http";
@@ -8,13 +8,14 @@ import { parseSupervisoryData, pickSupervisoryLink, SUPERVISORY_PAGE_URL } from 
 import { readWorkbook } from "@/infrastructure/reference/workbook";
 import { db } from "./context";
 
-export interface ReferenceCheck {
-  at: string;
-  /** Date de l'annuaire des caisses appliqué. */
-  directory: string | null;
-  results: string[];
-  ok: boolean;
-}
+import type { ReferenceCheck } from "@/application/reference-data";
+
+export type { ReferenceCheck };
+
+/*
+ * Mise à jour des référentiels officiels (annuaire des caisses, données de surveillance, CO2)
+ * depuis admin.ch : chaque semaine par le planificateur, ou à la demande de l'administrateur.
+ */
 
 /**
  * Rafraîchit les référentiels officiels depuis admin.ch : annuaire des caisses (adresses),
@@ -24,7 +25,7 @@ export interface ReferenceCheck {
 export async function refreshReference(): Promise<ReferenceCheck> {
   const results: string[] = [];
   let ok = true;
-  const local = getSetting<{ directory?: string | null }>(db(), "reference.local") ?? {};
+  const local = getSetting<{ directory?: string | null }>(db(), SETTING_KEYS.referenceLocal) ?? {};
 
   try {
     const link = pickDirectoryLink(await fetchText(DIRECTORY_PAGE_URL));
@@ -58,16 +59,16 @@ export async function refreshReference(): Promise<ReferenceCheck> {
     results.push(`Redistribution CO2 indisponible (${error instanceof Error ? error.message : String(error)}).`);
   }
 
-  setSetting(db(), "reference.local", local);
+  setSetting(db(), SETTING_KEYS.referenceLocal, local);
   const check: ReferenceCheck = { at: new Date().toISOString(), directory: local.directory ?? null, results, ok };
-  setSetting(db(), "reference.lastCheck", check);
+  setSetting(db(), SETTING_KEYS.referenceLastCheck, check);
   return check;
 }
 
 /** Rafraîchissement hebdomadaire, en tâche de fond du planificateur. */
 export async function referenceTick(): Promise<void> {
   if (process.env.OFSP_AUTO_CHECK === "false") return;
-  const last = getSetting<ReferenceCheck>(db(), "reference.lastCheck");
+  const last = getSetting<ReferenceCheck>(db(), SETTING_KEYS.referenceLastCheck);
   const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
   if (ageH < 24 * 7) return;
   const check = await refreshReference();

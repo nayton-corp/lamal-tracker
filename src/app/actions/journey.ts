@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getHousehold, getHouseholdMode, listPersons, setHouseholdMode, type HouseholdMode } from "@/application/household";
-import { UserError } from "@/application/review";
+import { UserError } from "@/application/errors";
 import { deleteSignature, saveSignature } from "@/application/signatures";
 import { saveNeeds, setStrategy } from "@/application/strategy";
+import { DEFAULT_HEALTH_COSTS_RP } from "@/domain/lamal";
 import { STRATEGIES, type Strategy } from "@/domain/strategy";
 import { chfField, toActionError, type ActionState } from "@/server/action";
 import { db, nowIso } from "@/server/context";
@@ -17,10 +18,10 @@ export async function chooseModeAction(form: FormData) {
   const scope = await requireScope();
   let mode = String(form.get("mode")) as HouseholdMode;
   // Plusieurs personnes enregistrées : « pour moi seul·e » n'a plus de sens.
-  const h = getHousehold(db(), scope);
-  if (mode === "SOLO" && h && listPersons(db(), h.id).length > 1) mode = "FAMILY";
+  const householdRow = getHousehold(db(), scope);
+  if (mode === "SOLO" && householdRow && listPersons(db(), householdRow.id).length > 1) mode = "FAMILY";
   // Avant que le foyer existe, le choix attend sa création (voir saveHouseholdAction).
-  if (h) {
+  if (householdRow) {
     if (getHouseholdMode(db(), scope) !== mode) setHouseholdMode(db(), scope, mode);
   } else await rememberMode(mode);
   revalidatePath("/", "layout");
@@ -59,7 +60,7 @@ export async function saveNeedsAction(_: ActionState, form: FormData): Promise<A
           lineId: id,
           franchiseChf: franchise === "" || franchise === "auto" ? null : Number(franchise),
           models: form.getAll(`models-${id}`).map(String),
-          healthCostsRp: health ?? 50000,
+          healthCostsRp: health ?? DEFAULT_HEALTH_COSTS_RP,
           doctorName: doctor || null,
         };
       }),

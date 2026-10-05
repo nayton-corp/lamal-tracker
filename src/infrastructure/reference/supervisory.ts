@@ -32,6 +32,7 @@ const rp = (v: unknown) => {
   return n === null ? null : Math.round(n * 100);
 };
 
+/** Un onglet par année (nommé « AAAA »), à partir de `minYear` ; erreur si aucun tableau n'est reconnu. */
 export function parseSupervisoryData(sheets: readonly Sheet[], minYear = 2015): SupervisoryRow[] {
   const out: SupervisoryRow[] = [];
   for (const sheet of sheets) {
@@ -67,6 +68,7 @@ export function parseSupervisoryData(sheets: readonly Sheet[], minYear = 2015): 
 
 export const SUPERVISORY_PAGE_URL = "https://www.bag.admin.ch/de/aufsichtsdaten-krankenversicherer";
 
+/** Lien du classeur le plus récent (année dans le nom du fichier) trouvé dans la page de l'OFSP ; null sinon. */
 export function pickSupervisoryLink(html: string, base = "https://www.bag.admin.ch"): string | null {
   const links = [...html.matchAll(/href="([^"]+\.xlsx)"/gi)]
     .map((m) => new URL(m[1]!.replace(/&amp;/g, "&"), base).toString())

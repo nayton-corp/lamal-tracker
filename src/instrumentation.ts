@@ -3,7 +3,7 @@ export async function register() {
   const { pingHeartbeat, schedulerTick } = await import("./server/watch");
   const run = () =>
     schedulerTick()
-      .then(() => pingHeartbeat(true))
+      .then((failed) => pingHeartbeat(failed.length === 0))
       .catch((e) => {
         console.error("[scheduler]", e);
         return pingHeartbeat(false);

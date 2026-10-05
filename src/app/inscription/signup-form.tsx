@@ -9,7 +9,7 @@ import { confirmEmailAction, signUpAction } from "./actions";
 
 export function SignUpForm({ code }: { code: string }) {
   const [state, action] = useActionState(signUpAction, null);
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
   return (
     <form action={action} className="space-y-4">
       <Field label="Code d'invitation" htmlFor="code">
@@ -18,7 +18,7 @@ export function SignUpForm({ code }: { code: string }) {
       <Field label="Votre courriel" htmlFor="email" hint="Il sert à vous connecter. Nous n'y envoyons que des messages liés à votre compte.">
         <Input id="email" name="email" type="email" autoComplete="username" inputMode="email" required autoFocus={Boolean(code)} />
       </Field>
-      <NewPasswordFields errors={fe} />
+      <NewPasswordFields errors={fieldErrors} />
       <Checkbox
         name="consent"
         required

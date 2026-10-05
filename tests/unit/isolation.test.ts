@@ -20,7 +20,7 @@ import {
   savePolicy,
   setHouseholdMode,
 } from "@/application/household";
-import { generateLetters, getLetter } from "@/application/letters";
+import { deleteLetter, generateLetters, getLetter, markLetterAcknowledged, markLetterSent } from "@/application/letters";
 import {
   deleteOfferRequest,
   generateOfferRequests,
@@ -38,13 +38,10 @@ import {
   closeReview,
   confirmLineage,
   decide,
-  deleteLetter,
   deleteReview,
   getReviewByYear,
   getReviewView,
   keepAsIs,
-  markLetterAcknowledged,
-  markLetterSent,
   openReview,
   reopenReview,
   setLineFlags,
@@ -87,7 +84,7 @@ function insurerId(bag: number) {
 }
 
 /** Un foyer complet : personne, contrat, complémentaire, signature, rituel décidé, lettre et demande d'offre. */
-function household_(name: string): Fixture {
+function makeHousehold(name: string): Fixture {
   let scope = testAccount(db);
   scope = withHousehold(scope, saveHousehold(db, scope, { name, street: "Rue du Lac 1", postalCode: "1003", city: "Lausanne", canton: "VD", region: 1 }));
   setHouseholdMode(db, scope, "SOLO");
@@ -99,8 +96,8 @@ function household_(name: string): Fixture {
   const lcaId = saveLca(db, scope, { personId, insurerName: "Helsana", linkedInsurerId: insurerId(1562), guarantee: "HOSPITAL_SEMI_PRIVATE" });
   saveSignature(db, scope, personId, PNG);
   const { reviewId } = openReview(db, scope, 2027);
-  const pr = getReviewView(db, scope, reviewId, TODAY).persons[0]!;
-  decide(db, scope, pr.line.id, { tariffId: pr.best!.tariffId, franchiseChf: pr.best!.franchiseChf }, NOW);
+  const pr = getReviewView(db, scope, reviewId, TODAY).lines[0]!;
+  decide(db, scope, pr.line.id, { tariffId: pr.bestOffer!.tariffId, franchiseChf: pr.bestOffer!.franchiseChf }, NOW);
   acknowledgeLca(db, scope, pr.line.id, NOW);
   const [offerId] = generateOfferRequests(db, scope, reviewId, TODAY);
   markOfferRequestSent(db, scope, offerId!, TODAY);
@@ -131,8 +128,8 @@ beforeAll(async () => {
   db = openDb(":memory:");
   await importPremiumFile(db, path.join(FIXTURES_DIR, "primes-2026.xlsx"), "test");
   await importPremiumFile(db, path.join(FIXTURES_DIR, "primes-2027.xlsx"), "test");
-  a = household_("Alex");
-  b = household_("Bea");
+  a = makeHousehold("Alex");
+  b = makeHousehold("Bea");
 });
 
 describe("cloisonnement des foyers", () => {
@@ -215,7 +212,7 @@ describe("cloisonnement des foyers", () => {
   it("les correspondances de tarifs confirmées restent propres au foyer", () => {
     confirmLineage(db, a.scope, a.lineId, "HEL-TEL");
     expect(db.select().from(tariffLineage).all().map((l) => l.householdId)).toEqual([a.scope.householdId]);
-    expect(getReviewView(db, b.scope, b.reviewId, TODAY).persons[0]!.line.renewalStatus).not.toBe("MATCHED");
+    expect(getReviewView(db, b.scope, b.reviewId, TODAY).lines[0]!.line.renewalStatus).not.toBe("MATCHED");
   });
 
   it("les coordonnées des caisses, partagées, sont réservées à l'administrateur", () => {

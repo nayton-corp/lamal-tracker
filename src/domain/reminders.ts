@@ -1,8 +1,13 @@
 import { daysBetween, formatDateLong, type IsoDate } from "./dates";
 import { REMINDER_OFFSETS, type ReviewDeadlines } from "./deadlines";
 
+/*
+ * Rappels du rituel pour l'envoi des courriers postaux (notifications push, parfois aussi par
+ * courriel) : avant la date d'envoi conseillée, juste après, puis relance sans confirmation.
+ */
+
 /** Où en est un foyer dans l'envoi de ses courriers papier, pour une année cible. */
-export interface PaperProgress {
+export interface LetterProgress {
   /** Rituel clôturé : plus aucun rappel. */
   closed: boolean;
   /** Personnes du foyer, et celles qui ont décidé de garder leur contrat. */
@@ -26,7 +31,10 @@ export interface Reminder {
 }
 
 /** Délai après lequel une caisse qui n'a pas confirmé mérite une relance. */
-export const CONFIRMATION_FOLLOW_UP_DAYS = 21;
+export const CONFIRMATION_FOLLOW_UP_DAYS = 21; // « plus de trois semaines » dans les textes ci-dessous
+
+/** Une semaine avant la date d'envoi, le rappel part aussi par courriel (en plus de la notification). */
+export const MAIL_REMINDER_DAYS_BEFORE = 7;
 /** Dernier rappel, après la date d'envoi conseillée : un recommandé posté ce jour-là arrive encore. */
 const LATE_REMINDER_DAYS = 2;
 
@@ -37,7 +45,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
  * des courriers à poster, ou si le foyer n'a encore rien préparé), un dernier rappel juste après,
  * puis une relance par envoi resté sans confirmation de la caisse.
  */
-export function paperReminders(today: IsoDate, targetYear: number, deadlines: ReviewDeadlines, p: PaperProgress): Reminder[] {
+export function letterReminders(today: IsoDate, targetYear: number, deadlines: ReviewDeadlines, p: LetterProgress): Reminder[] {
   if (p.closed || p.persons === 0) return [];
   const out: Reminder[] = [];
   const url = `/rituel/${targetYear}`;
@@ -61,7 +69,7 @@ export function paperReminders(today: IsoDate, targetYear: number, deadlines: Re
       body,
       url: p.letters > 0 ? `${url}/lettres` : url,
       mail:
-        left === 7 || tomorrow
+        left === MAIL_REMINDER_DAYS_BEFORE || tomorrow
           ? {
               subject: tomorrow ? "Vos courriers d'assurance maladie : dernier jour conseillé demain" : "Vos courriers d'assurance maladie : plus qu'une semaine",
               text:

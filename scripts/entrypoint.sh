@@ -14,4 +14,7 @@ if [ ! -d "$DATA_DIR" ] || [ ! -w "$DATA_DIR" ]; then
   exit 1
 fi
 
+# Base, journal WAL et copies créés lisibles par ce seul utilisateur (données de santé).
+umask 077
+
 exec "$@"

@@ -4,6 +4,11 @@ import path from "node:path";
 import readline from "node:readline";
 import { extractPremiumFile, isXlsxZip } from "./archive";
 
+/*
+ * Lecture des fichiers de primes OFSP (xlsx, csv ou archive zip) ligne par ligne, en flux : le
+ * fichier fait des dizaines de Mo, le Raspberry Pi n'a pas la mémoire pour le charger d'un coup.
+ */
+
 /** Lit les lignes d'un fichier de primes (xlsx en flux, ou csv) sous forme de tableaux de cellules. */
 export async function* readRows(file: string): AsyncGenerator<unknown[]> {
   if (!(await isZip(file))) yield* readCsv(file);
@@ -89,6 +94,7 @@ async function csvEncoding(file: string): Promise<BufferEncoding> {
   }
 }
 
+/** Découpe une ligne CSV : guillemets et « "" » respectés ; un champ ne peut pas s'étendre sur plusieurs lignes. */
 export function splitCsvLine(line: string, delimiter: string): string[] {
   const out: string[] = [];
   let cur = "";

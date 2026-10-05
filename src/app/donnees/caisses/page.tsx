@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { BadgeCheck, Globe, Mail, Phone } from "lucide-react";
 import { getHousehold, listInsurers, listPersons, listPolicies } from "@/application/household";
 import { formatDateLong } from "@/domain/dates";
-import { insurerAddressLines, insurerLabel } from "@/infrastructure/db/queries";
+import { insurerAddressLines, insurerLabel } from "@/domain/insurer";
 import { db } from "@/server/context";
 import { Section } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
@@ -17,12 +17,12 @@ type InsurerRow = ReturnType<typeof listInsurers>[number];
 export default async function InsurersPage() {
   const scope = await pageScope();
   // Coordonnées des caisses : partagées par tous les foyers, modifiables par l'administrateur seul.
-  if (!scope.admin) notFound();
+  if (!scope.isAdmin) notFound();
   const insurers = listInsurers(db())
     .filter((i) => i.officialAddress || i.terminationAddress)
     .sort((a, b) => insurerLabel(a).localeCompare(insurerLabel(b), "fr"));
-  const h = getHousehold(db(), scope);
-  const mine = new Set(h ? listPersons(db(), h.id).flatMap((p) => listPolicies(db(), p.id).map((x) => x.policy.insurerId)) : []);
+  const householdRow = getHousehold(db(), scope);
+  const mine = new Set(householdRow ? listPersons(db(), householdRow.id).flatMap((p) => listPolicies(db(), p.id).map((x) => x.policy.insurerId)) : []);
   const yours = insurers.filter((i) => mine.has(i.id));
   const others = insurers.filter((i) => !mine.has(i.id));
   const date = insurers.map((i) => i.directoryDate).filter(Boolean).sort().at(-1);

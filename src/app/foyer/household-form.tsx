@@ -71,7 +71,7 @@ export function HouseholdForm({ household, onDone, person, next, submitLabel }: 
   const useManual = manual || (options !== null && options.length === 0 && /^\d{4}$/.test(npa));
   const canton = useManual ? manualCanton : chosen?.canton ?? household?.canton ?? "";
   const region = useManual ? manualRegion : chosen?.region ?? household?.region ?? 0;
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
 
   return (
     <form action={action} className="space-y-4">
@@ -84,14 +84,14 @@ export function HouseholdForm({ household, onDone, person, next, submitLabel }: 
       {solo ? (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Prénom" htmlFor="firstName" error={fe.firstName}>
+            <Field label="Prénom" htmlFor="firstName" error={fieldErrors.firstName}>
               <Input id="firstName" name="firstName" required defaultValue={person?.firstName} autoComplete="given-name" />
             </Field>
-            <Field label="Nom" htmlFor="lastName" error={fe.lastName}>
+            <Field label="Nom" htmlFor="lastName" error={fieldErrors.lastName}>
               <Input id="lastName" name="lastName" required defaultValue={person?.lastName} autoComplete="family-name" />
             </Field>
           </div>
-          <Field label="Date de naissance" htmlFor="birthDate" error={fe.birthDate}>
+          <Field label="Date de naissance" htmlFor="birthDate" error={fieldErrors.birthDate}>
             <Input id="birthDate" name="birthDate" type="date" required defaultValue={person?.birthDate} />
           </Field>
         </>
@@ -102,7 +102,7 @@ export function HouseholdForm({ household, onDone, person, next, submitLabel }: 
         <Input id="street" name="street" defaultValue={household?.street ?? ""} autoComplete="street-address" />
       </Field>
       <div className="grid grid-cols-[7rem_1fr] gap-3">
-        <Field label="Code postal (NPA)" htmlFor="postalCode" error={fe.canton || fe.region}>
+        <Field label="Code postal (NPA)" htmlFor="postalCode" error={fieldErrors.canton || fieldErrors.region}>
           <Input id="postalCode" name="postalCode" inputMode="numeric" maxLength={4} required value={npa} onChange={(e) => setNpa(e.target.value.replace(/\D/g, ""))} autoComplete="postal-code" />
         </Field>
         <Field label="Localité" htmlFor="city">

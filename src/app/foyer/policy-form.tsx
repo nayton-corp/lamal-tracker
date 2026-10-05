@@ -7,7 +7,7 @@ import { importYearAction } from "@/app/actions/data";
 import { savePolicyAction, tariffOptionsAction } from "@/app/actions/household";
 import type { TariffOptions } from "@/application/tariffs";
 import { MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
-import { formatChf } from "@/domain/money";
+import { formatChf, rpToInput } from "@/domain/money";
 import { Alert } from "@/ui/alert";
 import { Button } from "@/ui/button";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
@@ -70,12 +70,12 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
   // sélection n'a pas changé, on garde la prime saisie.
   const inherited =
     !changed && policy.billedMonthlyRp !== null && official !== null && policy.billedMonthlyRp !== official
-      ? (policy.billedMonthlyRp / 100).toFixed(2)
+      ? rpToInput(policy.billedMonthlyRp)
       : null;
   const custom = customPremium ?? inherited;
-  const premiumValue = custom ?? (official !== null ? (official / 100).toFixed(2) : policy.billedMonthlyRp !== null ? (policy.billedMonthlyRp / 100).toFixed(2) : "");
+  const premiumValue = custom ?? rpToInput(official ?? policy.billedMonthlyRp);
   const franchises = options?.franchises ?? [0, 100, 200, 300, 400, 500, 600, 1000, 1500, 2000, 2500];
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
 
   async function importYear() {
     setImporting(true);
@@ -112,7 +112,7 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
             ))}
           </Select>
         </Field>
-        <Field label="Caisse-maladie" htmlFor="insurerId" error={fe.insurerId}>
+        <Field label="Caisse-maladie" htmlFor="insurerId" error={fieldErrors.insurerId}>
           <Select id="insurerId" name="insurerId" required value={insurerId ?? ""} onChange={(e) => { setInsurerId(Number(e.target.value)); setTariffCode(""); setCustomPremium(null); setChanged(true); }}>
             <option value="" disabled>
               Choisir…
@@ -133,7 +133,7 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
       )}
 
       {ofspMode ? (
-        <Field label="Produit" htmlFor="tariffPick" error={fe.modelType}>
+        <Field label="Produit" htmlFor="tariffPick" error={fieldErrors.modelType}>
           <Select id="tariffPick" required value={tariffCode} onChange={(e) => { setTariffCode(e.target.value); setCustomPremium(null); setChanged(true); }}>
             <option value="" disabled>
               Choisir le produit…
@@ -199,7 +199,7 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
               <span className="text-sm font-normal text-muted">/mois</span>
             </p>
           </div>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setCustomPremium((official / 100).toFixed(2))}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setCustomPremium(rpToInput(official))}>
             Ma prime diffère
           </Button>
         </div>
@@ -208,7 +208,7 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
           <Field
             label="Prime mensuelle facturée (CHF)"
             htmlFor="billedMonthlyInput"
-            error={fe.billedMonthlyRp}
+            error={fieldErrors.billedMonthlyRp}
             hint={official !== null ? `Prime officielle : ${formatChf(official)}. Montant brut de la police, avant redistribution CO2.` : "Montant brut figurant sur la police, avant redistribution CO2."}
           >
             <Input

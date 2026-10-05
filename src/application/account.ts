@@ -4,11 +4,12 @@ import { appUser, authToken, householdMember, passkey } from "@/infrastructure/d
 import { bumpUsage } from "./usage";
 import { alreadyRegisteredMail, emailChangeMail, passwordResetDoneMail, resetPasswordMail, verifyEmailMail, type MailDeps } from "./account-mail";
 import { audit } from "./audit";
-import { checkNewPassword, closeAllSessions, findUserByEmail, normalizeEmail, setPassword, storedPassword, validatePassword, verifyPassword, type PwnedCheck } from "./auth";
+import { checkNewPassword, closeAllSessions, findUserByEmail, normalizeEmail, setPassword, storedPassword, validatePassword, requirePassword, type PwnedCheck } from "./auth";
 import { UserError } from "./errors";
 import { claimInvitation, findUsableInvitation } from "./invitations";
 import { checkSecondFactor, FACTOR_LOCKED, recoveryCodesLeft } from "./mfa";
 import { consumeToken, countAttempt, deleteUserTokens, issueToken, peekToken } from "./tokens";
+import { logMailError } from "@/infrastructure/mail/mailer";
 
 /*
  * Cycle de vie d'un compte : inscription sur invitation, confirmation du courriel, réinitialisation
@@ -50,7 +51,8 @@ export async function signUp(
 
   if (findUserByEmail(db, email)) {
     if (!deps.mail) throw new UserError("Cette adresse a déjà un compte : connectez-vous.");
-    await deps.mail.mailer.send(alreadyRegisteredMail(email, `${deps.mail.appUrl}/login`, `${deps.mail.appUrl}/login/oubli`));
+    // Sans attendre l'envoi : la durée de réponse ne doit pas trahir qu'un compte existe.
+    void deps.mail.mailer.send(alreadyRegisteredMail(email, `${deps.mail.appUrl}/login`, `${deps.mail.appUrl}/login/oubli`)).catch(logMailError("déjà inscrit"));
     return { kind: "check-mail" };
   }
 
@@ -99,7 +101,22 @@ export function verificationPending(db: Db, token: string | undefined, nowIso: s
  * Confirme l'adresse du lien : celle de l'inscription, ou la nouvelle adresse d'un changement.
  * Renvoie le compte, pour ouvrir sa session.
  */
-export function confirmEmail(db: Db, token: string | undefined, nowIso: string): number {
+/** Au-delà, un lien de confirmation n'ouvre plus de session : il faut se connecter. */
+export const AUTO_LOGIN_LINK_MINUTES = 15;
+
+export interface EmailConfirmation {
+  userId: number;
+  /** Première confirmation d'une inscription récente : on peut connecter la personne directement. */
+  autoLogin: boolean;
+  /** Ancienne adresse, à prévenir, quand le lien confirmait un changement de courriel. */
+  previousEmail: string | null;
+}
+
+/**
+ * Confirme l'adresse portée par le jeton. Un lien intercepté ne doit pas suffire à prendre un
+ * compte : la session n'est ouverte que pour la toute première confirmation, peu après l'inscription.
+ */
+export function confirmEmail(db: Db, token: string | undefined, nowIso: string): EmailConfirmation {
   const row = consumeToken(db, "VERIFY_EMAIL", token, nowIso);
   if (!row?.userId) throw new UserError("Ce lien n'est plus valable. Connectez-vous pour en recevoir un nouveau.");
   const email = String(row.data?.email ?? "");
@@ -110,7 +127,8 @@ export function confirmEmail(db: Db, token: string | undefined, nowIso: string):
   const changed = user.email !== email;
   db.update(appUser).set({ email, emailVerifiedAt: nowIso }).where(eq(appUser.id, user.id)).run();
   audit(db, user.id, changed ? "EMAIL_CHANGED" : "EMAIL_CONFIRMED", { nowIso });
-  return user.id;
+  const recent = Date.parse(nowIso) - Date.parse(row.createdAt) < AUTO_LOGIN_LINK_MINUTES * 60_000;
+  return { userId: user.id, autoLogin: !changed && user.emailVerifiedAt === null && recent, previousEmail: changed ? user.email : null };
 }
 
 /** Demande de réinitialisation : même réponse, que l'adresse ait un compte ou non. */
@@ -125,7 +143,8 @@ export async function requestPasswordReset(db: Db, rawEmail: string, mail: MailD
   if (!user || user.disabledAt || !user.emailVerifiedAt) return;
   deleteUserTokens(db, user.id, "RESET_PASSWORD");
   const token = issueToken(db, { userId: user.id, kind: "RESET_PASSWORD", ttlMs: RESET_MINUTES * 60_000 }, nowIso);
-  await mail.mailer.send(resetPasswordMail(email, link(mail, "/login/reinitialiser", token)));
+  // Sans attendre l'envoi : la durée de réponse ne doit pas trahir qu'un compte existe.
+  void mail.mailer.send(resetPasswordMail(email, link(mail, "/login/reinitialiser", token))).catch(logMailError("réinitialisation"));
 }
 
 /** Lien de réinitialisation valable ? Et faut-il le code du double facteur ? */
@@ -166,7 +185,7 @@ export async function resetPassword(
   setPassword(db, user.id, input.password);
   closeAllSessions(db, user.id);
   audit(db, user.id, "PASSWORD_RESET", { nowIso: now.iso });
-  if (deps.mail && user.email) await deps.mail.mailer.send(passwordResetDoneMail(user.email));
+  if (deps.mail && user.email) await deps.mail.mailer.send(passwordResetDoneMail(user.email)).catch(logMailError("mot de passe réinitialisé"));
 }
 
 /**
@@ -184,7 +203,7 @@ export async function requestEmailChange(
   const email = normalizeEmail(input.email);
   const user = db.select().from(appUser).where(eq(appUser.id, userId)).get();
   if (!user) throw new UserError("Compte introuvable.");
-  if (!verifyPassword(db, userId, input.password)) throw new UserError("Mot de passe incorrect.");
+  requirePassword(db, userId, input.password, nowIso);
   if (user.email === email) throw new UserError("C'est déjà votre adresse.");
   if (findUserByEmail(db, email)) throw new UserError("Cette adresse est déjà utilisée par un autre compte.");
   if (mail) {

@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { acknowledgeLcaAction } from "@/app/actions/review";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/form";
+import { formatTimestamp } from "@/domain/dates";
 
 export function LcaConfirm({ lineId, person, currentInsurer, acknowledgedAt }: { lineId: number; person: string; currentInsurer: string; acknowledgedAt: string | null }) {
   const router = useRouter();
@@ -15,7 +16,7 @@ export function LcaConfirm({ lineId, person, currentInsurer, acknowledgedAt }: {
   if (acknowledgedAt) {
     return (
       <p className="flex items-center gap-2 rounded-xl bg-saving-soft p-3 text-sm font-medium text-saving">
-        <CheckCircle2 aria-hidden className="size-5" /> Confirmé le {new Date(acknowledgedAt).toLocaleDateString("fr-CH")}
+        <CheckCircle2 aria-hidden className="size-5" /> Confirmé le {formatTimestamp(acknowledgedAt, "date")}
       </p>
     );
   }

@@ -1,5 +1,10 @@
 import data from "./postal-regions.json";
 
+/*
+ * Code postal → communes, canton et région de primes (fichier embarqué, OFSP et swisstopo), pour
+ * proposer la bonne région de primes à la saisie de l'adresse du foyer.
+ */
+
 /** [code postal, localité, commune, n° OFS, canton, région, part des adresses du code postal en %] */
 type Row = [string, string, string, number, string, number, number];
 
@@ -14,6 +19,7 @@ export interface CommuneOption {
 }
 
 const rows = (data as unknown as { rows: Row[] }).rows;
+/** Date de validité des régions de primes du fichier embarqué (ex. « 1.1.2027 »). */
 export const REGIONS_VALID_FROM = (data as { validFrom: string }).validFrom;
 
 /**

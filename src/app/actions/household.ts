@@ -17,21 +17,24 @@ import {
 } from "@/application/household";
 import { tariffOptions, type TariffOptions } from "@/application/tariffs";
 import { analyzePolicyText, applyPolicyImport, createHouseholdFromPolicy, previewPolicyHolder, type ConfirmedImport, type HouseholdFromPolicy, type PolicyHolderPreview, type PolicyImport } from "@/application/policy-import";
-import { readPdfText } from "@/infrastructure/pdf/read-text";
+import { MAX_PDF_PAGES, readPdfText } from "@/infrastructure/pdf/read-text";
+import { MAX_POLICY_TEXT } from "@/domain/policy-import";
+import { rateLimit } from "@/server/accounts";
 import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/postal";
-import { UserError } from "@/application/review";
+import { UserError } from "@/application/errors";
+import { DEFAULT_HEALTH_COSTS_RP, DEFAULT_KID_SUBGROUP } from "@/domain/lamal";
 import { chfField, rethrowForeignKey, toActionError, type ActionState } from "@/server/action";
-import { db, today } from "@/server/context";
+import { currentYear, db } from "@/server/context";
 import { requireScope } from "@/server/auth";
 import { chosenMode } from "@/server/onboarding";
 import { withHousehold, type Scope } from "@/application/scope";
 
-const str = (f: FormData, k: string) => {
+const formText = (f: FormData, k: string) => {
   const v = f.get(k);
   return v === null ? undefined : String(v);
 };
-const opt = (f: FormData, k: string) => {
-  const v = str(f, k)?.trim();
+const formTextOrNull = (f: FormData, k: string) => {
+  const v = formText(f, k)?.trim();
   return v ? v : null;
 };
 
@@ -39,14 +42,14 @@ export async function saveHouseholdAction(_: ActionState, form: FormData): Promi
   const scope = await requireScope();
   try {
     const id = saveHousehold(db(), scope, {
-      name: str(form, "name") ?? "",
-      street: str(form, "street"),
-      postalCode: str(form, "postalCode"),
-      city: str(form, "city"),
-      commune: str(form, "commune"),
-      bfsNumber: opt(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
-      canton: (str(form, "canton") ?? "") as never,
-      region: Number(str(form, "region")),
+      name: formText(form, "name") ?? "",
+      street: formText(form, "street"),
+      postalCode: formText(form, "postalCode"),
+      city: formText(form, "city"),
+      commune: formText(form, "commune"),
+      bfsNumber: formTextOrNull(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
+      canton: (formText(form, "canton") ?? "") as never,
+      region: Number(formText(form, "region")),
     });
     const mine = withHousehold(scope, id);
     if (!getHouseholdMode(db(), mine)) setHouseholdMode(db(), mine, (await chosenMode(scope)) ?? "FAMILY");
@@ -63,19 +66,19 @@ export async function savePersonAction(_: ActionState, form: FormData): Promise<
   const scope = await requireScope();
   let id: number;
   try {
-    const h = getHousehold(db(), scope);
-    if (!h) throw new UserError("Enregistrez d'abord l'adresse.");
+    const householdRow = getHousehold(db(), scope);
+    if (!householdRow) throw new UserError("Enregistrez d'abord l'adresse.");
     // Les préférences du comparateur (frais, modèles, médecin, caisses exclues) viennent du
     // questionnaire des besoins : on les conserve telles quelles à la modification.
-    const existing = opt(form, "id") ? listPersons(db(), h.id).find((p) => p.id === Number(form.get("id"))) : undefined;
+    const existing = formTextOrNull(form, "id") ? listPersons(db(), householdRow.id).find((p) => p.id === Number(form.get("id"))) : undefined;
     id = savePerson(db(), scope, {
       id: existing?.id,
-      firstName: str(form, "firstName") ?? "",
-      lastName: str(form, "lastName") ?? "",
-      birthDate: str(form, "birthDate") ?? "",
-      kidSubgroup: str(form, "kidSubgroup") ?? "K1",
+      firstName: formText(form, "firstName") ?? "",
+      lastName: formText(form, "lastName") ?? "",
+      birthDate: formText(form, "birthDate") ?? "",
+      kidSubgroup: formText(form, "kidSubgroup") ?? DEFAULT_KID_SUBGROUP,
       employedAccidentCover: form.has("employedAccidentCover") ? form.get("employedAccidentCover") === "on" : (existing?.employedAccidentCover ?? false),
-      healthCostsRp: existing?.healthCostsRp ?? 50000,
+      healthCostsRp: existing?.healthCostsRp ?? DEFAULT_HEALTH_COSTS_RP,
       allowedModels: (existing?.allowedModels ?? []) as never,
       excludedInsurerIds: existing?.excludedInsurerIds ?? [],
       doctorName: existing?.doctorName ?? null,
@@ -93,12 +96,12 @@ export async function savePersonAction(_: ActionState, form: FormData): Promise<
 
 /** Une 2e personne fait passer en mode foyer ; le nom du foyer se déduit de la première personne. */
 function afterPersonSaved(scope: Scope) {
-  const h = getHousehold(db(), scope)!;
-  const persons = listPersons(db(), h.id);
+  const householdRow = getHousehold(db(), scope)!;
+  const persons = listPersons(db(), householdRow.id);
   if (persons.length > 1 && getHouseholdMode(db(), scope) !== "FAMILY") setHouseholdMode(db(), scope, "FAMILY");
-  if (!h.name.trim() && persons[0]) {
+  if (!householdRow.name.trim() && persons[0]) {
     const first = persons[0];
-    saveHousehold(db(), scope, { ...h, canton: h.canton as never, name: persons.length === 1 ? `${first.firstName} ${first.lastName}` : `Famille ${first.lastName}` });
+    saveHousehold(db(), scope, { ...householdRow, canton: householdRow.canton as never, name: persons.length === 1 ? `${first.firstName} ${first.lastName}` : `Famille ${first.lastName}` });
   }
 }
 
@@ -106,29 +109,29 @@ function afterPersonSaved(scope: Scope) {
 export async function saveSoloAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
-    const firstName = str(form, "firstName") ?? "";
-    const lastName = str(form, "lastName") ?? "";
-    const h = getHousehold(db(), scope);
+    const firstName = formText(form, "firstName") ?? "";
+    const lastName = formText(form, "lastName") ?? "";
+    const householdRow = getHousehold(db(), scope);
     const id = saveHousehold(db(), scope, {
       name: `${firstName} ${lastName}`.trim(),
-      street: str(form, "street"),
-      postalCode: str(form, "postalCode"),
-      city: str(form, "city"),
-      commune: str(form, "commune"),
-      bfsNumber: opt(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
-      canton: (str(form, "canton") ?? "") as never,
-      region: Number(str(form, "region")),
+      street: formText(form, "street"),
+      postalCode: formText(form, "postalCode"),
+      city: formText(form, "city"),
+      commune: formText(form, "commune"),
+      bfsNumber: formTextOrNull(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
+      canton: (formText(form, "canton") ?? "") as never,
+      region: Number(formText(form, "region")),
     });
-    const existing = h ? listPersons(db(), h.id)[0] : undefined;
+    const existing = householdRow ? listPersons(db(), householdRow.id)[0] : undefined;
     const mine = withHousehold(scope, id);
     savePerson(db(), mine, {
       id: existing?.id,
       firstName,
       lastName,
-      birthDate: str(form, "birthDate") ?? "",
-      kidSubgroup: existing?.kidSubgroup ?? "K1",
+      birthDate: formText(form, "birthDate") ?? "",
+      kidSubgroup: existing?.kidSubgroup ?? DEFAULT_KID_SUBGROUP,
       employedAccidentCover: existing?.employedAccidentCover ?? false,
-      healthCostsRp: existing?.healthCostsRp ?? 50000,
+      healthCostsRp: existing?.healthCostsRp ?? DEFAULT_HEALTH_COSTS_RP,
       allowedModels: (existing?.allowedModels ?? []) as never,
       excludedInsurerIds: existing?.excludedInsurerIds ?? [],
       doctorName: existing?.doctorName ?? null,
@@ -160,18 +163,18 @@ export async function savePolicyAction(_: ActionState, form: FormData): Promise<
     const billed = chfField(form.get("billedMonthly"));
     if (billed === null) throw new UserError("Indiquez la prime mensuelle facturée.");
     savePolicy(db(), scope, {
-      id: opt(form, "id") ? Number(form.get("id")) : undefined,
+      id: formTextOrNull(form, "id") ? Number(form.get("id")) : undefined,
       personId: Number(form.get("personId")),
       coverageYear: Number(form.get("coverageYear")),
       insurerId: Number(form.get("insurerId")),
-      policyNumber: opt(form, "policyNumber"),
-      tariffCode: opt(form, "tariffCode"),
-      tariffLabel: opt(form, "tariffLabel"),
-      modelType: str(form, "modelType") ?? "STANDARD",
+      policyNumber: formTextOrNull(form, "policyNumber"),
+      tariffCode: formTextOrNull(form, "tariffCode"),
+      tariffLabel: formTextOrNull(form, "tariffLabel"),
+      modelType: formText(form, "modelType") ?? "STANDARD",
       franchiseChf: Number(form.get("franchiseChf")),
       accident: form.get("accident") === "on",
       billedMonthlyRp: billed,
-    }, opt(form, "tariffCode") ? "OFSP" : "MANUAL");
+    }, formTextOrNull(form, "tariffCode") ? "OFSP" : "MANUAL");
   } catch (e) {
     return toActionError(e);
   }
@@ -193,16 +196,16 @@ export async function saveLcaAction(_: ActionState, form: FormData): Promise<Act
   const scope = await requireScope();
   try {
     saveLca(db(), scope, {
-      id: opt(form, "id") ? Number(form.get("id")) : undefined,
+      id: formTextOrNull(form, "id") ? Number(form.get("id")) : undefined,
       personId: Number(form.get("personId")),
-      insurerName: str(form, "insurerName") ?? "",
-      linkedInsurerId: opt(form, "linkedInsurerId") ? Number(form.get("linkedInsurerId")) : null,
-      guarantee: (str(form, "guarantee") ?? "") as never,
-      productName: opt(form, "productName"),
-      policyNumber: opt(form, "policyNumber"),
+      insurerName: formText(form, "insurerName") ?? "",
+      linkedInsurerId: formTextOrNull(form, "linkedInsurerId") ? Number(form.get("linkedInsurerId")) : null,
+      guarantee: (formText(form, "guarantee") ?? "") as never,
+      productName: formTextOrNull(form, "productName"),
+      policyNumber: formTextOrNull(form, "policyNumber"),
       monthlyRp: chfField(form.get("monthly")),
-      minTermEnd: opt(form, "minTermEnd"),
-      noticeMonths: opt(form, "noticeMonths") ? Number(form.get("noticeMonths")) : null,
+      minTermEnd: formTextOrNull(form, "minTermEnd"),
+      noticeMonths: formTextOrNull(form, "noticeMonths") ? Number(form.get("noticeMonths")) : null,
       active: form.getAll("active").includes("on"),
     });
   } catch (e) {
@@ -235,25 +238,30 @@ export async function tariffOptionsAction(personId: number, year: number, insure
 const MAX_PDF = 20 * 1024 * 1024;
 
 /** Texte du PDF envoyé, ou un message d'erreur lisible. */
-async function pdfText(form: FormData): Promise<{ text: string } | { error: string }> {
+async function pdfText(form: FormData, scope: Scope): Promise<{ text: string } | { error: string }> {
+  try {
+    rateLimit([`pdf:${scope.userId}`], 10, 60);
+  } catch (e) {
+    return { error: toActionError(e)?.error ?? "Trop de demandes." };
+  }
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choisissez le PDF de votre police." };
   if (file.size > MAX_PDF) return { error: "Fichier trop volumineux (20 Mo au plus)." };
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") return { error: "Ce fichier n'est pas un PDF." };
   try {
-    return { text: await readPdfText(bytes) };
+    return { text: (await readPdfText(bytes)).slice(0, MAX_POLICY_TEXT) };
   } catch {
-    return { error: "Ce fichier n'a pas pu être lu comme un PDF." };
+    return { error: `Ce fichier n'a pas pu être lu comme une police (PDF de ${MAX_PDF_PAGES} pages au plus).` };
   }
 }
 
 export async function analyzePolicyAction(form: FormData): Promise<{ result?: PolicyImport; error?: string }> {
   const scope = await requireScope();
-  const read = await pdfText(form);
+  const read = await pdfText(form, scope);
   if ("error" in read) return read;
   try {
-    return { result: analyzePolicyText(db(), scope, read.text, Number(today().slice(0, 4))) };
+    return { result: analyzePolicyText(db(), scope, read.text, currentYear()) };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     return { error: "Lecture impossible." };
@@ -262,11 +270,11 @@ export async function analyzePolicyAction(form: FormData): Promise<{ result?: Po
 
 /** Accueil depuis la police : personnes et adresse lues, avant tout foyer. Le texte est renvoyé pour l'étape suivante. */
 export async function analyzePolicyStartAction(form: FormData): Promise<{ preview?: PolicyHolderPreview; text?: string; error?: string }> {
-  await requireScope();
-  const read = await pdfText(form);
+  const scope = await requireScope();
+  const read = await pdfText(form, scope);
   if ("error" in read) return read;
   try {
-    return { preview: previewPolicyHolder(db(), read.text, Number(today().slice(0, 4))), text: read.text.slice(0, 200_000) };
+    return { preview: previewPolicyHolder(db(), read.text, currentYear()), text: read.text };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     return { error: "Lecture impossible." };
@@ -285,7 +293,7 @@ export async function createFromPolicyAction(input: HouseholdFromPolicy, text: s
   }
   // Pas de revalidation ici : l'écran reste monté pour vérifier les contrats ; l'enregistrement final rafraîchit.
   try {
-    return { result: analyzePolicyText(db(), mine, String(text).slice(0, 200_000), Number(today().slice(0, 4))) };
+    return { result: analyzePolicyText(db(), mine, String(text).slice(0, MAX_POLICY_TEXT), currentYear()) };
   } catch (e) {
     return { error: e instanceof UserError ? e.message : "Lecture impossible." };
   }

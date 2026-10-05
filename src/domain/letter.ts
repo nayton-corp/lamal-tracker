@@ -1,9 +1,16 @@
 import { formatDateLong, type IsoDate } from "./dates";
 
+/*
+ * Contenu des courriers postaux (lettres) : résiliation ou changement de franchise/modèle adressé
+ * à la caisse actuelle, demande d'offre à une nouvelle caisse. Indépendant du rendu (PDF, aperçu).
+ */
+
 export interface LetterPerson {
   fullName: string;
   birthDate: IsoDate;
+  /** Numéro à rappeler à la caisse : n° d'assuré, sinon n° AVS, sinon n° de police. */
   policyNumber: string | null;
+  /** Un mineur ne signe pas : son représentant légal signe pour lui. */
   isMinor: boolean;
 }
 
@@ -22,6 +29,14 @@ export interface LetterInput {
   newInsurerName?: string | null;
 }
 
+/** Dans `paragraphs`, ces marqueurs sont remplacés au rendu par la liste des personnes et la liste annexe. */
+export const PERSONS_PLACEHOLDER = "__PERSONS__";
+export const EXTRA_ROWS_PLACEHOLDER = "__EXTRA__";
+
+/**
+ * Contenu figé d'une lettre, enregistré en JSON dans `letter.content` : ne renommer aucun champ
+ * sans prévoir la lecture des lettres déjà enregistrées.
+ */
 export interface LetterContent {
   senderLines: string[];
   insurerLines: string[];
@@ -34,7 +49,7 @@ export interface LetterContent {
   closing: string;
   signatures: string[];
   footer: string;
-  /** Mention au-dessus du destinataire ; absente des anciennes lettres = « RECOMMANDÉ ». */
+  /** Mention postale au-dessus du destinataire ; absente des anciennes lettres = « RECOMMANDÉ ». */
   mailing?: string | null;
   /** Liste à puces après les personnes (complémentaires demandées). */
   extraRows?: string[];
@@ -83,7 +98,7 @@ export function buildLetter(input: LetterInput): LetterContent {
     placeAndDate: `${input.place}, le ${formatDateLong(input.date)}`,
     subject,
     salutation: "Madame, Monsieur,",
-    paragraphs: [...paragraphs, "__PERSONS__", ...after],
+    paragraphs: [...paragraphs, PERSONS_PLACEHOLDER, ...after],
     personRows,
     lcaClause: termination
       ? "Cette résiliation porte exclusivement sur l'assurance de base obligatoire (LAMal). Les assurances complémentaires (LCA) éventuellement conclues auprès de votre groupe ne sont pas résiliées et doivent être maintenues sans changement."
@@ -124,13 +139,13 @@ export function buildOfferRequest(input: OfferRequestInput): LetterContent {
   const withLca = input.persons.filter((p) => p.lca.length > 0);
   const paragraphs = [
     `Je souhaite affilier à votre caisse, pour l'assurance obligatoire des soins (LAMal) dès le 1er janvier ${input.targetYear}, ${several ? "les personnes suivantes" : "la personne suivante"}, domiciliée${several ? "s" : ""} ${input.domicile} :`,
-    "__PERSONS__",
+    PERSONS_PLACEHOLDER,
     "Je vous prie de m'adresser une offre correspondante ainsi que la confirmation d'affiliation ou les documents à remplir.",
   ];
   if (withLca.length) {
     paragraphs.push(
       "Je vous prie également de me faire une offre pour les assurances complémentaires (LCA) suivantes, avec les questionnaires de santé nécessaires :",
-      "__EXTRA__",
+      EXTRA_ROWS_PLACEHOLDER,
       "Je ne résilierai mes complémentaires actuelles qu'après votre acceptation écrite de celles-ci.",
     );
   }
@@ -154,7 +169,7 @@ export function buildOfferRequest(input: OfferRequestInput): LetterContent {
 /** Version texte d'un courrier, pour un e-mail. */
 export function letterPlainText(c: LetterContent): string {
   const blocks = c.paragraphs.map((p) =>
-    p === "__PERSONS__" ? c.personRows.map((r) => `- ${r}`).join("\n") : p === "__EXTRA__" ? (c.extraRows ?? []).map((r) => `- ${r}`).join("\n") : p,
+    p === PERSONS_PLACEHOLDER ? c.personRows.map((r) => `- ${r}`).join("\n") : p === EXTRA_ROWS_PLACEHOLDER ? (c.extraRows ?? []).map((r) => `- ${r}`).join("\n") : p,
   );
   return [c.salutation, ...blocks, ...(c.lcaClause ? [c.lcaClause] : []), c.closing, [...c.signatures, ...c.senderLines.slice(1)].join("\n")].join("\n\n");
 }

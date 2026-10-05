@@ -4,10 +4,16 @@ import { marketStats } from "@/domain/comparison";
 import { defaultSubgroup } from "@/domain/lamal";
 import { changePermille } from "@/domain/money";
 import type { Db } from "@/infrastructure/db/client";
-import { activeDataset, insurerLabel, offersFor, parametersFor } from "@/infrastructure/db/queries";
+import { activeDataset, offersFor, parametersFor } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { insurer, lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
 import { getHousehold } from "./household";
 import type { Scope } from "./scope";
+
+/*
+ * Historique pluriannuel du foyer (page Historique) : primes facturées par personne et par année,
+ * repères du marché pour le même profil, totaux du foyer et statistiques sur la période.
+ */
 
 export interface HistoryPoint {
   year: number;
@@ -44,7 +50,7 @@ export interface HistoryStats {
   /** Primes payées sur toutes les années connues (12 × prime facturée). */
   totalPaidRp: number;
   /** Économies annuelles décidées lors des rituels clôturés (renouvellement − choix). */
-  ritualSavings: { year: number; annualRp: number }[];
+  reviewSavings: { year: number; annualRp: number }[];
   /** Hausse annuelle moyenne du foyer et du marché sur la période. */
   avgChangePermille: number | null;
   avgMarketChangePermille: number | null;
@@ -61,9 +67,9 @@ export interface HouseholdHistory {
 
 /** Historique pluriannuel : primes réellement facturées, nettes de CO2, et repères de marché. */
 export function householdHistory(db: Db, scope: Scope): HouseholdHistory {
-  const h = getHousehold(db, scope);
-  if (!h) return { years: [], persons: [], totals: [], stats: { totalPaidRp: 0, ritualSavings: [], avgChangePermille: null, avgMarketChangePermille: null, gapToCheapestAnnualRp: null } };
-  const persons = db.select().from(person).where(eq(person.householdId, h.id)).orderBy(asc(person.sortOrder), asc(person.birthDate)).all();
+  const householdRow = getHousehold(db, scope);
+  if (!householdRow) return { years: [], persons: [], totals: [], stats: { totalPaidRp: 0, reviewSavings: [], avgChangePermille: null, avgMarketChangePermille: null, gapToCheapestAnnualRp: null } };
+  const persons = db.select().from(person).where(eq(person.householdId, householdRow.id)).orderBy(asc(person.sortOrder), asc(person.birthDate)).all();
   const insurers = new Map(db.select().from(insurer).all().map((i) => [i.id, i]));
   const years = new Set<number>();
 
@@ -73,6 +79,7 @@ export function householdHistory(db: Db, scope: Scope): HouseholdHistory {
     const points = policies.map((pol) => {
       years.add(pol.coverageYear);
       const params = parametersFor(db, pol.coverageYear);
+      // Redistribution CO2 versée chaque mois en déduction de la prime (inconnue : 0).
       const co2Monthly = params.co2AnnualRp === null ? 0 : Math.round(params.co2AnnualRp / 12);
       const ds = activeDataset(db, pol.coverageYear);
       let market: ReturnType<typeof marketStats> = null;
@@ -80,8 +87,8 @@ export function householdHistory(db: Db, scope: Scope): HouseholdHistory {
         const ageClass = ageClassForYear(p.birthDate, pol.coverageYear);
         const offers = offersFor(db, {
           datasetId: ds.id,
-          canton: h.canton,
-          region: h.region,
+          canton: householdRow.canton,
+          region: householdRow.region,
           ageClass,
           accident: pol.accident,
           subgroup: ageClass === "KID" ? p.kidSubgroup : defaultSubgroup(ageClass),
@@ -129,7 +136,7 @@ export function householdHistory(db: Db, scope: Scope): HouseholdHistory {
     prevMedian = median;
     return t;
   });
-  return { years: sortedYears, persons: result, totals, stats: historyStats(db, h.id, result, totals) };
+  return { years: sortedYears, persons: result, totals, stats: historyStats(db, householdRow.id, result, totals) };
 }
 
 /** Hausse annuelle moyenne (composée), en pour mille, entre deux montants séparés de `years` ans. */
@@ -141,7 +148,7 @@ function cagrPermille(from: number, to: number, years: number): number | null {
 function historyStats(db: Db, householdId: number, persons: PersonHistory[], totals: YearTotal[]): HistoryStats {
   const totalPaidRp = persons.reduce((a, p) => a + p.points.reduce((b, pt) => b + pt.billedMonthlyRp * 12, 0), 0);
   const closed = db.select().from(review).where(eq(review.householdId, householdId)).all().filter((r) => r.status === "CLOSED");
-  const ritualSavings = closed
+  const reviewSavings = closed
     .map((r) => {
       const lines = db.select().from(reviewLine).where(eq(reviewLine.reviewId, r.id)).all();
       const annualRp = lines.reduce(
@@ -162,7 +169,7 @@ function historyStats(db: Db, householdId: number, persons: PersonHistory[], tot
   const lastKnown = totals.at(-1);
   return {
     totalPaidRp,
-    ritualSavings,
+    reviewSavings,
     avgChangePermille: first && last ? cagrPermille(first.billedMonthlyRp, last.billedMonthlyRp, span) : null,
     avgMarketChangePermille: mFirst && mLast ? cagrPermille(mFirst.marketMedianMonthlyRp!, mLast.marketMedianMonthlyRp!, mLast.year - mFirst.year) : null,
     gapToCheapestAnnualRp: lastKnown?.marketMinMonthlyRp != null ? Math.max(0, (lastKnown.billedMonthlyRp - lastKnown.marketMinMonthlyRp) * 12) : null,

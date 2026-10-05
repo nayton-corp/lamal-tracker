@@ -6,14 +6,13 @@ import { requestPasswordReset, resendVerification, resetPassword } from "@/appli
 import { checkNewPassword, createFirstAdmin, hasStrongFactor, login, normalizeEmail, passwordToDefine, primaryUserId, setPassword } from "@/application/auth";
 import { finishMfaLogin, startMfaLogin } from "@/application/mfa";
 import { finishPasskeyLogin, passkeyLoginOptions } from "@/application/passkeys";
-import { accountDeps, clientIp, deleteCookie, mailDeps, rateLimit, readCookie, relyingParty, setupCodeMatches, writeCookie } from "@/server/accounts";
+import { accountDeps, clientIp, DIRECT_CLIENT, deleteCookie, mailDeps, rateLimit, readCookie, relyingParty, setupCodeMatches, writeCookie } from "@/server/accounts";
 import type { ActionState } from "@/server/action";
 import { toActionError } from "@/server/action";
 import { completeLogin, endSession, landingAfterLogin, safeNext } from "@/server/auth";
 import { db, nowIso } from "@/server/context";
+import { COOKIE } from "@/server/cookie-names";
 
-const MFA_COOKIE = "lamal_mfa";
-const WEBAUTHN_COOKIE = "lamal_wa";
 
 /** Ralentit chaque échec, sans bloquer le serveur. */
 const slowDown = () => new Promise((r) => setTimeout(r, 500));
@@ -78,7 +77,7 @@ export async function loginAction(_: ActionState, form: FormData): Promise<Actio
       if (mail) await resendVerification(db(), outcome.userId, mail, nowIso());
       return { error: "Confirmez d'abord votre adresse : le lien de confirmation vient de vous être renvoyé (pensez aux courriels indésirables)." };
     case "mfa":
-      await writeCookie(MFA_COOKIE, startMfaLogin(db(), outcome.userId, nowIso()), 5 * 60);
+      await writeCookie(COOKIE.mfa, startMfaLogin(db(), outcome.userId, nowIso()), 5 * 60);
       redirect(`/login/code?next=${encodeURIComponent(next)}`);
     case "ok":
       await completeLogin(outcome.userId);
@@ -88,7 +87,7 @@ export async function loginAction(_: ActionState, form: FormData): Promise<Actio
 
 /** Deuxième étape : code de l'application d'authentification, ou code de secours. */
 export async function mfaAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const token = await readCookie(MFA_COOKIE);
+  const token = await readCookie(COOKIE.mfa);
   let outcome;
   try {
     rateLimit([`mfa-ip:${await clientIp()}`], 30, 15);
@@ -98,10 +97,10 @@ export async function mfaAction(_: ActionState, form: FormData): Promise<ActionS
   }
   if (!outcome.ok) {
     await slowDown();
-    if (outcome.restart) await deleteCookie(MFA_COOKIE);
+    if (outcome.restart) await deleteCookie(COOKIE.mfa);
     return { error: outcome.error, ...(outcome.restart ? { ok: "restart" } : {}) };
   }
-  await deleteCookie(MFA_COOKIE);
+  await deleteCookie(COOKIE.mfa);
   await completeLogin(outcome.userId);
   redirect(landingAfterLogin(outcome.userId, safeNext(form.get("next"))));
 }
@@ -109,9 +108,12 @@ export async function mfaAction(_: ActionState, form: FormData): Promise<ActionS
 /** Connexion par passkey, étape 1 : le défi à signer par l'appareil. */
 export async function passkeyLoginOptionsAction(): Promise<{ options?: PublicKeyCredentialRequestOptionsJSON; error?: string }> {
   try {
-    rateLimit([`passkey-ip:${await clientIp()}`], 30, 15);
+    // Sans mandataire, toutes les requêtes partagent la même « IP » : limiter ici bloquerait les
+    // passkeys de tout le monde. Une passkey ne se devine pas ; la limite ne sert qu'à freiner.
+    const ip = await clientIp();
+    if (ip !== DIRECT_CLIENT) rateLimit([`passkey-ip:${ip}`], 30, 15);
     const { options, token } = await passkeyLoginOptions(db(), await relyingParty(), nowIso());
-    await writeCookie(WEBAUTHN_COOKIE, token, 5 * 60);
+    await writeCookie(COOKIE.webauthn, token, 5 * 60);
     return { options };
   } catch (e) {
     return { error: toActionError(e)?.error };
@@ -121,8 +123,8 @@ export async function passkeyLoginOptionsAction(): Promise<{ options?: PublicKey
 /** Connexion par passkey, étape 2 : la réponse de l'appareil ouvre la session. */
 export async function passkeyLoginAction(response: AuthenticationResponseJSON, next: string): Promise<{ error?: string }> {
   const mail = mailDeps();
-  const token = await readCookie(WEBAUTHN_COOKIE);
-  await deleteCookie(WEBAUTHN_COOKIE);
+  const token = await readCookie(COOKIE.webauthn);
+  await deleteCookie(COOKIE.webauthn);
   const result = await finishPasskeyLogin(db(), token, response, await relyingParty(), { nowIso: nowIso(), mailEnabled: mail !== null });
   if (!result.ok) {
     if (result.unverifiedUserId && mail) await resendVerification(db(), result.unverifiedUserId, mail, nowIso());

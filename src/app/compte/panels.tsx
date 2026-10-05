@@ -26,8 +26,8 @@ import { Field, FormError, Input } from "@/ui/form";
 import { usePasskeySupport } from "@/ui/media";
 import { Sheet } from "@/ui/sheet";
 import { SubmitButton } from "@/ui/submit";
+import { formatTimestamp } from "@/domain/dates";
 
-const dateFmt = (iso: string) => new Date(iso).toLocaleDateString("fr-CH", { timeZone: "Europe/Zurich", day: "numeric", month: "short", year: "numeric" });
 
 /** Champ « mot de passe actuel » des actions sensibles. */
 function CurrentPassword({ id }: { id: string }) {
@@ -113,10 +113,11 @@ export function PasswordPanel() {
 // ───────────────────────── Passkeys ─────────────────────────
 
 /** Ajout d'une passkey : mot de passe redemandé si la connexion date de plus de dix minutes. */
-export function AddPasskey({ onDone, label = "Ajouter une passkey", block }: { onDone?: () => void; label?: string; block?: boolean }) {
+/** `askPassword` : la session n'est pas confirmée, le champ du mot de passe est montré d'emblée. */
+export function AddPasskey({ onDone, label = "Ajouter une passkey", block, askPassword = false }: { onDone?: () => void; label?: string; block?: boolean; askPassword?: boolean }) {
   const supported = usePasskeySupport();
   const [pending, setPending] = useState(false);
-  const [needPassword, setNeedPassword] = useState(false);
+  const [needPassword, setNeedPassword] = useState(askPassword);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -179,7 +180,7 @@ export function PasskeysPanel({ passkeys }: { passkeys: { id: string; name: stri
               <Fingerprint aria-hidden className="size-4 shrink-0 text-muted" />
               <span className="flex-1">
                 {k.name || "Passkey"}
-                <span className="block text-muted">Ajoutée le {dateFmt(k.createdAt)}{k.lastUsedAt ? ` · utilisée le ${dateFmt(k.lastUsedAt)}` : ""}</span>
+                <span className="block text-muted">Ajoutée le {formatTimestamp(k.createdAt, "date")}{k.lastUsedAt ? ` · utilisée le ${formatTimestamp(k.lastUsedAt, "date")}` : ""}</span>
               </span>
               <SheetAction label="Retirer" title="Retirer cette passkey ?" description="Elle ne permettra plus de se connecter." variant="ghost" icon={<Trash2 aria-hidden className="size-4" />}>
                 {() => (
@@ -348,7 +349,7 @@ export function SessionsPanel({ sessions, currentId }: { sessions: Omit<SessionI
               {s.device}
               {s.id === currentId && <span className="ml-1 text-muted">(cet appareil)</span>}
             </span>
-            <span className="text-muted">{dateFmt(s.lastSeenAt)}</span>
+            <span className="text-muted">{formatTimestamp(s.lastSeenAt, "date")}</span>
           </li>
         ))}
       </ul>

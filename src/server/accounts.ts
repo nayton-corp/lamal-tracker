@@ -6,6 +6,7 @@ import type { AccountDeps } from "@/application/account";
 import { UserError } from "@/application/errors";
 import type { RelyingParty } from "@/application/passkeys";
 import { pwnedCount } from "@/infrastructure/hibp";
+import { cookieVariants } from "./cookie-names";
 import { mailerFromEnv, type Mailer } from "@/infrastructure/mail/mailer";
 import { consume } from "@/infrastructure/rate-limit";
 
@@ -63,9 +64,13 @@ export function mailDeps(): MailDeps | null {
   return mailer && url ? { mailer, appUrl: url } : null;
 }
 
+/** Dépendances des cas d'usage de compte : courriels (null s'ils ne sont pas configurés) et contrôle des fuites. */
 export function accountDeps(): AccountDeps {
   return { mail: mailDeps(), pwned: (password) => pwnedCount(password) };
 }
+
+/** Valeur de `clientIp()` sans mandataire de confiance (TRUSTED_PROXY_HOPS=0) : tous les clients la partagent. */
+export const DIRECT_CLIENT = "directe";
 
 /**
  * Adresse IP du client, pour les limites de débit. Next ne pose X-Forwarded-For que s'il manque :
@@ -75,7 +80,7 @@ export function accountDeps(): AccountDeps {
  * est ramenée à son préfixe /64, que le client contrôle en entier.
  */
 export function clientIpFrom(forwarded: string, hops: number): string {
-  if (hops <= 0) return "directe";
+  if (hops <= 0) return DIRECT_CLIENT;
   const parts = forwarded.split(",").map((p) => p.trim()).filter(Boolean);
   const ip = parts[parts.length - hops];
   if (!ip) return "inconnue";
@@ -90,6 +95,7 @@ function ipv6Prefix(ip: string): string {
   return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
 }
 
+/** Adresse du client de la requête en cours, selon TRUSTED_PROXY_HOPS (voir `clientIpFrom`). */
 export async function clientIp(): Promise<string> {
   const hops = Math.max(0, Math.floor(Number(process.env.TRUSTED_PROXY_HOPS ?? 0)) || 0);
   return clientIpFrom((await headers()).get("x-forwarded-for") ?? "", hops);
@@ -106,9 +112,9 @@ export function rateLimit(keys: string[], limit: number, windowMinutes: number) 
 export async function requestOrigin(): Promise<string> {
   const configured = appUrl();
   if (configured) return configured;
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto")?.split(",")[0]?.trim() || "http";
-  return `${proto}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost"}`;
+  const requestHeaders = await headers();
+  const proto = requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim() || "http";
+  return `${proto}://${requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost"}`;
 }
 
 /** Site WebAuthn : le nom de domaine de l'app. Les passkeys exigent HTTPS (ou localhost). */
@@ -119,6 +125,7 @@ export async function relyingParty(): Promise<RelyingParty> {
 
 // ───────────────────────── Cookies ─────────────────────────
 
+/** Requête reçue en HTTPS, d'après l'en-tête X-Forwarded-Proto posé par le mandataire. */
 export async function isSecureRequest(): Promise<boolean> {
   return ((await headers()).get("x-forwarded-proto") ?? "http").split(",")[0]!.trim() === "https";
 }
@@ -127,12 +134,13 @@ export async function isSecureRequest(): Promise<boolean> {
  * En HTTPS, les cookies portent le préfixe `__Host-` : le navigateur les refuse s'ils ne sont pas
  * sécurisés ou s'ils visent un autre chemin ou un sous-domaine. En HTTP (réseau local), nom simple.
  */
-export const cookieNames = (name: string) => [`__Host-${name}`, name];
+export { cookieVariants } from "./cookie-names";
 
+/** Valeur d'un cookie de l'app, sous son nom préfixé ou simple (voir `cookieVariants`). */
 export async function readCookie(name: string): Promise<string | undefined> {
   const jar = await cookies();
   // En HTTPS, seul le cookie préfixé compte : un cookie simple a pu être posé par un sous-domaine.
-  const names = (await isSecureRequest()) ? [`__Host-${name}`] : cookieNames(name);
+  const names = (await isSecureRequest()) ? cookieVariants(name).slice(0, 1) : cookieVariants(name);
   for (const n of names) {
     const value = jar.get(n)?.value;
     if (value) return value;
@@ -140,14 +148,16 @@ export async function readCookie(name: string): Promise<string | undefined> {
   return undefined;
 }
 
+/** Pose un cookie httpOnly, préfixé `__Host-` en HTTPS. */
 export async function writeCookie(name: string, value: string, maxAgeSeconds: number) {
   const secure = await isSecureRequest();
   (await cookies()).set(secure ? `__Host-${name}` : name, value, { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: maxAgeSeconds });
 }
 
+/** Efface toutes les variantes du cookie (préfixée et simple). */
 export async function deleteCookie(name: string) {
   const jar = await cookies();
-  for (const n of cookieNames(name)) {
+  for (const n of cookieVariants(name)) {
     if (jar.get(n)) jar.set(n, "", { httpOnly: true, sameSite: "lax", secure: n.startsWith("__Host-"), path: "/", maxAge: 0 });
   }
 }

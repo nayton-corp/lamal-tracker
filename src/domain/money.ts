@@ -1,15 +1,11 @@
 /**
  * Montants en centimes (Rappen), toujours entiers. Jamais de float pour de l'argent :
- * les conversions passent par ici et nulle part ailleurs.
+ * les conversions passent par ici et nulle part ailleurs. Suffixe des noms : `*Rp`.
+ *
+ * Taux, entiers eux aussi : `*Bp` en points de base (1/10 000, 1000 Bp = 10 %), `*Permille`
+ * en pour-mille (1/1 000, 32 ‰ = 3,2 %).
  */
 export type Rappen = number;
-
-export function assertRappen(value: number, label = "montant"): Rappen {
-  if (!Number.isSafeInteger(value)) {
-    throw new Error(`${label} doit être un entier en centimes, reçu ${value}`);
-  }
-  return value;
-}
 
 /** Accepte 432.1, "432.10", "432,10", "1'234.50", "1’234.50", "CHF 12". */
 export function parseChf(input: number | string): Rappen {
@@ -71,9 +67,16 @@ export function changePermille(from: Rappen, to: Rappen): number | null {
   return Math.round(((to - from) * 1000) / from);
 }
 
+/** Pour-mille → texte « +3.2 % » (signe affiché si `signed`, « — » si inconnu). */
 export function formatPermille(permille: number | null, signed = true): string {
   if (permille === null) return "—";
   const sign = permille < 0 ? "−" : signed && permille > 0 ? "+" : "";
   const abs = Math.abs(permille);
   return `${sign}${Math.floor(abs / 10)}.${abs % 10} %`;
+}
+
+/** Montant en centimes → valeur d'un champ de saisie (« 412.50 », sans « CHF » ni séparateur). */
+export function rpToInput(rp: Rappen | null | undefined, decimals: 0 | 2 = 2): string {
+  if (rp === null || rp === undefined) return "";
+  return (rp / 100).toFixed(decimals);
 }

@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { ageClassForYear } from "@/domain/age";
 import { savePersonAction } from "@/app/actions/household";
-import { KID_SUBGROUPS } from "@/domain/lamal";
+import { DEFAULT_KID_SUBGROUP, KID_SUBGROUPS } from "@/domain/lamal";
 import { Alert } from "@/ui/alert";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
 import { SubmitButton } from "@/ui/submit";
@@ -43,7 +43,7 @@ export function PersonForm({ person, year, onDone, stay, next, submitLabel }: {
 }) {
   const [state, action] = useActionState(savePersonAction, null);
   const [birthDate, setBirthDate] = useState(person?.birthDate ?? "");
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
   const minor = /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && isMinorAround(birthDate, year);
   useEffect(() => {
     if (state?.ok) onDone?.();
@@ -54,19 +54,19 @@ export function PersonForm({ person, year, onDone, stay, next, submitLabel }: {
       {stay && <input type="hidden" name="stay" value="1" />}
       {next && <input type="hidden" name="next" value={next} />}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Prénom" htmlFor="firstName" error={fe.firstName}>
+        <Field label="Prénom" htmlFor="firstName" error={fieldErrors.firstName}>
           <Input id="firstName" name="firstName" required defaultValue={person?.firstName} autoComplete="given-name" />
         </Field>
-        <Field label="Nom" htmlFor="lastName" error={fe.lastName}>
+        <Field label="Nom" htmlFor="lastName" error={fieldErrors.lastName}>
           <Input id="lastName" name="lastName" required defaultValue={person?.lastName} autoComplete="family-name" />
         </Field>
       </div>
-      <Field label="Date de naissance" htmlFor="birthDate" error={fe.birthDate}>
+      <Field label="Date de naissance" htmlFor="birthDate" error={fieldErrors.birthDate}>
         <Input id="birthDate" name="birthDate" type="date" required value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
       </Field>
       {minor ? (
         <Field label="Rang de l'enfant" htmlFor="kidSubgroup" hint="Certaines caisses font un rabais dès le 2e ou 3e enfant : voir la police.">
-          <Select id="kidSubgroup" name="kidSubgroup" defaultValue={person?.kidSubgroup ?? "K1"}>
+          <Select id="kidSubgroup" name="kidSubgroup" defaultValue={person?.kidSubgroup ?? DEFAULT_KID_SUBGROUP}>
             {KID_SUBGROUPS.map((k) => (
               <option key={k} value={k}>
                 {KID_RANK[k]}
@@ -75,7 +75,7 @@ export function PersonForm({ person, year, onDone, stay, next, submitLabel }: {
           </Select>
         </Field>
       ) : (
-        <input type="hidden" name="kidSubgroup" value={person?.kidSubgroup ?? "K1"} />
+        <input type="hidden" name="kidSubgroup" value={person?.kidSubgroup ?? DEFAULT_KID_SUBGROUP} />
       )}
       {!minor && person?.id && (
         <Checkbox name="employedAccidentCover" defaultChecked={person?.employedAccidentCover} label="Employé·e au moins 8 h par semaine (accident couvert par l'employeur)" />

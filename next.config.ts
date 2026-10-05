@@ -17,9 +17,14 @@ const config: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["better-sqlite3", "exceljs", "@react-pdf/renderer", "web-push", "unpdf"],
   poweredByHeader: false,
+  // La base locale de développement (data/) ne doit jamais partir avec le build « standalone ».
+  outputFileTracingExcludes: { "*": ["data/**", "tests/**", "deploy/**", "**/*.db", "**/*.db-*"] },
   experimental: {
-    // Un fichier de primes OFSP complet pèse ≈ 20 Mo ; la police importée est limitée à 20 Mo.
+    // Plus gros envoi accepté : un fichier de primes OFSP complet (≈ 20 Mo, refusé au-delà de 25 Mo).
+    // Les deux limites doivent suivre : le proxy (src/proxy.ts) lit le corps avant l'action, et
+    // coupe à 10 Mo par défaut. Le mandataire HTTPS accepte 30 Mo (deploy/Caddyfile).
     serverActions: { bodySizeLimit: "25mb" },
+    proxyClientMaxBodySize: "25mb",
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

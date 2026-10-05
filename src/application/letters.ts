@@ -5,12 +5,20 @@ import { reviewDeadlines } from "@/domain/deadlines";
 import { buildLetter, type LetterContent } from "@/domain/letter";
 import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
-import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
+import { insurerLabel, insurerRecipient } from "@/domain/insurer";
 import { household, insurer, letter, review } from "@/infrastructure/db/schema";
-import { getReviewView, UserError } from "./review";
-import { findLetter, type Scope } from "./scope";
+import { UserError } from "./errors";
+import { getReviewView } from "./review";
+import { findLetter, ownedLetter, type Scope } from "./scope";
+import { bumpUsage } from "./usage";
 
-export interface GenerateResult {
+/*
+ * Lettres (courriers postaux) du rituel adressées à la caisse actuelle : résiliation ou
+ * changement de franchise/modèle. Génération, rendu, puis suivi (envoi, n° de suivi, confirmation
+ * de la caisse). Une lettre envoyée est figée.
+ */
+
+export interface GenerateLettersResult {
   created: number[];
   blocked: { person: string; reasons: string[] }[];
 }
@@ -19,26 +27,26 @@ export interface GenerateResult {
  * Génère une lettre par caisse actuelle et par type (résiliation / changement), pour toutes
  * les personnes concernées. Les lettres non envoyées sont régénérées ; les envoyées sont figées.
  */
-export function generateLetters(db: Db, scope: Scope, reviewId: number, today: IsoDate): GenerateResult {
+export function generateLetters(db: Db, scope: Scope, reviewId: number, today: IsoDate): GenerateLettersResult {
   const view = getReviewView(db, scope, reviewId, today);
-  const h = db.select().from(household).where(eq(household.id, view.review.householdId)).get();
-  if (!h) throw new UserError("Foyer non configuré.");
+  const householdRow = db.select().from(household).where(eq(household.id, view.review.householdId)).get();
+  if (!householdRow) throw new UserError("Foyer non configuré.");
   const deadlines = reviewDeadlines(view.review.targetYear);
 
-  const blocked: GenerateResult["blocked"] = [];
-  const groups = new Map<string, typeof view.persons>();
+  const blocked: GenerateLettersResult["blocked"] = [];
+  const groups = new Map<string, typeof view.lines>();
   const sentLineIds = new Set(view.letters.filter((l) => l.sentAt).flatMap((l) => l.lineIds));
 
-  for (const pr of view.persons) {
-    if (pr.line.decision !== "SWITCH" && pr.line.decision !== "ADJUST") continue;
-    if (sentLineIds.has(pr.line.id)) continue;
-    if (!pr.letterCheck.allowed) {
-      blocked.push({ person: `${pr.person.firstName} ${pr.person.lastName}`, reasons: pr.letterCheck.blockers });
+  for (const lineView of view.lines) {
+    if (lineView.line.decision !== "SWITCH" && lineView.line.decision !== "ADJUST") continue;
+    if (sentLineIds.has(lineView.line.id)) continue;
+    if (!lineView.letterCheck.allowed) {
+      blocked.push({ person: `${lineView.person.firstName} ${lineView.person.lastName}`, reasons: lineView.letterCheck.blockers });
       continue;
     }
-    const kind = pr.line.decision === "SWITCH" ? "TERMINATION" : "CHANGE";
-    const key = `${pr.policy.insurerId}|${kind}`;
-    groups.set(key, [...(groups.get(key) ?? []), pr]);
+    const kind = lineView.line.decision === "SWITCH" ? "TERMINATION" : "CHANGE";
+    const key = `${lineView.policy.insurerId}|${kind}`;
+    groups.set(key, [...(groups.get(key) ?? []), lineView]);
   }
 
   const created: number[] = [];
@@ -48,15 +56,15 @@ export function generateLetters(db: Db, scope: Scope, reviewId: number, today: I
     for (const [key, members] of groups) {
       const [insurerIdStr, kind] = key.split("|") as [string, "TERMINATION" | "CHANGE"];
       const insurerId = Number(insurerIdStr);
-      const ins = tx.select().from(insurer).where(eq(insurer.id, insurerId)).get()!;
+      const insurerRow = tx.select().from(insurer).where(eq(insurer.id, insurerId)).get()!;
       const adults = members.filter((m) => m.line.targetAgeClass !== "KID");
       const sender = adults[0]?.person ?? members[0]!.person;
-      const newInsurers = [...new Set(members.map((m) => m.chosenInsurer).filter(Boolean))];
+      const newInsurers = [...new Set(members.map((m) => m.chosenInsurerName).filter(Boolean))];
       const content: LetterContent = buildLetter({
         kind,
-        senderLines: [`${sender.firstName} ${sender.lastName}`, h.street, `${h.postalCode} ${h.city}`].filter((l) => l.trim()),
-        insurerLines: insurerRecipient(ins),
-        place: h.city || "",
+        senderLines: [`${sender.firstName} ${sender.lastName}`, householdRow.street, `${householdRow.postalCode} ${householdRow.city}`].filter((l) => l.trim()),
+        insurerLines: insurerRecipient(insurerRow),
+        place: householdRow.city || "",
         date: today,
         effectiveEnd: deadlines.effectiveEnd,
         targetYear: view.review.targetYear,
@@ -83,6 +91,7 @@ export function generateLetters(db: Db, scope: Scope, reviewId: number, today: I
   return { created, blocked };
 }
 
+/** Lettre du foyer ; null si elle n'existe pas ou appartient à un autre foyer. */
 export function getLetter(db: Db, scope: Scope, id: number) {
   const row = findLetter(db, scope, id);
   if (!row) return null;
@@ -93,7 +102,34 @@ export function getLetter(db: Db, scope: Scope, id: number) {
 export function letterDocument(db: Db, scope: Scope, id: number) {
   const row = getLetter(db, scope, id);
   if (!row) return null;
-  const ins = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
+  const insurerRow = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
   const r = db.select({ targetYear: review.targetYear }).from(review).where(eq(review.id, row.reviewId)).get()!;
-  return { ...row, insurerName: insurerLabel(ins), targetYear: r.targetYear };
+  return { ...row, insurerName: insurerLabel(insurerRow), targetYear: r.targetYear };
+}
+
+// ───────────────────────── Suivi des courriers ─────────────────────────
+
+/** Supprime une lettre pas encore envoyée ; sans effet si elle est introuvable. */
+export function deleteLetter(db: Db, scope: Scope, letterId: number) {
+  const l = findLetter(db, scope, letterId);
+  if (!l) return;
+  if (l.sentAt) throw new UserError("Une lettre envoyée ne peut pas être supprimée.");
+  db.delete(letter).where(eq(letter.id, letterId)).run();
+}
+
+/** Lettre postée (date AAAA-MM-JJ, n° de suivi du recommandé facultatif) ; le compteur d'usage n'avance qu'une fois. */
+export function markLetterSent(db: Db, scope: Scope, letterId: number, sentAt: string, trackingNumber: string | null) {
+  const row = ownedLetter(db, scope, letterId);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sentAt)) throw new UserError("Date d'envoi au format AAAA-MM-JJ.");
+  if (trackingNumber && trackingNumber.length > 60) throw new UserError("Numéro de suivi trop long.");
+  db.transaction((tx) => {
+    tx.update(letter).set({ sentAt, trackingNumber }).where(eq(letter.id, letterId)).run();
+    if (!row.sentAt) bumpUsage(tx, "letters.sent");
+  });
+}
+
+/** Réception confirmée par la caisse à la date `at` ; null annule la confirmation. */
+export function markLetterAcknowledged(db: Db, scope: Scope, letterId: number, at: string | null) {
+  ownedLetter(db, scope, letterId);
+  db.update(letter).set({ acknowledgedAt: at }).where(eq(letter.id, letterId)).run();
 }

@@ -59,7 +59,7 @@ describe("migration vers plusieurs foyers", () => {
     expect(fs.readdirSync(path.join(dir, "backups"))).toHaveLength(1);
     const userId = primaryUserId(db)!;
     const scope = scopeForUser(db, userId)!;
-    expect(scope).toEqual({ userId, householdId: hid, householdRole: "OWNER", admin: true });
+    expect(scope).toEqual({ userId, householdId: hid, householdRole: "OWNER", isAdmin: true });
     expect(attemptLogin(db, userId, "ancien-mot-de-passe", NOW)).toEqual({ ok: true });
     // Sans courriel encore : connexion en laissant le champ vide ; Pingen reste ouvert à son foyer.
     expect(legacyAdminId(db)).toBe(userId);

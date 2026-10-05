@@ -18,11 +18,11 @@ import { ConfirmButton } from "@/ui/confirm-button";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
 import { SignupInviteForm } from "./signup-invite";
+import { formatTimestamp } from "@/domain/dates";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Administration" };
 
-const dateFmt = (iso: string) => new Date(iso).toLocaleDateString("fr-CH", { timeZone: "Europe/Zurich", day: "numeric", month: "short", year: "numeric" });
 
 /**
  * Administration de l'instance : chiffres d'usage, invitations, comptes, avis, Pingen par foyer.
@@ -30,7 +30,7 @@ const dateFmt = (iso: string) => new Date(iso).toLocaleDateString("fr-CH", { tim
  */
 export default async function AdminPage() {
   const scope = await pageScope();
-  if (!scope.admin) notFound();
+  if (!scope.isAdmin) notFound();
   const now = nowIso();
   const accounts = listAccounts(db(), scope);
   const invitations = listSignupInvitations(db(), scope);
@@ -99,7 +99,7 @@ export default async function AdminPage() {
                       <span className="min-w-0 flex-1">
                         <span className="block font-medium">{i.label || "Invitation"}</span>
                         <span className="text-muted">
-                          {i.uses}/{i.maxUses} utilisée{i.uses > 1 ? "s" : ""} · {i.revokedAt ? "révoquée" : i.expiresAt <= now ? "expirée" : `jusqu'au ${dateFmt(i.expiresAt)}`}
+                          {i.uses}/{i.maxUses} utilisée{i.uses > 1 ? "s" : ""} · {i.revokedAt ? "révoquée" : i.expiresAt <= now ? "expirée" : `jusqu'au ${formatTimestamp(i.expiresAt, "date")}`}
                         </span>
                       </span>
                       {active && (
@@ -126,8 +126,8 @@ export default async function AdminPage() {
                     {a.disabled && <Badge tone="increase">suspendu</Badge>}
                   </div>
                   <p className="text-sm text-muted">
-                    Créé le {dateFmt(a.createdAt)}
-                    {a.lastSeenAt ? ` · vu le ${dateFmt(a.lastSeenAt)}` : ""}
+                    Créé le {formatTimestamp(a.createdAt, "date")}
+                    {a.lastSeenAt ? ` · vu le ${formatTimestamp(a.lastSeenAt, "date")}` : ""}
                     {" · "}
                     {a.emailVerified ? "courriel confirmé" : "courriel non confirmé"}
                     {" · "}
@@ -174,7 +174,7 @@ export default async function AdminPage() {
                     <div className="flex flex-wrap items-center gap-2 text-sm">
                       <Badge tone={f.kind === "PROBLEM" ? "increase" : f.kind === "IDEA" ? "primary" : "neutral"}>{FEEDBACK_KINDS[f.kind]}</Badge>
                       <span className="text-muted">
-                        {dateFmt(f.createdAt)} · {f.email ?? "compte sans courriel"}
+                        {formatTimestamp(f.createdAt, "date")} · {f.email ?? "compte sans courriel"}
                         {f.page ? ` · depuis ${f.page}` : ""}
                       </span>
                     </div>

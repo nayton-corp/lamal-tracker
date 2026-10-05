@@ -1,11 +1,21 @@
+import { isOfficialUrl } from "../ofsp/source";
+
+/*
+ * Téléchargements depuis admin.ch pour les référentiels officiels, avec délai d'attente. Les liens
+ * sont lus sur des pages web : seuls les hôtes officiels en HTTPS sont suivis, redirections comprises.
+ */
+
 // admin.ch refuse les requêtes sans User-Agent de navigateur.
 const HEADERS = {
   "User-Agent": "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
   Accept: "*/*",
 };
 
+/** Corps de la réponse ; erreur si le statut HTTP n'est pas 2xx ou si `timeoutMs` est dépassé. */
 export async function fetchBuffer(url: string, timeoutMs = 120_000): Promise<Buffer> {
+  if (!isOfficialUrl(url)) throw new Error(`${url} : hôte non officiel, téléchargement refusé`);
   const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(timeoutMs) });
+  if (res.url && !isOfficialUrl(res.url)) throw new Error(`${url} : redirigé hors des hôtes officiels`);
   if (!res.ok) throw new Error(`${url} : HTTP ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }

@@ -8,7 +8,12 @@ import insurersData from "../reference/data/insurers.json";
 import supervisoryData from "../reference/data/supervisory.json";
 import type { DirectoryEntry } from "../reference/insurer-directory";
 import type { SupervisoryRow } from "../reference/supervisory";
-import { getSetting, setSetting } from "./settings";
+import { getSetting, setSetting, SETTING_KEYS } from "./settings";
+
+/*
+ * Référentiel de départ, appliqué à chaque ouverture de la base : caisses connues, paramètres
+ * légaux des années récentes, données officielles embarquées dans l'image (annuaire, surveillance, CO2).
+ */
 
 type SupervisoryTuple = [number, number, number, number, number | null, number | null, number | null];
 
@@ -52,13 +57,13 @@ export function seedReference(db: Db, currentYear: number) {
   });
 
   const bundled = `${insurersData.validFrom}|${supervisoryData.source}|${supervisoryData.rows.length}|${JSON.stringify([...officialCo2Table()])}`;
-  if (getSetting<string>(db, "reference.bundled") === bundled) return;
-  const local = getSetting<{ directory?: string | null }>(db, "reference.local");
+  if (getSetting<string>(db, SETTING_KEYS.referenceBundled) === bundled) return;
+  const local = getSetting<{ directory?: string | null }>(db, SETTING_KEYS.referenceLocal);
   // Un annuaire plus récent téléchargé par le Pi n'est pas remplacé par l'embarqué.
   if (!local?.directory || (insurersData.validFrom ?? "") >= local.directory) {
     applyDirectory(db, { validFrom: insurersData.validFrom, entries: insurersData.entries as DirectoryEntry[] });
   }
   applySupervisory(db, bundledSupervisory());
   applyCo2(db, officialCo2Table());
-  setSetting(db, "reference.bundled", bundled);
+  setSetting(db, SETTING_KEYS.referenceBundled, bundled);
 }

@@ -9,6 +9,12 @@ import { premium, tariff, tariffDataset } from "./schema";
 import { seedReference } from "./seed";
 import { sealLegacyData } from "../crypto/legacy";
 
+/*
+ * Ouverture de la base SQLite : réglages (WAL, clés étrangères, effacement sûr), copie avant
+ * migration, migrations Drizzle (dossier drizzle/), reprise des imports interrompus, chiffrement
+ * des anciennes données et référentiel de départ.
+ */
+
 export type Db = BetterSQLite3Database<typeof schema> & { $client: Database.Database };
 
 function migrationsFolder(): string {
@@ -30,6 +36,22 @@ function pendingMigrations(sqlite: Database.Database, folder: string): number {
 }
 
 const BACKUPS_KEPT = 5;
+/**
+ * Durée de vie d'une copie d'avant migration. Elle contient les comptes supprimés depuis : passé
+ * ce délai (le même que la sauvegarde continue), elle est effacée, comme annoncé dans la page de
+ * confidentialité.
+ */
+const BACKUP_MAX_AGE_DAYS = 30;
+
+/** Efface les copies d'avant migration de plus de `BACKUP_MAX_AGE_DAYS` jours. */
+export function pruneOldBackups(file: string, nowMs = Date.now()) {
+  const dir = path.join(path.dirname(file), "backups");
+  if (!fs.existsSync(dir)) return;
+  for (const n of fs.readdirSync(dir).filter((name) => /^lamal-.*\.db$/.test(name))) {
+    const full = path.join(dir, n);
+    if (nowMs - fs.statSync(full).mtimeMs > BACKUP_MAX_AGE_DAYS * 86_400_000) fs.rmSync(full, { force: true });
+  }
+}
 
 /**
  * Copie cohérente de la base dans `<dossier>/backups/` (VACUUM INTO, synchrone) avant une
@@ -69,6 +91,7 @@ export function openDb(file: string): Db {
   const onDisk = file !== ":memory:";
   if (onDisk) fs.mkdirSync(path.dirname(file), { recursive: true });
   const existed = onDisk && fs.existsSync(file);
+  if (onDisk) pruneOldBackups(file);
   const sqlite = new Database(file);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");

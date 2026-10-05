@@ -3,7 +3,12 @@ import webpush from "web-push";
 import { z } from "zod";
 import type { Db } from "../db/client";
 import { householdMember, notificationLog, pushSubscription } from "../db/schema";
-import { getSetting, setSetting } from "../db/settings";
+import { getSetting, setSetting, SETTING_KEYS } from "../db/settings";
+
+/*
+ * Notifications push (Web Push, clés VAPID) : abonnements des appareils par compte, envoi à un
+ * compte, à un foyer ou à tous, dédoublonné par `notification_log`.
+ */
 
 interface Vapid {
   publicKey: string;
@@ -12,10 +17,10 @@ interface Vapid {
 
 /** Clés VAPID générées au premier besoin et conservées en base. */
 export function vapidKeys(db: Db): Vapid {
-  let keys = getSetting<Vapid>(db, "push.vapid");
+  let keys = getSetting<Vapid>(db, SETTING_KEYS.pushVapid);
   if (!keys) {
     keys = webpush.generateVAPIDKeys();
-    setSetting(db, "push.vapid", keys);
+    setSetting(db, SETTING_KEYS.pushVapid, keys);
   }
   return keys;
 }
@@ -32,6 +37,7 @@ const PUSH_HOSTS = [
   /\.push\.services\.mozilla\.com$/,
 ];
 
+/** Adresse HTTPS d'un service push connu (voir `PUSH_HOSTS`). */
 export function isPushEndpoint(endpoint: string): boolean {
   let url: URL;
   try {
@@ -67,6 +73,7 @@ export function saveSubscription(db: Db, userId: number, sub: PushSubscriptionIn
     .run();
 }
 
+/** Désabonne un appareil, seulement s'il appartient à ce compte. */
 export function removeSubscription(db: Db, userId: number, endpoint: string) {
   db.delete(pushSubscription).where(and(eq(pushSubscription.userId, userId), eq(pushSubscription.endpoint, endpoint))).run();
 }
@@ -122,7 +129,7 @@ export async function notify(db: Db, audience: Audience, msg: PushMessage, dedup
   return sent;
 }
 
-/** Clé de dédoublonnage propre à un foyer. */
-export function householdKey(householdId: number, key: string): string {
+/** Clé de dédoublonnage (journal des notifications) propre à un foyer : « h<id>:<clé> ». */
+export function householdNotificationKey(householdId: number, key: string): string {
   return `h${householdId}:${key}`;
 }

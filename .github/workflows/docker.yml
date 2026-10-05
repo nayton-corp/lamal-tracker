@@ -17,7 +17,13 @@ permissions:
 
 jobs:
   image:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # Sur workflow_run, seulement une CI réussie sur un push de main dans ce dépôt : le filtre
+    # `branches` porte sur le nom de branche, qu'une PR venue d'un fork peut aussi appeler « main ».
+    if: >-
+      github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,3 +54,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Étape finale toujours reconstruite : les correctifs Debian du jour (apt-get upgrade) ne
+          # doivent pas venir d'un cache figé.
+          no-cache-filters: runtime

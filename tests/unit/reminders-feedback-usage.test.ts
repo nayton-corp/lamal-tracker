@@ -10,7 +10,7 @@ import { deleteAccountData, exportData } from "@/application/data-rights";
 import { FEEDBACK_PER_DAY, listFeedback, markFeedback, sendFeedback } from "@/application/feedback";
 import { createSignupInvitation } from "@/application/invitations";
 import { paperProgress, reminderTick } from "@/application/reminders";
-import { markLetterSent } from "@/application/review";
+import { markLetterSent } from "@/application/letters";
 import { scopeForUser, type Scope } from "@/application/scope";
 import { usageSummary } from "@/application/usage";
 import type { Reminder } from "@/domain/reminders";

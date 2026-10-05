@@ -4,15 +4,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { saveInsurer } from "@/application/household";
-import { UserError } from "@/application/review";
+import { UserError } from "@/application/errors";
 import { resetCo2, resetInsurerAddress, saveCo2 } from "@/application/reference-data";
 import { refreshReference } from "@/server/reference";
 import { saveSubscription, removeSubscription, notify, pushSubscriptionSchema } from "@/infrastructure/push/push";
 import { chfField, toActionError, type ActionState } from "@/server/action";
-import { db, nowIso, today } from "@/server/context";
+import { currentYear, db, nowIso } from "@/server/context";
 import { dataDir, importJob, startArchivesImport, startImport, startYearImport } from "@/server/jobs";
 import { checkForNewPremiums } from "@/server/watch";
 import { requireAdminScope, requireScope } from "@/server/auth";
+import { rateLimit } from "@/server/accounts";
+import { FIRST_PREMIUM_YEAR } from "@/domain/lamal";
+import { MIN_ARCHIVE_YEAR } from "@/infrastructure/ofsp/source";
 
 export async function checkPremiumsAction(): Promise<ActionState> {
   await requireAdminScope();
@@ -28,9 +31,15 @@ export async function checkPremiumsAction(): Promise<ActionState> {
  * un contrat. Ouvert à tout compte : ce sont des données publiques, un seul import tourne à la fois.
  */
 export async function importYearAction(year: number): Promise<ActionState> {
-  await requireScope();
-  const current = Number(today().slice(0, 4));
-  if (!Number.isInteger(year) || year < 2010 || year > current + 1) return { error: "Année invalide." };
+  const scope = await requireScope();
+  const current = currentYear();
+  if (!Number.isInteger(year) || year < FIRST_PREMIUM_YEAR || year > current + 1) return { error: "Année invalide." };
+  if (year < MIN_ARCHIVE_YEAR) return { error: `Primes officielles disponibles dès ${MIN_ARCHIVE_YEAR} seulement.` };
+  try {
+    rateLimit([`import-year:${scope.userId}`], 3, 60);
+  } catch (e) {
+    return toActionError(e);
+  }
   return startYearImport(year) ? { ok: `Import des primes ${year} lancé.` } : { error: "Un import est déjà en cours." };
 }
 
@@ -39,8 +48,8 @@ export async function importArchivesAction(): Promise<ActionState> {
   return startArchivesImport() ? { ok: "Import des archives lancé." } : { error: "Un import est déjà en cours." };
 }
 
-/** Un fichier de primes OFSP complet pèse quelques dizaines de Mo ; au-delà, ce n'est pas lui. */
-const MAX_UPLOAD_BYTES = 60 * 1024 * 1024;
+/** Un fichier de primes OFSP complet pèse ≈ 20 Mo ; au-delà, ce n'est pas lui (voir next.config.ts). */
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export async function uploadPremiumsAction(_: ActionState, form: FormData): Promise<ActionState> {
   await requireAdminScope();
@@ -48,7 +57,7 @@ export async function uploadPremiumsAction(_: ActionState, form: FormData): Prom
     const file = form.get("file");
     if (!(file instanceof File) || file.size === 0) throw new UserError("Choisissez un fichier .xlsx ou .csv.");
     if (!/\.(xlsx|csv|zip)$/i.test(file.name)) throw new UserError("Format attendu : .xlsx, .csv ou archive .zip de l'OFSP.");
-    if (file.size > MAX_UPLOAD_BYTES) throw new UserError("Fichier trop volumineux (60 Mo au maximum).");
+    if (file.size > MAX_UPLOAD_BYTES) throw new UserError("Fichier trop volumineux (25 Mo au maximum).");
     if (importJob().running) throw new UserError("Un import est déjà en cours.");
     const dir = path.join(dataDir(), "uploads");
     fs.mkdirSync(dir, { recursive: true });

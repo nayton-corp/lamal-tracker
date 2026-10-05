@@ -3,8 +3,8 @@ import Link from "next/link";
 import { chooseModeAction } from "@/app/actions/journey";
 import { getHousehold, listInsurers, listPersons, listPolicies } from "@/application/household";
 import { formatDateShort } from "@/domain/dates";
-import { insurerLabel } from "@/infrastructure/db/queries";
-import { db, today } from "@/server/context";
+import { insurerLabel } from "@/domain/insurer";
+import { currentYear, db } from "@/server/context";
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
@@ -12,6 +12,7 @@ import { Page } from "@/ui/page";
 import { ContractsStep, IdentityStep, MemberAdder } from "./steps";
 import { pageScope } from "@/server/auth";
 import { chosenMode } from "@/server/onboarding";
+import { selectableYears } from "@/domain/lamal";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bienvenue" };
@@ -37,11 +38,11 @@ const FAMILY_STEPS: { key: StepKey; label: string }[] = [
 export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ etape?: string }> }) {
   const scope = await pageScope();
   const asked = (await searchParams).etape as StepKey | undefined;
-  const h = getHousehold(db(), scope);
+  const householdRow = getHousehold(db(), scope);
   const mode = await chosenMode(scope);
   const solo = mode === "SOLO";
-  const year = Number(today().slice(0, 4));
-  const persons = h ? listPersons(db(), h.id) : [];
+  const year = currentYear();
+  const persons = householdRow ? listPersons(db(), householdRow.id) : [];
   const withContracts = persons.map((p) => {
     const current = listPolicies(db(), p.id).find((x) => x.policy.coverageYear === year);
     return {
@@ -56,8 +57,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   const steps = solo ? SOLO_STEPS : FAMILY_STEPS;
   const done: Record<StepKey, boolean> = {
     structure: mode !== null,
-    vous: Boolean(h) && persons.length > 0,
-    adresse: Boolean(h),
+    vous: Boolean(householdRow) && persons.length > 0,
+    adresse: Boolean(householdRow),
     membres: persons.length > 0,
     contrats: persons.length > 0 && withContracts.every((p) => p.contract),
   };
@@ -68,7 +69,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   const insurers = listInsurers(db())
     .map((i) => ({ id: i.id, name: insurerLabel(i) }))
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  const years = Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i);
+  const years = selectableYears(year);
   const first = persons[0];
 
   return (
@@ -104,7 +105,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
 
       {(step === "vous" || step === "adresse") && (
         <IdentityStep
-          household={h}
+          household={householdRow}
           person={solo ? (first ? { firstName: first.firstName, lastName: first.lastName, birthDate: first.birthDate } : null) : undefined}
           insurers={insurers}
           years={years}

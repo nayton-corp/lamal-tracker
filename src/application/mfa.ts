@@ -1,18 +1,18 @@
-import { randomBytes } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { and, count, eq, gt, isNull } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
 import { appUser, auditEvent, passkey, recoveryCode } from "@/infrastructure/db/schema";
 import { totpContext } from "@/infrastructure/crypto/legacy";
 import { openSecret, sealSecret } from "@/infrastructure/crypto/vault";
 import { audit } from "./audit";
-import { verifyPassword } from "./auth";
+import { requirePassword } from "./auth";
 import { UserError } from "./errors";
 import { consumeToken, countAttempt, digest, issueToken, peekToken } from "./tokens";
 import { newTotpSecret, totpUri, verifyTotp } from "./totp";
 
 /*
  * Double facteur : code à 6 chiffres d'une application d'authentification (TOTP), et dix codes de
- * secours à usage unique remis à l'activation. À la connexion, le mot de passe correct ouvre une
+ * secours à usage unique (16 caractères) remis à l'activation. À la connexion, le mot de passe correct ouvre une
  * étape d'attente de 5 minutes, limitée à 5 essais, avant la session. Le secret TOTP est gardé
  * chiffré par la clé maître, y compris pendant l'activation.
  */
@@ -32,12 +32,22 @@ const MAX_CODE_ATTEMPTS = 5;
 export const MAX_FACTOR_FAILURES_PER_DAY = 10;
 const RECOVERY_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
+/** 16 caractères parmi 31 ≈ 79 bits : impossible à deviner, même avec l'empreinte en main. */
+const RECOVERY_LENGTH = 16;
+/** Ancien format (10 caractères), encore accepté jusqu'à la prochaine régénération des codes. */
+const LEGACY_RECOVERY_LENGTH = 10;
+
 const normalizeRecovery = (code: string) => code.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+/** Empreinte d'un code de secours, propre au compte (deux comptes n'ont jamais la même). */
+function recoveryHash(userId: number, normalized: string): string {
+  return normalized.length === LEGACY_RECOVERY_LENGTH ? digest(normalized) : digest(`${userId}:${normalized}`);
+}
+
+/** « abcd-efgh-jkmn-pqrs » : tirage uniforme (randomInt, sans biais de modulo). */
 function newRecoveryCode(): string {
-  const bytes = randomBytes(10);
-  const chars = [...bytes].map((b) => RECOVERY_ALPHABET[b % RECOVERY_ALPHABET.length]).join("");
-  return `${chars.slice(0, 5)}-${chars.slice(5)}`;
+  const chars = Array.from({ length: RECOVERY_LENGTH }, () => RECOVERY_ALPHABET[randomInt(RECOVERY_ALPHABET.length)]).join("");
+  return chars.match(/.{4}/g)!.join("-");
 }
 
 function userRow(db: Db, userId: number) {
@@ -51,7 +61,7 @@ function replaceRecoveryCodes(db: Db, userId: number): string[] {
   const codes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode);
   db.transaction((tx) => {
     tx.delete(recoveryCode).where(eq(recoveryCode.userId, userId)).run();
-    for (const code of codes) tx.insert(recoveryCode).values({ userId, codeHash: digest(normalizeRecovery(code)) }).run();
+    for (const code of codes) tx.insert(recoveryCode).values({ userId, codeHash: recoveryHash(userId, normalizeRecovery(code)) }).run();
   });
   return codes;
 }
@@ -64,19 +74,10 @@ export function recoveryCodesLeft(db: Db, userId: number): number {
 export function startTotpSetup(db: Db, userId: number, password: string, nowIso: string): { token: string; secret: string; uri: string } {
   const user = userRow(db, userId);
   if (user.totpEnabledAt) throw new UserError("Le double facteur est déjà actif.");
-  if (!verifyPassword(db, userId, password)) throw new UserError("Mot de passe incorrect.");
+  requirePassword(db, userId, password, nowIso);
   const secret = newTotpSecret();
   const token = issueToken(db, { userId, kind: "TOTP_SETUP", ttlMs: SETUP_MINUTES * 60_000, data: { secret: sealSecret(db, secret, setupContext(userId)) } }, nowIso);
   return { token, secret, uri: totpUri(secret, user.email ?? "administrateur") };
-}
-
-/** Secret provisoire encore valable (page d'activation rechargée). */
-export function pendingTotpSetup(db: Db, userId: number, token: string | undefined, nowIso: string): { secret: string; uri: string } | null {
-  const row = peekToken(db, "TOTP_SETUP", token, nowIso);
-  if (!row || row.userId !== userId) return null;
-  const secret = setupSecret(db, userId, row.data);
-  if (!secret) return null;
-  return { secret, uri: totpUri(secret, userRow(db, userId).email ?? "administrateur") };
 }
 
 /** Le premier code juste active le double facteur ; renvoie les codes de secours à noter. */
@@ -95,17 +96,19 @@ export function confirmTotpSetup(db: Db, userId: number, token: string | undefin
   return replaceRecoveryCodes(db, userId);
 }
 
+/** Remplace tous les codes de secours (les anciens ne valent plus rien) ; mot de passe exigé. */
 export function regenerateRecoveryCodes(db: Db, userId: number, password: string, nowIso: string): string[] {
   if (!userRow(db, userId).totpEnabledAt) throw new UserError("Activez d'abord le double facteur.");
-  if (!verifyPassword(db, userId, password)) throw new UserError("Mot de passe incorrect.");
+  requirePassword(db, userId, password, nowIso);
   audit(db, userId, "RECOVERY_REGENERATED", { nowIso });
   return replaceRecoveryCodes(db, userId);
 }
 
+/** Désactive le double facteur et efface les codes de secours ; refusé à un administrateur sans passkey. */
 export function disableTotp(db: Db, userId: number, password: string, nowIso: string) {
   const user = userRow(db, userId);
   if (!user.totpEnabledAt) return;
-  if (!verifyPassword(db, userId, password)) throw new UserError("Mot de passe incorrect.");
+  requirePassword(db, userId, password, nowIso);
   const hasPasskey = db.select({ id: passkey.id }).from(passkey).where(eq(passkey.userId, userId)).limit(1).get();
   if (user.role === "ADMIN" && !hasPasskey) throw new UserError("L'administrateur doit garder un second facteur : ajoutez d'abord une passkey.");
   db.transaction((tx) => {
@@ -127,11 +130,11 @@ export function verifySecondFactor(db: Db, userId: number, code: string, nowMs: 
     return true;
   }
   const normalized = normalizeRecovery(code);
-  if (normalized.length !== 10) return false;
+  if (normalized.length !== RECOVERY_LENGTH && normalized.length !== LEGACY_RECOVERY_LENGTH) return false;
   const used = db
     .update(recoveryCode)
     .set({ usedAt: nowIso })
-    .where(and(eq(recoveryCode.userId, userId), eq(recoveryCode.codeHash, digest(normalized)), isNull(recoveryCode.usedAt)))
+    .where(and(eq(recoveryCode.userId, userId), eq(recoveryCode.codeHash, recoveryHash(userId, normalized)), isNull(recoveryCode.usedAt)))
     .run();
   if (used.changes !== 1) return false;
   audit(db, userId, "RECOVERY_USED", { nowIso });
@@ -168,12 +171,14 @@ export function startMfaLogin(db: Db, userId: number, nowIso: string): string {
   return issueToken(db, { userId, kind: "LOGIN_MFA", ttlMs: LOGIN_MINUTES * 60_000 }, nowIso);
 }
 
+/** Une connexion attend-elle son code de double facteur (jeton du cookie encore valable) ? */
 export function pendingMfaLogin(db: Db, token: string | undefined, nowIso: string): boolean {
   return peekToken(db, "LOGIN_MFA", token, nowIso) !== null;
 }
 
 export type MfaOutcome = { ok: true; userId: number } | { ok: false; error: string; restart: boolean };
 
+/** Seconde étape de la connexion. `restart` : le jeton est perdu (expiré, bloqué, trop d'essais), retour au mot de passe. */
 export function finishMfaLogin(db: Db, token: string | undefined, code: string, nowMs: number, nowIso: string): MfaOutcome {
   const row = peekToken(db, "LOGIN_MFA", token, nowIso);
   if (!row?.userId) return { ok: false, error: "Étape expirée : reconnectez-vous.", restart: true };

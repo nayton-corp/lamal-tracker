@@ -86,10 +86,14 @@ jobs:
           tags: lamal-tracker:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Étape finale toujours reconstruite : les correctifs Debian du jour (apt-get upgrade) ne
+          # doivent pas venir d'un cache figé.
+          no-cache-filters: runtime
+      # Deux sources pour la base de failles : si le miroir est incomplet, la seconde prend le relais.
       - name: Scan Trivy
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.67.2 image \
-            --db-repository mirror.gcr.io/aquasec/trivy-db --skip-java-db-update --scanners vuln \
+            --db-repository mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db --skip-java-db-update --scanners vuln \
             --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 lamal-tracker:ci
       - name: Conteneur en lecture seule, utilisateur non root
         run: |

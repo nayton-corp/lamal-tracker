@@ -5,9 +5,9 @@ import { deleteLcaAction, deletePersonAction, deletePolicyAction } from "@/app/a
 import { getPerson, listInsurers, listLca, listPolicies } from "@/application/household";
 import { activeReview } from "@/application/review";
 import { ageClassForYear } from "@/domain/age";
-import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal";
-import { insurerLabel } from "@/infrastructure/db/queries";
-import { db, today } from "@/server/context";
+import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType, selectableYears } from "@/domain/lamal";
+import { insurerLabel } from "@/domain/insurer";
+import { currentYear, db } from "@/server/context";
 import { Badge } from "@/ui/badge";
 import { ConfirmButton } from "@/ui/confirm-button";
 import { Card, Section } from "@/ui/card";
@@ -26,14 +26,13 @@ export default async function PersonPage({ params, searchParams }: { params: Pro
   const back = (await searchParams).retour === "bienvenue" ? "/bienvenue?etape=membres" : "/foyer";
   const p = getPerson(db(), scope, Number(id));
   if (!p) notFound();
-  const year = Number(today().slice(0, 4));
+  const year = currentYear();
   const allInsurers = listInsurers(db());
   const insurers = allInsurers.map((i) => ({ id: i.id, name: insurerLabel(i) }));
   const lcaInsurers = allInsurers.map((i) => ({ id: i.id, name: insurerLabel(i), lcaName: suggestedLcaInsurer({ name: insurerLabel(i), groupName: i.groupName }) }));
   const policies = listPolicies(db(), p.id).reverse();
   const lca = listLca(db(), p.id);
-  // Contrats saisissables de 2010 à l'année prochaine (historique personnel).
-  const years = Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i);
+  const years = selectableYears(year);
   const lamalInsurerId = policies[0]?.policy.insurerId ?? null;
   const hasCurrent = policies.some((x) => x.policy.coverageYear === year);
   const openReview = activeReview(db(), scope);

@@ -22,6 +22,7 @@ export function verifyEmailMail(to: string, link: string): Mail {
   };
 }
 
+/** Envoyé à la place de la confirmation quand l'adresse a déjà un compte : l'inscription ne révèle pas qui est inscrit. */
 export function alreadyRegisteredMail(to: string, loginUrl: string, resetUrl: string): Mail {
   return {
     to,
@@ -46,11 +47,21 @@ export function passwordResetDoneMail(to: string): Mail {
   };
 }
 
+/** Alerte de connexion depuis un appareil inconnu (sans cookie d'appareil connu). */
 export function newDeviceMail(to: string, device: string, when: string): Mail {
   return {
     to,
     subject: "Nouvelle connexion à votre compte",
     text: `Bonjour,\n\nUne connexion à votre compte Primes LAMal a eu lieu depuis un nouvel appareil :\n\n${device}, le ${when}\n\nSi c'est vous, il n'y a rien à faire. Sinon, changez votre mot de passe et déconnectez les autres appareils dans « Mon compte ».${SIGNATURE}`,
+  };
+}
+
+/** Changement de sécurité sur le compte (mot de passe, facteur, adresse) : la personne doit le savoir. */
+export function securityChangeMail(to: string, what: string, when: string): Mail {
+  return {
+    to,
+    subject: "Changement de sécurité sur votre compte",
+    text: `Bonjour,\n\n${what} (${when}).\n\nSi c'est vous, il n'y a rien à faire. Sinon, réinitialisez votre mot de passe (« Mot de passe oublié ») et prévenez l'administrateur.${SIGNATURE}`,
   };
 }
 

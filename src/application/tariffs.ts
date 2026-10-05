@@ -8,6 +8,11 @@ import { premium, tariff } from "@/infrastructure/db/schema";
 import { getHousehold, getPerson } from "./household";
 import type { Scope } from "./scope";
 
+/*
+ * Tarifs officiels d'une caisse, pour pré-remplir la saisie d'un contrat (franchise, modèle,
+ * prime avec ou sans accident) au lieu de tout retaper.
+ */
+
 export interface TariffOption {
   code: string;
   label: string;
@@ -25,11 +30,11 @@ export interface TariffOptions {
 /** Tarifs d'un assureur pour une personne et une année, pour pré-remplir un contrat. */
 export function tariffOptions(db: Db, scope: Scope, personId: number, year: number, insurerId: number): TariffOptions {
   const p = getPerson(db, scope, personId);
-  const h = getHousehold(db, scope);
+  const householdRow = getHousehold(db, scope);
   const ageClass = p ? ageClassForYear(p.birthDate, year) : "ADULT";
   const franchises = franchisesFor(parametersFor(db, year), ageClass);
   const ds = activeDataset(db, year);
-  if (!p || !h || !ds) return { available: false, franchises, tariffs: [] };
+  if (!p || !householdRow || !ds) return { available: false, franchises, tariffs: [] };
   const subgroup = ageClass === "KID" ? p.kidSubgroup : defaultSubgroup(ageClass);
   const rows = db
     .select({ code: tariff.code, label: tariff.label, modelType: tariff.modelType, franchise: premium.franchiseChf, accident: premium.accident, monthly: premium.monthlyRp })
@@ -39,8 +44,8 @@ export function tariffOptions(db: Db, scope: Scope, personId: number, year: numb
       and(
         eq(premium.datasetId, ds.id),
         eq(tariff.insurerId, insurerId),
-        eq(premium.canton, h.canton),
-        eq(premium.region, h.region),
+        eq(premium.canton, householdRow.canton),
+        eq(premium.region, householdRow.region),
         eq(premium.ageClass, ageClass),
         eq(premium.subgroup, subgroup),
       ),

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { reviewDeadlines } from "./deadlines";
-import { paperReminders, type PaperProgress } from "./reminders";
+import { letterReminders, type LetterProgress } from "./reminders";
 
 // Rituel 2027 : réception au lundi 30 novembre 2026, envoi conseillé au lundi 23 novembre.
 const d = reviewDeadlines(2027);
-const base: PaperProgress = { closed: false, persons: 2, keeping: 0, letters: 0, lettersSent: 0, awaiting: [] };
-const on = (today: string, p: Partial<PaperProgress> = {}) => paperReminders(today, 2027, d, { ...base, ...p });
+const base: LetterProgress = { closed: false, persons: 2, keeping: 0, letters: 0, lettersSent: 0, awaiting: [] };
+const on = (today: string, p: Partial<LetterProgress> = {}) => letterReminders(today, 2027, d, { ...base, ...p });
 
 describe("rappels d'envoi des courriers", () => {
   it("rien de préparé : rappel général, par courriel seulement à J-7 et J-1", () => {

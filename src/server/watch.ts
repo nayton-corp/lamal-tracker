@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { opsTick } from "@/application/ops";
 import { reminderTick } from "@/application/reminders";
-import { getSetting, setSetting } from "@/infrastructure/db/settings";
-import { householdKey, notify } from "@/infrastructure/push/push";
+import { getSetting, setSetting, SETTING_KEYS } from "@/infrastructure/db/settings";
+import { householdNotificationKey, notify } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
 import { yearAttemptKey, yearRetryDue } from "@/infrastructure/ofsp/retry";
 import { activeDataset } from "@/infrastructure/db/queries";
@@ -12,11 +12,16 @@ import { purgeAudit } from "@/application/audit";
 import { purgeExpiredTokens } from "@/application/tokens";
 import { inactivityTick } from "@/application/data-rights";
 import { mailDeps } from "./accounts";
-import { db, nowIso, ritualYear, today } from "./context";
+import { currentYear, db, nowIso, reviewTargetYear, today } from "./context";
 import { pingenTick } from "./pingen";
 import { referenceTick } from "./reference";
 import { importJob, startBootstrapImport, startImport, startYearImport } from "./jobs";
 import { latestActiveYear } from "@/infrastructure/db/queries";
+
+/*
+ * Planificateur, appelé chaque heure par instrumentation.ts : publications et imports OFSP,
+ * référentiels, rappels du rituel, suivi Pingen, comptes inactifs, alertes et ménage.
+ */
 
 /**
  * Vérifie si l'OFSP a publié un nouveau fichier (signature HTTP), et l'importe si oui.
@@ -30,17 +35,17 @@ export async function checkForNewPremiums(force = false): Promise<string> {
   } catch (error) {
     if (!force) throw error;
   }
-  const previous = getSetting<RemoteSignature>(db(), "ofsp.signature");
+  const previous = getSetting<RemoteSignature>(db(), SETTING_KEYS.ofspSignature);
   const changed = !previous || !sig || previous.etag !== sig.etag || previous.lastModified !== sig.lastModified || previous.length !== sig.length || previous.url !== sig.url;
   if (!changed && !force) {
-    setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), url, ok: true });
+    setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), url, ok: true });
     return "Aucune nouvelle publication.";
   }
 
   const started = startImport({ kind: "download", url }, async (outcome) => {
     // Signature mémorisée seulement si le fichier a été pris en compte : un import refusé
     // (FAILED) sera retenté au prochain contrôle sans attendre une nouvelle publication.
-    if (sig && (outcome.status === "IMPORTED" || outcome.status === "ALREADY")) setSetting(db(), "ofsp.signature", sig);
+    if (sig && (outcome.status === "IMPORTED" || outcome.status === "ALREADY")) setSetting(db(), SETTING_KEYS.ofspSignature, sig);
     if (outcome.status === "IMPORTED" && outcome.report.year) {
       const year = outcome.report.year;
       await notify(
@@ -52,7 +57,7 @@ export async function checkForNewPremiums(force = false): Promise<string> {
     }
   });
   // Le contrôle ne compte que si l'import a pu démarrer ; sinon on réessaie à la prochaine passe.
-  if (started) setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), url, ok: Boolean(sig) });
+  if (started) setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), url, ok: Boolean(sig) });
   return started ? "Import lancé." : "Un import est déjà en cours.";
 }
 
@@ -61,12 +66,12 @@ export async function checkForNewPremiums(force = false): Promise<string> {
  * relances quand une caisse tarde à confirmer.
  */
 export async function sendDeadlineReminders(): Promise<void> {
-  const year = ritualYear();
+  const year = reviewTargetYear();
   if (!activeDataset(db(), year)) return;
   await reminderTick(
     db(),
     {
-      push: (householdId, r) => notify(db(), { householdId }, { title: r.title, body: r.body, url: r.url }, householdKey(householdId, r.key)),
+      push: (householdId, r) => notify(db(), { householdId }, { title: r.title, body: r.body, url: r.url }, householdNotificationKey(householdId, r.key)),
       mail: mailDeps(),
     },
     today(),
@@ -85,10 +90,10 @@ function inPublicationSeason(iso: string): boolean {
  */
 function ensureBaseDatasets(): boolean {
   if (process.env.OFSP_AUTO_CHECK === "false" || importJob().running) return false;
-  const year = Number(today().slice(0, 4));
+  const year = currentYear();
   if (latestActiveYear(db()) === null) {
     return startBootstrapImport(year, async (outcome) => {
-      if (outcome.status === "IMPORTED") setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), ok: true });
+      if (outcome.status === "IMPORTED") setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), ok: true });
     });
   }
   if (!activeDataset(db(), year)) {
@@ -101,53 +106,54 @@ function ensureBaseDatasets(): boolean {
   return false;
 }
 
-/** Une passe du planificateur : en saison, contrôle quotidien ; sinon hebdomadaire. */
-export async function schedulerTick(): Promise<void> {
+/** Une passe du planificateur (contrôle OFSP quotidien en saison, hebdomadaire sinon) ; renvoie les tâches en échec. */
+export async function schedulerTick(): Promise<string[]> {
   if (ensureBaseDatasets()) {
     console.log("[watch] import initial des primes lancé");
-    return;
+    return [];
   }
-  const last = getSetting<{ at: string }>(db(), "ofsp.lastCheck");
+  // Chaque tâche est isolée : une erreur est journalisée, n'empêche pas les suivantes, et fait
+  // envoyer un signal d'échec au service de surveillance (voir pingHeartbeat).
+  const failed: string[] = [];
+  const task = async (name: string, run: () => Promise<unknown> | unknown) => {
+    try {
+      await run();
+    } catch (error) {
+      failed.push(name);
+      console.error(`[watch] ${name} :`, error instanceof Error ? error.message : error);
+    }
+  };
+
+  const last = getSetting<{ at: string }>(db(), SETTING_KEYS.ofspLastCheck);
   const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
   const every = inPublicationSeason(today()) ? 20 : 24 * 7;
   if (process.env.OFSP_AUTO_CHECK !== "false" && ageH >= every) {
-    try {
-      console.log("[watch]", await checkForNewPremiums());
-    } catch (error) {
-      console.error("[watch] contrôle OFSP impossible :", error instanceof Error ? error.message : error);
-      setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), ok: false });
-    }
+    await task("contrôle OFSP", async () => {
+      try {
+        console.log("[watch]", await checkForNewPremiums());
+      } catch (error) {
+        setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), ok: false });
+        throw error;
+      }
+    });
   }
-  try {
-    await referenceTick();
-  } catch (error) {
-    console.error("[watch] référentiels", error);
-  }
-  try {
-    await sendDeadlineReminders();
-  } catch (error) {
-    console.error("[watch] rappels", error);
-  }
-  try {
-    await pingenTick();
-  } catch (error) {
-    console.error("[watch] suivi Pingen", error);
-  }
-  try {
+  await task("référentiels", referenceTick);
+  await task("rappels", sendDeadlineReminders);
+  await task("suivi Pingen", pingenTick);
+  await task("comptes inactifs", async () => {
     const { notified, deleted } = await inactivityTick(db(), mailDeps(), nowIso());
     if (notified || deleted) console.log(`[watch] comptes inactifs : ${notified} rappel(s), ${deleted} suppression(s)`);
-  } catch (error) {
-    console.error("[watch] comptes inactifs", error instanceof Error ? error.message : error);
-  }
-  try {
+  });
+  await task("alertes", async () => {
     const sent = await opsTick(db(), { mail: mailDeps(), disk: dataDisk }, nowIso());
     if (sent.length) console.warn(`[watch] alertes d'exploitation envoyées : ${sent.join(", ")}`);
-  } catch (error) {
-    console.error("[watch] alertes", error instanceof Error ? error.message : error);
-  }
+  });
   // Ménage : jetons expirés, journal de sécurité de plus de 12 mois.
-  purgeExpiredTokens(db(), nowIso());
-  purgeAudit(db(), nowIso());
+  await task("ménage", () => {
+    purgeExpiredTokens(db(), nowIso());
+    purgeAudit(db(), nowIso());
+  });
+  return failed;
 }
 
 /** Espace libre du volume qui contient la base. */

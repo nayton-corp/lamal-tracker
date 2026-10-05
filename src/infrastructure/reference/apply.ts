@@ -5,11 +5,18 @@ import co2Data from "./data/co2.json";
 import type { DirectoryEntry } from "./insurer-directory";
 import type { SupervisoryRow } from "./supervisory";
 
+/*
+ * Écriture en base des référentiels officiels (annuaire des caisses, données de surveillance, CO2),
+ * qu'ils viennent de l'image (seed.ts) ou d'une mise à jour en ligne (server/reference.ts). Ce que
+ * l'utilisateur a saisi n'est jamais écrasé.
+ */
+
 /** Redistribution CO2 officielle d'une année (référentiel embarqué), en centimes par personne et par an. */
 export function officialCo2(year: number): number | null {
   return (co2Data.amountsRp as Record<string, number>)[String(year)] ?? null;
 }
 
+/** Tous les montants CO2 embarqués, par année (centimes par personne et par an). */
 export function officialCo2Table(): Map<number, number> {
   return new Map(Object.entries(co2Data.amountsRp as Record<string, number>).map(([y, rp]) => [Number(y), rp]));
 }
@@ -48,6 +55,7 @@ export function applyDirectory(db: Db, dir: { validFrom: string | null; entries:
   return changed;
 }
 
+/** Enregistre (ou remplace) les indicateurs par caisse et par année ; renvoie le nombre de lignes. */
 export function applySupervisory(db: Db, rows: readonly SupervisoryRow[]): number {
   db.transaction((tx) => {
     for (const r of rows) {
