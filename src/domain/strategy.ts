@@ -1,5 +1,5 @@
 import type { RankedOffer } from "./comparison";
-import type { Level, TrendLevel } from "./insurer-profile";
+import type { TercileLevel, TrendLevel } from "./insurer-profile";
 import type { ModelType } from "./lamal";
 import type { Rappen } from "./money";
 
@@ -41,13 +41,13 @@ export const STRATEGY_INFO: Record<Strategy, StrategyInfo> = {
   },
 };
 
-export interface CurrentContract {
+export interface StrategyBaseline {
   modelType: ModelType;
   franchiseChf: number;
 }
 
 /** Réglages proposés d'office pour une stratégie (la personne peut les modifier ensuite). */
-export function strategyDefaults(strategy: Strategy, current: CurrentContract): { franchiseChf: number | null; models: ModelType[] | null } {
+export function strategyDefaults(strategy: Strategy, current: StrategyBaseline): { franchiseChf: number | null; models: ModelType[] | null } {
   switch (strategy) {
     case "KEEP":
       return { franchiseChf: current.franchiseChf, models: [current.modelType] };
@@ -59,8 +59,8 @@ export function strategyDefaults(strategy: Strategy, current: CurrentContract): 
 }
 
 export interface QualitySignals {
-  reservesLevel: Level | null;
-  adminLevel: Level | null;
+  reservesLevel: TercileLevel | null;
+  adminLevel: TercileLevel | null;
   trendLevel: TrendLevel | null;
 }
 

@@ -14,21 +14,21 @@ import { insurerAddressLines, insurerLabel, offersFor, parametersFor } from "@/i
 import { insurer, lamalPolicy, lcaPolicy, letter, person, review, reviewLine } from "@/infrastructure/db/schema";
 import { findLine, ownedReview, type Scope } from "../scope";
 import { ritualSteps, type RitualStep } from "@/domain/ritual-steps";
-import { type LineRow, type PersonRow, type PolicyRow, offerScope } from "./lines";
+import { type LineRow, type PersonRow, type PolicyRow, premiumProfileFor } from "./lines";
 
 // ───────────────────────── Vue de la revue ─────────────────────────
 
-export interface PersonReview {
+export interface ReviewLineView {
   line: LineRow;
   person: PersonRow;
   policy: PolicyRow;
-  currentInsurer: string;
-  chosenInsurer: string | null;
-  transition: string | null;
+  currentInsurerName: string;
+  chosenInsurerName: string | null;
+  ageTransitionMessage: string | null;
   /** Hausse mensuelle du renouvellement par rapport à la prime facturée. */
   increaseRp: number | null;
   increasePermille: number | null;
-  best: RankedOffer | null;
+  bestOffer: RankedOffer | null;
   renewalTotalRp: number | null;
   lcaWarnings: LcaWarning[];
   lcaCount: number;
@@ -43,7 +43,7 @@ export interface ReviewView {
   daysToDeadline: number;
   daysToSend: number;
   co2KnownForTarget: boolean;
-  persons: PersonReview[];
+  lines: ReviewLineView[];
   totals: {
     currentMonthlyRp: number;
     renewalMonthlyRp: number | null;
@@ -60,7 +60,7 @@ function bestOfferFor(
   r: typeof review.$inferSelect,
   line: LineRow,
   p: PersonRow,
-  offers: Offer[] = offersFor(db, offerScope(db, r, line)),
+  offers: Offer[] = offersFor(db, premiumProfileFor(db, r, line)),
 ): { best: RankedOffer | null; renewalTotalRp: number | null } {
   const params = parametersFor(db, r.targetYear);
   const ctx = { ageClass: line.targetAgeClass, params, healthCostsRp: p.healthCostsRp };
@@ -78,28 +78,28 @@ function bestOfferFor(
 }
 
 export function getReviewView(db: Db, scope: Scope, reviewId: number, today: IsoDate): ReviewView {
-  const r = ownedReview(db, scope, reviewId);
-  const deadlines = reviewDeadlines(r.targetYear);
-  const lines = db.select().from(reviewLine).where(eq(reviewLine.reviewId, r.id)).orderBy(asc(reviewLine.id)).all();
+  const reviewRow = ownedReview(db, scope, reviewId);
+  const deadlines = reviewDeadlines(reviewRow.targetYear);
+  const lineRows = db.select().from(reviewLine).where(eq(reviewLine.reviewId, reviewRow.id)).orderBy(asc(reviewLine.id)).all();
   const insurers = new Map(db.select().from(insurer).all().map((i) => [i.id, i]));
-  const params = parametersFor(db, r.targetYear);
+  const params = parametersFor(db, reviewRow.targetYear);
 
-  const persons: PersonReview[] = lines.map((line) => {
-    const p = db.select().from(person).where(eq(person.id, line.personId)).get()!;
+  const lineViews: ReviewLineView[] = lineRows.map((line) => {
+    const personRow = db.select().from(person).where(eq(person.id, line.personId)).get()!;
     const policy = db.select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
     const current = insurers.get(policy.insurerId)!;
-    const lca = db.select().from(lcaPolicy).where(and(eq(lcaPolicy.personId, p.id), eq(lcaPolicy.active, true))).all();
-    const { best, renewalTotalRp } = r.status === "CLOSED" ? { best: null, renewalTotalRp: null } : bestOfferFor(db, r, line, p);
+    const lca = db.select().from(lcaPolicy).where(and(eq(lcaPolicy.personId, personRow.id), eq(lcaPolicy.active, true))).all();
+    const { best, renewalTotalRp } = reviewRow.status === "CLOSED" ? { best: null, renewalTotalRp: null } : bestOfferFor(db, reviewRow, line, personRow);
     return {
       line,
-      person: p,
+      person: personRow,
       policy,
-      currentInsurer: insurerLabel(current),
-      chosenInsurer: line.chosenInsurerId ? insurerLabel(insurers.get(line.chosenInsurerId)!) : null,
-      transition: ageTransition(p.birthDate, r.targetYear)?.message ?? null,
+      currentInsurerName: insurerLabel(current),
+      chosenInsurerName: line.chosenInsurerId ? insurerLabel(insurers.get(line.chosenInsurerId)!) : null,
+      ageTransitionMessage: ageTransition(personRow.birthDate, reviewRow.targetYear)?.message ?? null,
       increaseRp: line.renewalMonthlyRp === null ? null : line.renewalMonthlyRp - policy.billedMonthlyRp,
       increasePermille: line.renewalMonthlyRp === null ? null : changePermille(policy.billedMonthlyRp, line.renewalMonthlyRp),
-      best,
+      bestOffer: best,
       renewalTotalRp,
       lcaWarnings: lcaWarnings(
         lca.map((c) => ({ productName: c.productName, insurerName: c.insurerName, linkedInsurerId: c.linkedInsurerId })),
@@ -123,7 +123,7 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
   const letters = db
     .select()
     .from(letter)
-    .where(eq(letter.reviewId, r.id))
+    .where(eq(letter.reviewId, reviewRow.id))
     .orderBy(asc(letter.id))
     .all()
     .map((l) => ({ ...l, insurerName: insurerLabel(insurers.get(l.insurerId)!) }));
@@ -132,24 +132,24 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
   const sentLineIds = new Set(letters.filter((l) => l.sentAt && !pingenFailed(l.pingenStatus)).flatMap((l) => l.lineIds));
 
   return {
-    review: r,
+    review: reviewRow,
     today,
     deadlines,
     urgency: urgency(today, deadlines),
     daysToDeadline: daysBetween(today, deadlines.receiptDeadline),
     daysToSend: daysBetween(today, deadlines.sendBy),
     co2KnownForTarget: params.co2AnnualRp !== null,
-    persons,
+    lines: lineViews,
     totals: {
-      currentMonthlyRp: persons.reduce((a, x) => a + x.policy.billedMonthlyRp, 0),
-      renewalMonthlyRp: sum(persons.map((x) => x.line.renewalMonthlyRp)),
-      chosenMonthlyRp: sum(persons.map((x) => x.line.chosenMonthlyRp)),
-      bestMonthlyRp: sum(persons.map((x) => x.best?.monthlyPremiumRp ?? null)),
-      potentialAnnualSavingsRp: persons.reduce((a, x) => a + Math.max(x.best?.savingsRp ?? 0, 0), 0),
+      currentMonthlyRp: lineViews.reduce((a, x) => a + x.policy.billedMonthlyRp, 0),
+      renewalMonthlyRp: sum(lineViews.map((x) => x.line.renewalMonthlyRp)),
+      chosenMonthlyRp: sum(lineViews.map((x) => x.line.chosenMonthlyRp)),
+      bestMonthlyRp: sum(lineViews.map((x) => x.bestOffer?.monthlyPremiumRp ?? null)),
+      potentialAnnualSavingsRp: lineViews.reduce((a, x) => a + Math.max(x.bestOffer?.savingsRp ?? 0, 0), 0),
     },
     letters,
     steps: ritualSteps({
-      lines: persons.map((x) => ({
+      lines: lineViews.map((x) => ({
         decision: x.line.decision,
         renewalKnown: x.line.renewalMonthlyRp !== null,
         lcaConfirmed: x.line.lcaAckAt !== null,
@@ -157,15 +157,15 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
         affiliationConfirmed: x.line.affiliationConfirmedAt !== null,
         letterSent: sentLineIds.has(x.line.id),
       })),
-      strategyChosen: r.strategy !== null,
-      needsConfirmed: r.needsConfirmedAt !== null,
+      strategyChosen: reviewRow.strategy !== null,
+      needsConfirmed: reviewRow.needsConfirmedAt !== null,
       terminationsAcknowledged: letters.filter((l) => l.kind === "TERMINATION").every((l) => l.acknowledgedAt),
     }),
   };
 }
 
 /** Lignes d'un rituel du foyer, dans l'ordre, avec le prénom de chaque personne (onglets, enchaînement). */
-export function reviewMembers(db: Db, scope: Scope, reviewId: number) {
+export function listReviewLineTabs(db: Db, scope: Scope, reviewId: number) {
   ownedReview(db, scope, reviewId);
   return db
     .select({ id: reviewLine.id, decision: reviewLine.decision, firstName: person.firstName })

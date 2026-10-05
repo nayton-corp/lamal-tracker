@@ -17,17 +17,17 @@ export const metadata = { title: "Vos besoins" };
 export default async function NeedsPage({ params }: { params: Promise<{ year: string }> }) {
   const scope = await pageScope();
   const year = Number((await params).year);
-  const r = getReviewByYear(db(), scope, year);
-  if (!r || r.status === "CLOSED") redirect(`/rituel/${year}`);
-  const view = getReviewView(db(), scope, r.id, today());
+  const reviewRow = getReviewByYear(db(), scope, year);
+  if (!reviewRow || reviewRow.status === "CLOSED") redirect(`/rituel/${year}`);
+  const view = getReviewView(db(), scope, reviewRow.id, today());
   const params_ = parametersFor(db(), year);
-  const open = view.persons.filter((p) => p.line.decision === "UNDECIDED");
-  const persons: NeedsPerson[] = (open.length ? open : view.persons).map((p) => {
+  const open = view.lines.filter((p) => p.line.decision === "UNDECIDED");
+  const persons: NeedsPerson[] = (open.length ? open : view.lines).map((p) => {
     const needs = effectiveNeeds({ line: p.line, person: p.person });
     return {
       lineId: p.line.id,
       firstName: p.person.firstName,
-      current: `${p.currentInsurer}, ${displayTariffLabel(p.policy.tariffLabel, p.policy.modelType as ModelType)}, franchise ${p.policy.franchiseChf}`,
+      current: `${p.currentInsurerName}, ${displayTariffLabel(p.policy.tariffLabel, p.policy.modelType as ModelType)}, franchise ${p.policy.franchiseChf}`,
       currentModel: p.policy.modelType as ModelType,
       currentFranchise: p.line.renewalFranchiseChf,
       franchises: franchisesFor(params_, p.line.targetAgeClass),
@@ -36,7 +36,7 @@ export default async function NeedsPage({ params }: { params: Promise<{ year: st
       healthCostsRp: p.person.healthCostsRp,
       doctorName: p.person.doctorName,
       accident: p.line.accident,
-      transition: p.transition,
+      transition: p.ageTransitionMessage,
     };
   });
 
@@ -46,9 +46,9 @@ export default async function NeedsPage({ params }: { params: Promise<{ year: st
         title={persons.length > 1 ? "Vos besoins" : "Votre besoin"}
         subtitle={
           <>
-            {r.strategy ? (
+            {reviewRow.strategy ? (
               <>
-                Pré-rempli pour la stratégie <strong>{STRATEGY_INFO[r.strategy].label}</strong> (<Link href={`/rituel/${year}/strategie`} className="text-primary underline">changer</Link>).{" "}
+                Pré-rempli pour la stratégie <strong>{STRATEGY_INFO[reviewRow.strategy].label}</strong> (<Link href={`/rituel/${year}/strategie`} className="text-primary underline">changer</Link>).{" "}
               </>
             ) : null}
             Vérifiez ou ajustez, puis comparez.
@@ -56,7 +56,7 @@ export default async function NeedsPage({ params }: { params: Promise<{ year: st
         }
         back={`/rituel/${year}`}
       />
-      <NeedsForm year={year} reviewId={r.id} persons={persons} strategyLabel={r.strategy ? STRATEGY_INFO[r.strategy].label : null} />
+      <NeedsForm year={year} reviewId={reviewRow.id} persons={persons} strategyLabel={reviewRow.strategy ? STRATEGY_INFO[reviewRow.strategy].label : null} />
     </Page>
   );
 }

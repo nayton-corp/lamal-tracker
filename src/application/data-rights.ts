@@ -67,7 +67,7 @@ export function exportData(db: Db, scope: Scope, nowIso: string) {
   const householdId = scope.householdId;
   if (householdId === null) return { format: "primes-lamal", version: 1, exporteLe: nowIso, compte, foyer: null };
 
-  const h = db.select().from(household).where(eq(household.id, householdId)).get()!;
+  const householdRow = db.select().from(household).where(eq(household.id, householdId)).get()!;
   const persons = db.select().from(person).where(eq(person.householdId, householdId)).orderBy(asc(person.sortOrder), asc(person.id)).all();
   const personIds = persons.map((p) => p.id);
   const policies = personIds.length ? db.select().from(lamalPolicy).where(inArray(lamalPolicy.personId, personIds)).orderBy(asc(lamalPolicy.coverageYear)).all() : [];
@@ -80,8 +80,8 @@ export function exportData(db: Db, scope: Scope, nowIso: string) {
   const offers = reviewIds.length ? db.select().from(offerRequest).where(inArray(offerRequest.reviewId, reviewIds)).orderBy(asc(offerRequest.id)).all() : [];
 
   const foyer = {
-    adresse: { nom: h.name, rue: h.street, npa: h.postalCode, localite: h.city, commune: h.commune, numeroOfs: h.bfsNumber, canton: h.canton, regionPrimes: h.region },
-    creeLe: h.createdAt,
+    adresse: { nom: householdRow.name, rue: householdRow.street, npa: householdRow.postalCode, localite: householdRow.city, commune: householdRow.commune, numeroOfs: householdRow.bfsNumber, canton: householdRow.canton, regionPrimes: householdRow.region },
+    creeLe: householdRow.createdAt,
     votreRole: scope.householdRole === "OWNER" ? "propriétaire" : "membre",
     membres: db
       .select({ courriel: appUser.email, role: householdMember.role, depuis: householdMember.createdAt })
@@ -157,7 +157,7 @@ export function deletionPreview(db: Db, scope: Scope): { othersInHousehold: numb
     scope.householdId === null
       ? 0
       : db.select({ userId: householdMember.userId }).from(householdMember).where(and(eq(householdMember.householdId, scope.householdId), ne(householdMember.userId, scope.userId))).all().length;
-  return { othersInHousehold: others, lastAdmin: scope.admin && isLastAdmin(db, scope.userId) };
+  return { othersInHousehold: others, lastAdmin: scope.isAdmin && isLastAdmin(db, scope.userId) };
 }
 
 function isLastAdmin(db: Db, userId: number): boolean {
@@ -202,7 +202,7 @@ export function deleteAccountData(db: Db, userId: number, nowIso: string): Accou
 /** Suppression demandée par l'utilisateur lui-même, identité confirmée. */
 export async function deleteOwnAccount(db: Db, scope: Scope, sessionId: string, mail: MailDeps | null, nowIso: string): Promise<AccountDeletion> {
   requireConfirmed(db, sessionId, nowIso);
-  if (scope.admin && isLastAdmin(db, scope.userId)) throw new UserError("Le seul compte administrateur ne peut pas être supprimé : il gère l'instance et ses invitations.");
+  if (scope.isAdmin && isLastAdmin(db, scope.userId)) throw new UserError("Le seul compte administrateur ne peut pas être supprimé : il gère l'instance et ses invitations.");
   const email = db.select({ email: appUser.email }).from(appUser).where(eq(appUser.id, scope.userId)).get()?.email ?? null;
   const result = deleteAccountData(db, scope.userId, nowIso);
   // Un courriel en échec ne doit pas annuler une suppression déjà faite.

@@ -15,8 +15,8 @@ const MAX_BYTES = 300_000;
 export function saveSignature(db: Db, scope: Scope, personId: number, dataUrl: string) {
   if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(dataUrl)) throw new UserError("Signature illisible : recommencez.");
   if (dataUrl.length > MAX_BYTES) throw new UserError("Signature trop lourde : recommencez avec un trait plus simple.");
-  const p = ownedPerson(db, scope, personId);
-  const sealed = sealForHousehold(db, p.householdId, dataUrl, signatureContext(personId));
+  const personRow = ownedPerson(db, scope, personId);
+  const sealed = sealForHousehold(db, personRow.householdId, dataUrl, signatureContext(personId));
   db.insert(signature).values({ personId, dataUrl: sealed }).onConflictDoUpdate({ target: signature.personId, set: { dataUrl: sealed, createdAt: new Date().toISOString() } }).run();
 }
 

@@ -12,9 +12,9 @@ export const metadata = { title: "Importer une police" };
 
 export default async function ImportPolicyPage() {
   const scope = await pageScope();
-  const h = getHousehold(db(), scope);
-  if (!h) redirect("/bienvenue");
-  const persons = listPersons(db(), h.id);
+  const householdRow = getHousehold(db(), scope);
+  if (!householdRow) redirect("/bienvenue");
+  const persons = listPersons(db(), householdRow.id);
   const year = currentYear();
   return (
     <Page>

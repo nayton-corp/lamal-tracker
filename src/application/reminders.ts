@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { reviewDeadlines } from "@/domain/deadlines";
 import { pingenFailed } from "@/domain/pingen";
-import { paperReminders, type PaperProgress, type Reminder } from "@/domain/reminders";
+import { letterReminders, type LetterProgress, type Reminder } from "@/domain/reminders";
 import type { Db } from "@/infrastructure/db/client";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { appUser, household, householdMember, insurer, letter, notificationLog, offerRequest, person, review, reviewLine } from "@/infrastructure/db/schema";
@@ -11,7 +11,7 @@ import { logMailError } from "@/infrastructure/mail/mailer";
 const SIGNATURE = "\n\n— Primes LAMal\nCe message est automatique : n'y répondez pas.";
 
 /** Avancement des courriers d'un foyer pour l'année cible (sans rituel ouvert : rien de préparé). */
-export function paperProgress(db: Db, householdId: number, targetYear: number): PaperProgress {
+export function paperProgress(db: Db, householdId: number, targetYear: number): LetterProgress {
   const persons = db.select({ id: person.id }).from(person).where(eq(person.householdId, householdId)).all().length;
   const r = db.select().from(review).where(and(eq(review.householdId, householdId), eq(review.targetYear, targetYear))).get();
   if (!r) return { closed: false, persons, keeping: 0, letters: 0, lettersSent: 0, awaiting: [] };
@@ -56,18 +56,18 @@ const householdLogKey = (householdId: number, key: string) => `h${householdId}:$
  */
 export async function reminderTick(db: Db, deps: ReminderDeps, today: string, targetYear: number): Promise<void> {
   const deadlines = reviewDeadlines(targetYear);
-  for (const h of db.select({ id: household.id }).from(household).all()) {
-    const reminders = paperReminders(today, targetYear, deadlines, paperProgress(db, h.id, targetYear));
+  for (const householdRow of db.select({ id: household.id }).from(household).all()) {
+    const reminders = letterReminders(today, targetYear, deadlines, paperProgress(db, householdRow.id, targetYear));
     for (const r of reminders) {
-      await deps.push(h.id, r);
+      await deps.push(householdRow.id, r);
       if (!r.mail || !deps.mail) continue;
-      const logKey = householdLogKey(h.id, `courriel:${r.key}`);
+      const logKey = householdLogKey(householdRow.id, `courriel:${r.key}`);
       if (db.select().from(notificationLog).where(eq(notificationLog.key, logKey)).get()) continue;
       const recipients = db
         .select({ email: appUser.email })
         .from(householdMember)
         .innerJoin(appUser, eq(appUser.id, householdMember.userId))
-        .where(and(eq(householdMember.householdId, h.id), isNotNull(appUser.email), isNotNull(appUser.emailVerifiedAt), isNull(appUser.disabledAt)))
+        .where(and(eq(householdMember.householdId, householdRow.id), isNotNull(appUser.email), isNotNull(appUser.emailVerifiedAt), isNull(appUser.disabledAt)))
         .all();
       for (const { email } of recipients) {
         const text = `${r.mail.text}\n\nOuvrir l'app : ${deps.mail.appUrl}${r.url}${SIGNATURE}`;

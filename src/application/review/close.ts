@@ -8,8 +8,8 @@ import { findReview, ownedReview, type Scope } from "../scope";
 
 /** Crée les contrats de l'année cible à partir des décisions, puis clôt la revue. */
 export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: string) {
-  const r = ownedReview(db, scope, reviewId);
-  if (r.status === "CLOSED") return;
+  const reviewRow = ownedReview(db, scope, reviewId);
+  if (reviewRow.status === "CLOSED") return;
   const lines = db.select().from(reviewLine).where(eq(reviewLine.reviewId, reviewId)).all();
   const undecided = lines.filter((l) => l.decision === "UNDECIDED" || l.chosenMonthlyRp === null);
   if (undecided.length) throw new UserError("Toutes les personnes doivent avoir une décision avant la clôture.");
@@ -19,17 +19,17 @@ export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: stri
       const existing = tx
         .select()
         .from(lamalPolicy)
-        .where(and(eq(lamalPolicy.personId, l.personId), eq(lamalPolicy.coverageYear, r.targetYear)))
+        .where(and(eq(lamalPolicy.personId, l.personId), eq(lamalPolicy.coverageYear, reviewRow.targetYear)))
         .get();
       if (existing?.source === "MANUAL") {
-        const p = tx.select({ firstName: person.firstName }).from(person).where(eq(person.id, l.personId)).get();
+        const personRow = tx.select({ firstName: person.firstName }).from(person).where(eq(person.id, l.personId)).get();
         throw new UserError(
-          `Un contrat ${r.targetYear} saisi à la main existe déjà pour ${p?.firstName ?? "cette personne"} : supprimez-le ou gardez-le.`,
+          `Un contrat ${reviewRow.targetYear} saisi à la main existe déjà pour ${personRow?.firstName ?? "cette personne"} : supprimez-le ou gardez-le.`,
         );
       }
       const values = {
         personId: l.personId,
-        coverageYear: r.targetYear,
+        coverageYear: reviewRow.targetYear,
         insurerId: l.chosenInsurerId!,
         policyNumber: l.decision === "SWITCH" ? null : prev.policyNumber,
         tariffCode: l.chosenTariffCode,
@@ -53,9 +53,9 @@ export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: stri
  * Les décisions restent, on peut les modifier puis clôturer à nouveau.
  */
 export function reopenReview(db: Db, scope: Scope, reviewId: number) {
-  const r = ownedReview(db, scope, reviewId);
-  if (r.status !== "CLOSED") return;
-  const created = createdPolicies(db, r.id, r.targetYear);
+  const reviewRow = ownedReview(db, scope, reviewId);
+  if (reviewRow.status !== "CLOSED") return;
+  const created = createdPolicies(db, reviewRow.id, reviewRow.targetYear);
   const ids = created.map((p) => p.id);
   if (ids.length) {
     const usedBy = db.select().from(reviewLine).where(inArray(reviewLine.currentPolicyId, ids)).get();
@@ -66,14 +66,14 @@ export function reopenReview(db: Db, scope: Scope, reviewId: number) {
   }
   db.transaction((tx) => {
     if (ids.length) tx.delete(lamalPolicy).where(inArray(lamalPolicy.id, ids)).run();
-    tx.update(review).set({ status: "OPEN", closedAt: null }).where(eq(review.id, r.id)).run();
+    tx.update(review).set({ status: "OPEN", closedAt: null }).where(eq(review.id, reviewRow.id)).run();
   });
 }
 
 /** Supprime le rituel (décisions et lettres comprises), même clôturé : on revient à l'état d'avant. */
 export function deleteReview(db: Db, scope: Scope, reviewId: number) {
-  const r = findReview(db, scope, reviewId);
-  if (!r) return;
+  const reviewRow = findReview(db, scope, reviewId);
+  if (!reviewRow) return;
   reopenReview(db, scope, reviewId);
   db.delete(review).where(eq(review.id, reviewId)).run();
 }

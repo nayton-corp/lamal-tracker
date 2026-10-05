@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { closeReviewAction, deleteReviewAction, openReviewAction, reopenReviewAction, undoAction } from "@/app/actions/review";
 import { getHousehold, listPersons, listPolicies } from "@/application/household";
-import { ensureReview, getReviewByYear, getReviewView, type PersonReview, type ReviewView } from "@/application/review";
-import { reviewDeadlines, ritualWindowOpen } from "@/domain/deadlines";
+import { openReviewIfPossible, getReviewByYear, getReviewView, type ReviewLineView, type ReviewView } from "@/application/review";
+import { reviewDeadlines, isReviewWindowOpen } from "@/domain/deadlines";
 import { formatDateLong } from "@/domain/dates";
 import { STRATEGY_INFO } from "@/domain/strategy";
 import { Awareness } from "../_parts/awareness";
@@ -41,14 +41,14 @@ const RENEWAL_BADGE = {
   MISSING: { tone: "increase", label: "Plus proposé", hint: "Votre caisse ne propose plus ce contrat dans votre région en {year} : il faudra en choisir un autre." },
 } as const;
 
-export default async function RitualPage({ params }: { params: Promise<{ year: string }> }) {
+export default async function ReviewPage({ params }: { params: Promise<{ year: string }> }) {
   const scope = await pageScope();
   const year = Number((await params).year);
   if (!Number.isInteger(year) || year < FIRST_PREMIUM_YEAR || year > currentYear() + 1) notFound();
-  const h = getHousehold(db(), scope);
-  const persons = h ? listPersons(db(), h.id) : [];
+  const householdRow = getHousehold(db(), scope);
+  const persons = householdRow ? listPersons(db(), householdRow.id) : [];
 
-  if (!h || persons.length === 0) {
+  if (!householdRow || persons.length === 0) {
     return (
       <Page>
         <PageHeader title={`Rituel ${year}`} />
@@ -61,8 +61,8 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
 
   const dataset = activeDataset(db(), year);
   // Les primes sont publiées : l'analyse s'ouvre d'elle-même (rien n'est décidé à la place de l'utilisateur).
-  const windowOpen = ritualWindowOpen(today(), year, Boolean(dataset));
-  if (windowOpen && !getReviewByYear(db(), scope, year)) ensureReview(db(), scope, year);
+  const windowOpen = isReviewWindowOpen(today(), year, Boolean(dataset));
+  if (windowOpen && !getReviewByYear(db(), scope, year)) openReviewIfPossible(db(), scope, year);
   const reviewRow = getReviewByYear(db(), scope, year);
   const hasContracts = persons.some((p) => listPolicies(db(), p.id).some((x) => x.policy.coverageYear === year - 1));
 
@@ -106,10 +106,10 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
 
   const view = getReviewView(db(), scope, reviewRow.id, today());
   const closed = view.review.status === "CLOSED";
-  const missingPersons = persons.filter((p) => !view.persons.some((x) => x.person.id === p.id));
+  const missingPersons = persons.filter((p) => !view.lines.some((x) => x.person.id === p.id));
   return (
     <Page wide>
-      <PageHeader title={`Rituel ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${h.canton}, région ${h.region}`} />
+      <PageHeader title={`Rituel ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${householdRow.canton}, région ${householdRow.region}`} />
 
       <Awareness view={view} detailed={false} cta={false} />
       {!closed && <Steps view={view} />}
@@ -141,7 +141,7 @@ export default async function RitualPage({ params }: { params: Promise<{ year: s
 
       <Section title="Par personne">
         <ul className="grid gap-3 lg:grid-cols-2">
-          {view.persons.map((pr, i) => (
+          {view.lines.map((pr, i) => (
             <li key={pr.line.id} id={`ligne-${pr.line.id}`} className="animate-rise" style={{ animationDelay: `${i * 40}ms` }}>
               <PersonCard pr={pr} year={year} closed={closed} ready={Boolean(view.review.needsConfirmedAt)} />
             </li>
@@ -232,7 +232,7 @@ function Steps({ view }: { view: ReviewView }) {
   );
 }
 
-function PersonCard({ pr, year, closed, ready }: { pr: PersonReview; year: number; closed: boolean; ready: boolean }) {
+function PersonCard({ pr, year, closed, ready }: { pr: ReviewLineView; year: number; closed: boolean; ready: boolean }) {
   const badge = RENEWAL_BADGE[pr.line.renewalStatus];
   const decided = pr.line.decision !== "UNDECIDED";
   return (
@@ -241,15 +241,15 @@ function PersonCard({ pr, year, closed, ready }: { pr: PersonReview; year: numbe
         <div>
           <p className="text-lg font-semibold">{pr.person.firstName}</p>
           <p className="text-sm text-muted">
-            {pr.currentInsurer} · {displayTariffLabel(pr.policy.tariffLabel, pr.policy.modelType as ModelType)} · franchise {pr.policy.franchiseChf}
+            {pr.currentInsurerName} · {displayTariffLabel(pr.policy.tariffLabel, pr.policy.modelType as ModelType)} · franchise {pr.policy.franchiseChf}
           </p>
         </div>
         <Badge tone={decided ? (pr.line.decision === "KEEP" ? "primary" : "saving") : "neutral"}>{DECISION_LABEL[pr.line.decision]}</Badge>
       </div>
 
-      {pr.transition && (
+      {pr.ageTransitionMessage && (
         <Alert tone="info" title={AGE_CLASS_LABEL[pr.line.targetAgeClass]}>
-          {pr.transition}
+          {pr.ageTransitionMessage}
         </Alert>
       )}
 
@@ -284,7 +284,7 @@ function PersonCard({ pr, year, closed, ready }: { pr: PersonReview; year: numbe
         <div className="flex items-center justify-between gap-3 rounded-xl border border-saving/30 bg-saving-soft/50 p-3 text-sm">
           <div>
             <p className="font-medium">
-              {pr.chosenInsurer} · {displayTariffLabel(pr.line.chosenLabel, (pr.line.chosenModelType ?? "OTHER") as ModelType)}
+              {pr.chosenInsurerName} · {displayTariffLabel(pr.line.chosenLabel, (pr.line.chosenModelType ?? "OTHER") as ModelType)}
             </p>
             <p className="text-muted">Franchise {pr.line.chosenFranchiseChf}</p>
           </div>
@@ -293,12 +293,12 @@ function PersonCard({ pr, year, closed, ready }: { pr: PersonReview; year: numbe
           </p>
         </div>
       ) : (
-        pr.best && (
+        pr.bestOffer && (
           <div className="flex items-center justify-between gap-3 text-sm">
             <p className="text-muted">
-              Meilleure offre : <span className="font-medium text-foreground">{pr.best.insurerName}</span>, franchise {pr.best.franchiseChf}
+              Meilleure offre : <span className="font-medium text-foreground">{pr.bestOffer.insurerName}</span>, franchise {pr.bestOffer.franchiseChf}
             </p>
-            <Saving rp={pr.best.savingsRp} />
+            <Saving rp={pr.bestOffer.savingsRp} />
           </div>
         )
       )}
@@ -330,10 +330,10 @@ function PersonCard({ pr, year, closed, ready }: { pr: PersonReview; year: numbe
 function NextAction({ view }: { view: ReviewView }) {
   const step = nextStep(view);
   if (step.kind === "close" || step.kind === "none") {
-    const needsLetters = view.persons.some((p) => p.line.decision === "SWITCH" || p.line.decision === "ADJUST");
+    const needsLetters = view.lines.some((p) => p.line.decision === "SWITCH" || p.line.decision === "ADJUST");
     return needsLetters ? null : (
       <Alert tone="success" title="Rien à envoyer">
-        {view.persons.length > 1 ? "Toutes les personnes gardent leur contrat" : "Vous gardez votre contrat"} : aucun courrier n&apos;est nécessaire.
+        {view.lines.length > 1 ? "Toutes les personnes gardent leur contrat" : "Vous gardez votre contrat"} : aucun courrier n&apos;est nécessaire.
       </Alert>
     );
   }

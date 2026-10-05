@@ -25,7 +25,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
   const keys = ((await searchParams).c ?? "").split(",").filter(Boolean);
   let view;
   try {
-    view = compareForLine(db(), scope, lineId, { all: true, everyOffer: true });
+    view = compareForLine(db(), scope, lineId, { ignorePersonPreferences: true, everyOffer: true });
   } catch {
     notFound();
   }

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { listInsurers } from "@/application/household";
 import type { ValidationReport } from "@/domain/ofsp/report";
 import { listDatasets, listParameters } from "@/application/reference-data";
-import { getSetting } from "@/infrastructure/db/settings";
+import { getSetting, SETTING_KEYS } from "@/infrastructure/db/settings";
 import { subscriptionCount } from "@/infrastructure/push/push";
 import { currentYear, db } from "@/server/context";
 import { importJob } from "@/server/jobs";
@@ -46,15 +46,15 @@ export default async function DataPage() {
   const insurers = listInsurers(db());
   const customAddresses = insurers.filter((i) => i.terminationAddress?.trim()).length;
   const directoryDate = insurers.map((i) => i.directoryDate).filter(Boolean).sort().at(-1);
-  const reference = getSetting<ReferenceCheck>(db(), "reference.lastCheck");
-  const lastCheck = getSetting<{ at: string; ok: boolean }>(db(), "ofsp.lastCheck");
+  const reference = getSetting<ReferenceCheck>(db(), SETTING_KEYS.referenceLastCheck);
+  const lastCheck = getSetting<{ at: string; ok: boolean }>(db(), SETTING_KEYS.ofspLastCheck);
 
   return (
     <Page wide>
       <PageHeader title="Réglages" subtitle="Tout se met à jour tout seul : vous n'avez en principe rien à faire ici." />
 
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
-        {scope.admin && (
+        {scope.isAdmin && (
         <div className="space-y-6">
           <Section title="Primes officielles">
             <Card className="space-y-4">
@@ -114,7 +114,7 @@ export default async function DataPage() {
         )}
 
         <div className="space-y-6">
-          {scope.admin && (
+          {scope.isAdmin && (
             <>
           <Section title="Caisses-maladie">
             <Link href="/donnees/caisses" className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card hover:bg-surface-2">
@@ -156,7 +156,7 @@ export default async function DataPage() {
             <div className="space-y-3">
               <SettingsLink href="/compte" icon={<UserRoundCog aria-hidden className="size-5 text-primary" />} title="Mon compte" text="Courriel, mot de passe, passkeys, double facteur, appareils connectés." />
               <SettingsLink href="/compte/donnees" icon={<FolderLock aria-hidden className="size-5 text-primary" />} title="Mes données" text={scope.householdRole === "OWNER" ? "Télécharger une copie, supprimer le foyer ou le compte." : "Télécharger une copie, supprimer le compte."} />
-              {scope.admin && <SettingsLink href="/admin" icon={<ShieldCheck aria-hidden className="size-5 text-primary" />} title="Administration" text="Invitations, comptes, avis reçus, chiffres d'usage." />}
+              {scope.isAdmin && <SettingsLink href="/admin" icon={<ShieldCheck aria-hidden className="size-5 text-primary" />} title="Administration" text="Invitations, comptes, avis reçus, chiffres d'usage." />}
             </div>
           </Section>
 
@@ -171,7 +171,7 @@ export default async function DataPage() {
             </div>
           </Section>
 
-          {scope.admin && (
+          {scope.isAdmin && (
           <Section title="Sauvegarde">
             <Card className="space-y-3">
               <p className="text-sm text-muted">Une copie de toute la base, tous foyers compris, après confirmation de votre identité.</p>

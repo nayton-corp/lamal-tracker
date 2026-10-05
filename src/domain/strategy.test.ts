@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RankedOffer } from "./comparison";
-import { ritualWindowOpen } from "./deadlines";
+import { isReviewWindowOpen } from "./deadlines";
 import { balanceScoreRp, qualityPoints, rankForStrategy, strategyDefaults, usageFor, USAGE_INFO } from "./strategy";
 
 const offer = (insurerId: number, totalRp: number, monthly = totalRp / 12): RankedOffer => ({
@@ -51,9 +51,9 @@ describe("stratégies", () => {
   });
 
   it("ouvre la fenêtre du rituel de la publication au 30 novembre", () => {
-    expect(ritualWindowOpen("2026-10-05", 2027, true)).toBe(true);
-    expect(ritualWindowOpen("2026-10-05", 2027, false)).toBe(false);
-    expect(ritualWindowOpen("2026-11-30", 2027, true)).toBe(true);
-    expect(ritualWindowOpen("2026-12-01", 2027, true)).toBe(false);
+    expect(isReviewWindowOpen("2026-10-05", 2027, true)).toBe(true);
+    expect(isReviewWindowOpen("2026-10-05", 2027, false)).toBe(false);
+    expect(isReviewWindowOpen("2026-11-30", 2027, true)).toBe(true);
+    expect(isReviewWindowOpen("2026-12-01", 2027, true)).toBe(false);
   });
 });

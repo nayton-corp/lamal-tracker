@@ -43,7 +43,7 @@ export function PersonForm({ person, year, onDone, stay, next, submitLabel }: {
 }) {
   const [state, action] = useActionState(savePersonAction, null);
   const [birthDate, setBirthDate] = useState(person?.birthDate ?? "");
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
   const minor = /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && isMinorAround(birthDate, year);
   useEffect(() => {
     if (state?.ok) onDone?.();
@@ -54,14 +54,14 @@ export function PersonForm({ person, year, onDone, stay, next, submitLabel }: {
       {stay && <input type="hidden" name="stay" value="1" />}
       {next && <input type="hidden" name="next" value={next} />}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Prénom" htmlFor="firstName" error={fe.firstName}>
+        <Field label="Prénom" htmlFor="firstName" error={fieldErrors.firstName}>
           <Input id="firstName" name="firstName" required defaultValue={person?.firstName} autoComplete="given-name" />
         </Field>
-        <Field label="Nom" htmlFor="lastName" error={fe.lastName}>
+        <Field label="Nom" htmlFor="lastName" error={fieldErrors.lastName}>
           <Input id="lastName" name="lastName" required defaultValue={person?.lastName} autoComplete="family-name" />
         </Field>
       </div>
-      <Field label="Date de naissance" htmlFor="birthDate" error={fe.birthDate}>
+      <Field label="Date de naissance" htmlFor="birthDate" error={fieldErrors.birthDate}>
         <Input id="birthDate" name="birthDate" type="date" required value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
       </Field>
       {minor ? (

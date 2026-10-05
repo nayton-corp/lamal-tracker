@@ -47,9 +47,9 @@ interface Candidate {
 
 /** Primes officielles d'une personne pour l'année, dont le montant figure sur la police. */
 function candidates(db: Db, scope: Scope, year: number, birthDate: string, kidSubgroup: string, amounts: number[], insurerId: number | null): Candidate[] {
-  const h = getHousehold(db, scope);
+  const householdRow = getHousehold(db, scope);
   const ds = activeDataset(db, year);
-  if (!h || !ds || amounts.length === 0) return [];
+  if (!householdRow || !ds || amounts.length === 0) return [];
   const ageClass = ageClassForYear(birthDate, year);
   return db
     .select({ insurerId: tariff.insurerId, code: tariff.code, label: tariff.label, modelType: tariff.modelType, franchise: premium.franchiseChf, accident: premium.accident, monthly: premium.monthlyRp })
@@ -58,8 +58,8 @@ function candidates(db: Db, scope: Scope, year: number, birthDate: string, kidSu
     .where(
       and(
         eq(premium.datasetId, ds.id),
-        eq(premium.canton, h.canton),
-        eq(premium.region, h.region),
+        eq(premium.canton, householdRow.canton),
+        eq(premium.region, householdRow.region),
         eq(premium.ageClass, ageClass),
         eq(premium.subgroup, ageClass === "KID" ? kidSubgroup : defaultSubgroup(ageClass)),
         inArray(premium.monthlyRp, amounts),
@@ -84,9 +84,9 @@ function bestCandidate(list: Candidate[], read: PolicyExtract["persons"][number]
  * tarif officiel dont la prime figure sur la police (ou, à défaut, ce qu'on a pu lire).
  */
 export function analyzePolicyText(db: Db, scope: Scope, text: string, currentYear: number): PolicyImport {
-  const h = getHousehold(db, scope);
-  if (!h) throw new UserError("Configurez d'abord le foyer (canton, région, membres).");
-  const persons = listPersons(db, h.id);
+  const householdRow = getHousehold(db, scope);
+  if (!householdRow) throw new UserError("Configurez d'abord le foyer (canton, région, membres).");
+  const persons = listPersons(db, householdRow.id);
   if (persons.length === 0) throw new UserError("Ajoutez d'abord les membres du foyer : leur date de naissance permet de les retrouver dans la police.");
   const insurers = listInsurers(db);
   const guessYear = readYear(text, FIRST_PREMIUM_YEAR, currentYear + 1) ?? currentYear;
@@ -128,9 +128,9 @@ export function analyzePolicyText(db: Db, scope: Scope, text: string, currentYea
     };
   });
   for (const p of out) if (!p.matched) warnings.push(`${p.name} : prime non retrouvée dans les primes officielles ${year}, à compléter.`);
-  const ins = insurerId ? db.select().from(insurer).where(eq(insurer.id, insurerId)).get() : null;
-  if (!ins) warnings.push("Caisse non reconnue : choisissez-la.");
-  return { insurerId: ins?.id ?? null, insurerName: ins ? insurerLabel(ins) : null, year, persons: out, warnings };
+  const insurerRow = insurerId ? db.select().from(insurer).where(eq(insurer.id, insurerId)).get() : null;
+  if (!insurerRow) warnings.push("Caisse non reconnue : choisissez-la.");
+  return { insurerId: insurerRow?.id ?? null, insurerName: insurerRow ? insurerLabel(insurerRow) : null, year, persons: out, warnings };
 }
 
 const NO_TEXT = "Ce PDF ne contient pas de texte lisible (document scanné) : passez par la saisie guidée.";
@@ -157,9 +157,9 @@ export function previewPolicyHolder(db: Db, text: string, currentYear: number): 
   const insurers = listInsurers(db);
   const holder = readHolder(text, { maxYear: currentYear, insurerNames: insurers.flatMap((i) => [i.name, i.displayName, i.legalNameFr, i.groupName]).filter((n): n is string => Boolean(n)) });
   const insurerId = findInsurer(text.slice(0, 1500), importInsurers(insurers)) ?? findInsurer(text, importInsurers(insurers));
-  const ins = insurers.find((i) => i.id === insurerId) ?? null;
+  const insurerRow = insurers.find((i) => i.id === insurerId) ?? null;
   return {
-    insurerName: ins ? insurerLabel(ins) : null,
+    insurerName: insurerRow ? insurerLabel(insurerRow) : null,
     year: readYear(text, FIRST_PREMIUM_YEAR, currentYear + 1) ?? currentYear,
     persons: holder.persons,
     address: holder.address,
@@ -208,8 +208,8 @@ export interface ConfirmedImport {
 
 /** Enregistre les contrats confirmés (remplace le contrat de l'année s'il existe) et les complémentaires nouvelles. */
 export function applyPolicyImport(db: Db, scope: Scope, input: ConfirmedImport): number {
-  const ins = db.select().from(insurer).where(eq(insurer.id, input.insurerId)).get();
-  if (!ins) throw new UserError("Caisse inconnue.");
+  const insurerRow = db.select().from(insurer).where(eq(insurer.id, input.insurerId)).get();
+  if (!insurerRow) throw new UserError("Caisse inconnue.");
   db.transaction(() => {
     for (const p of input.persons) {
       savePolicy(db, scope, {
@@ -228,7 +228,7 @@ export function applyPolicyImport(db: Db, scope: Scope, input: ConfirmedImport):
       for (const l of p.lca.filter((x) => !existing.has(x.guarantee))) {
         saveLca(db, scope, {
           personId: p.personId,
-          insurerName: ins.groupName ?? insurerLabel(ins),
+          insurerName: insurerRow.groupName ?? insurerLabel(insurerRow),
           linkedInsurerId: input.insurerId,
           guarantee: l.guarantee,
           monthlyRp: l.monthlyRp,

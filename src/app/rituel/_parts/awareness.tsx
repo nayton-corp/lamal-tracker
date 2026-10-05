@@ -30,7 +30,7 @@ export function Awareness({ view, detailed, cta = true }: { view: ReviewView; de
   const permille = t.renewalMonthlyRp === null ? null : changePermille(t.currentMonthlyRp, t.renewalMonthlyRp);
   const closed = view.review.status === "CLOSED";
   const step = nextStep(view);
-  const several = view.persons.length > 1;
+  const several = view.lines.length > 1;
 
   return (
     <section aria-labelledby="reconduction" className="space-y-4 rounded-2xl bg-gradient-to-br from-primary to-[#1e3a8a] p-4 text-white shadow-card dark:from-[#1b2a4d] dark:to-[#131c2e] sm:p-5">
@@ -69,7 +69,7 @@ export function Awareness({ view, detailed, cta = true }: { view: ReviewView; de
 
       {detailed && !closed && (
         <ul className="divide-y divide-white/15 rounded-xl bg-white/5 text-sm">
-          {view.persons.map((p) => (
+          {view.lines.map((p) => (
             <li key={p.line.id} className="space-y-0.5 p-3">
               <p className="flex justify-between gap-2 font-semibold">
                 <span>{p.person.firstName}</span>
@@ -79,7 +79,7 @@ export function Awareness({ view, detailed, cta = true }: { view: ReviewView; de
                 </span>
               </p>
               <p className="text-white/80">
-                {p.currentInsurer} · {displayTariffLabel(p.line.renewalLabel ?? p.policy.tariffLabel, p.policy.modelType as ModelType)} · franchise {p.line.renewalFranchiseChf}
+                {p.currentInsurerName} · {displayTariffLabel(p.line.renewalLabel ?? p.policy.tariffLabel, p.policy.modelType as ModelType)} · franchise {p.line.renewalFranchiseChf}
                 {p.line.renewalFranchiseChf !== p.policy.franchiseChf && ` (au lieu de ${p.policy.franchiseChf})`}
               </p>
               <p className="text-white/70">

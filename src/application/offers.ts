@@ -36,31 +36,31 @@ export function setLcaWishes(db: Db, scope: Scope, lineId: number, keys: string[
  */
 export function generateOfferRequests(db: Db, scope: Scope, reviewId: number, today: IsoDate): number[] {
   const view = getReviewView(db, scope, reviewId, today);
-  const h = db.select().from(household).where(eq(household.id, view.review.householdId)).get();
-  if (!h) throw new UserError("Foyer non configuré.");
+  const householdRow = db.select().from(household).where(eq(household.id, view.review.householdId)).get();
+  if (!householdRow) throw new UserError("Foyer non configuré.");
   const sent = new Set(listOfferRequests(db, scope, reviewId).filter((o) => o.sentAt).flatMap((o) => o.lineIds));
-  const groups = new Map<number, typeof view.persons>();
-  for (const pr of view.persons) {
-    if (pr.line.decision !== "SWITCH" || !pr.line.chosenInsurerId || sent.has(pr.line.id)) continue;
-    groups.set(pr.line.chosenInsurerId, [...(groups.get(pr.line.chosenInsurerId) ?? []), pr]);
+  const groups = new Map<number, typeof view.lines>();
+  for (const lineView of view.lines) {
+    if (lineView.line.decision !== "SWITCH" || !lineView.line.chosenInsurerId || sent.has(lineView.line.id)) continue;
+    groups.set(lineView.line.chosenInsurerId, [...(groups.get(lineView.line.chosenInsurerId) ?? []), lineView]);
   }
 
-  const wishes = new Map(view.persons.map((pr) => [pr.line.id, lcaWishesFor(db, pr.line)]));
+  const wishes = new Map(view.lines.map((pr) => [pr.line.id, lcaWishesFor(db, pr.line)]));
   const created: number[] = [];
   db.transaction((tx) => {
     // Toute demande non envoyée est obsolète (une décision a pu être annulée) : on repart de zéro.
     tx.delete(offerRequest).where(and(eq(offerRequest.reviewId, reviewId), isNull(offerRequest.sentAt))).run();
     for (const [insurerId, members] of groups) {
-      const ins = tx.select().from(insurer).where(eq(insurer.id, insurerId)).get()!;
+      const insurerRow = tx.select().from(insurer).where(eq(insurer.id, insurerId)).get()!;
       const adults = members.filter((m) => m.line.targetAgeClass !== "KID");
       const sender = adults[0]?.person ?? members[0]!.person;
       const content = buildOfferRequest({
-        senderLines: [`${sender.firstName} ${sender.lastName}`, h.street, `${h.postalCode} ${h.city}`].filter((l) => l.trim()),
-        insurerLines: insurerRecipient(ins),
-        place: h.city || "",
+        senderLines: [`${sender.firstName} ${sender.lastName}`, householdRow.street, `${householdRow.postalCode} ${householdRow.city}`].filter((l) => l.trim()),
+        insurerLines: insurerRecipient(insurerRow),
+        place: householdRow.city || "",
         date: today,
         targetYear: view.review.targetYear,
-        domicile: `à ${[h.street, `${h.postalCode} ${h.city}`].filter((l) => l.trim()).join(", ")}`,
+        domicile: `à ${[householdRow.street, `${householdRow.postalCode} ${householdRow.city}`].filter((l) => l.trim()).join(", ")}`,
         persons: members.map((m) => {
           const model = (m.line.chosenModelType ?? "OTHER") as ModelType;
           const wish = [
@@ -144,7 +144,7 @@ export function deleteOfferRequest(db: Db, scope: Scope, id: number) {
 export function offerDocument(db: Db, scope: Scope, id: number) {
   const row = getOfferRequest(db, scope, id);
   if (!row) return null;
-  const ins = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
+  const insurerRow = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
   const r = db.select({ targetYear: review.targetYear }).from(review).where(eq(review.id, row.reviewId)).get()!;
-  return { ...row, insurerName: insurerLabel(ins), targetYear: r.targetYear };
+  return { ...row, insurerName: insurerLabel(insurerRow), targetYear: r.targetYear };
 }

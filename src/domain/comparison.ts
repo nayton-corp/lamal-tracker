@@ -117,13 +117,6 @@ export function marketStats(premiumsRp: readonly Rappen[]): MarketStats | null {
   return { count: sorted.length, minRp: sorted[0]!, medianRp: median, maxRp: sorted.at(-1)! };
 }
 
-/** Rang (1 = moins cher) d'une prime dans le marché, en percentile entier 0–100. */
-export function percentileOf(premiumRp: Rappen, premiumsRp: readonly Rappen[]): number | null {
-  if (premiumsRp.length === 0) return null;
-  const cheaper = premiumsRp.filter((p) => p < premiumRp).length;
-  return Math.round((cheaper * 100) / premiumsRp.length);
-}
-
 /**
  * Garde la meilleure offre de chaque caisse (la première dans l'ordre du classement) et
  * renumérote : une caisse = une ligne, comme dans les comparateurs grand public.

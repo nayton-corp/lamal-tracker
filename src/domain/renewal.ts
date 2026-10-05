@@ -2,7 +2,7 @@ import type { Offer } from "./comparison";
 import type { ModelType } from "./lamal";
 import { foldForSearch } from "./text";
 
-export interface CurrentContract {
+export interface RenewalSourcePolicy {
   insurerId: number;
   tariffCode: string | null;
   tariffLabel?: string | null;
@@ -76,7 +76,7 @@ function uniqueByCode(offers: readonly Offer[]): Offer[] {
  * `candidates` : offres déjà filtrées sur canton, région, classe d'âge cible, accident, sous-groupe.
  */
 export function findRenewal(
-  contract: CurrentContract,
+  contract: RenewalSourcePolicy,
   candidates: readonly Offer[],
   allowedFranchises: readonly number[],
   confirmedCode: string | null = null,

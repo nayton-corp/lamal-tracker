@@ -50,7 +50,7 @@ export function MfaForm({ next }: { next: string }) {
 
 export function CreatePasswordForm({ askEmail, askSetupCode }: { askEmail: boolean; askSetupCode: boolean }) {
   const [state, action] = useActionState(createPasswordAction, null);
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
   return (
     <form action={action} className="space-y-4">
       {askEmail ? (
@@ -60,9 +60,9 @@ export function CreatePasswordForm({ askEmail, askSetupCode }: { askEmail: boole
       ) : (
         <input type="hidden" name="username" autoComplete="username" value="administrateur" />
       )}
-      <NewPasswordFields errors={fe} autoFocus={!askEmail} />
+      <NewPasswordFields errors={fieldErrors} autoFocus={!askEmail} />
       {askSetupCode && (
-        <Field label="Code d'installation" htmlFor="setup" error={fe.setup} hint="La valeur de SETUP_TOKEN dans la configuration du serveur.">
+        <Field label="Code d'installation" htmlFor="setup" error={fieldErrors.setup} hint="La valeur de SETUP_TOKEN dans la configuration du serveur.">
           <Input id="setup" name="setup" type="password" autoComplete="off" required />
         </Field>
       )}
@@ -102,12 +102,12 @@ export function ForgotPasswordForm() {
 
 export function ResetPasswordForm({ token, needsCode }: { token: string; needsCode: boolean }) {
   const [state, action] = useActionState(resetPasswordAction, null);
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="t" value={token} />
       <input type="hidden" name="username" autoComplete="username" value="" />
-      <NewPasswordFields errors={fe} autoFocus label="Nouveau mot de passe" />
+      <NewPasswordFields errors={fieldErrors} autoFocus label="Nouveau mot de passe" />
       {needsCode && (
         <Field label="Code du double facteur" htmlFor="code" hint="Code de votre application d'authentification, ou un code de secours.">
           <Input id="code" name="code" autoComplete="one-time-code" required maxLength={20} />

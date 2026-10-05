@@ -30,7 +30,7 @@ export const metadata = { title: "Administration" };
  */
 export default async function AdminPage() {
   const scope = await pageScope();
-  if (!scope.admin) notFound();
+  if (!scope.isAdmin) notFound();
   const now = nowIso();
   const accounts = listAccounts(db(), scope);
   const invitations = listSignupInvitations(db(), scope);

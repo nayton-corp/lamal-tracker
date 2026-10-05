@@ -24,10 +24,10 @@ export const metadata = { title: "Contrôle LCA" };
 export default async function LcaPage({ params }: { params: Promise<{ year: string }> }) {
   const scope = await pageScope();
   const year = Number((await params).year);
-  const r = getReviewByYear(db(), scope, year);
-  if (!r || r.status === "CLOSED") redirect(`/rituel/${year}`);
-  const view = getReviewView(db(), scope, r.id, today());
-  const switching = view.persons.filter((p) => p.line.decision === "SWITCH");
+  const reviewRow = getReviewByYear(db(), scope, year);
+  if (!reviewRow || reviewRow.status === "CLOSED") redirect(`/rituel/${year}`);
+  const view = getReviewView(db(), scope, reviewRow.id, today());
+  const switching = view.lines.filter((p) => p.line.decision === "SWITCH");
   // Rien à vérifier tant que personne ne change de caisse.
   if (switching.length === 0) redirect(`/rituel/${year}`);
   const allDone = switching.every((p) => p.line.lcaAckAt);
@@ -56,7 +56,7 @@ export default async function LcaPage({ params }: { params: Promise<{ year: stri
             <div>
               <p className="text-lg font-semibold">{pr.person.firstName}</p>
               <p className="text-sm text-muted">
-                Quitte {pr.currentInsurer} pour {pr.chosenInsurer} (LAMal)
+                Quitte {pr.currentInsurerName} pour {pr.chosenInsurerName} (LAMal)
               </p>
             </div>
             {contracts.length > 0 ? (
@@ -80,7 +80,7 @@ export default async function LcaPage({ params }: { params: Promise<{ year: stri
               </p>
             )}
             <ActionForm action={lcaWishesAction} hidden={{ lineId: pr.line.id }} className="space-y-2 rounded-xl border border-border p-3">
-              <p className="text-sm font-medium">Complémentaires à demander à {pr.chosenInsurer}</p>
+              <p className="text-sm font-medium">Complémentaires à demander à {pr.chosenInsurerName}</p>
               <p className="text-sm text-muted">Elles figureront dans la demande d&apos;offre. Gardez les actuelles jusqu&apos;à l&apos;acceptation écrite des nouvelles.</p>
               {(() => {
                 const wishes = new Set<string>(lcaWishesFor(db(), pr.line));
@@ -113,7 +113,7 @@ export default async function LcaPage({ params }: { params: Promise<{ year: stri
             </ActionForm>
             )}
 
-            <LcaConfirm lineId={pr.line.id} person={pr.person.firstName} currentInsurer={pr.currentInsurer} acknowledgedAt={pr.line.lcaAckAt} />
+            <LcaConfirm lineId={pr.line.id} person={pr.person.firstName} currentInsurer={pr.currentInsurerName} acknowledgedAt={pr.line.lcaAckAt} />
           </Card>
         );
       })}

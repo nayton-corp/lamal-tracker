@@ -96,8 +96,8 @@ function household_(name: string): Fixture {
   const lcaId = saveLca(db, scope, { personId, insurerName: "Helsana", linkedInsurerId: insurerId(1562), guarantee: "HOSPITAL_SEMI_PRIVATE" });
   saveSignature(db, scope, personId, PNG);
   const { reviewId } = openReview(db, scope, 2027);
-  const pr = getReviewView(db, scope, reviewId, TODAY).persons[0]!;
-  decide(db, scope, pr.line.id, { tariffId: pr.best!.tariffId, franchiseChf: pr.best!.franchiseChf }, NOW);
+  const pr = getReviewView(db, scope, reviewId, TODAY).lines[0]!;
+  decide(db, scope, pr.line.id, { tariffId: pr.bestOffer!.tariffId, franchiseChf: pr.bestOffer!.franchiseChf }, NOW);
   acknowledgeLca(db, scope, pr.line.id, NOW);
   const [offerId] = generateOfferRequests(db, scope, reviewId, TODAY);
   markOfferRequestSent(db, scope, offerId!, TODAY);
@@ -212,7 +212,7 @@ describe("cloisonnement des foyers", () => {
   it("les correspondances de tarifs confirmées restent propres au foyer", () => {
     confirmLineage(db, a.scope, a.lineId, "HEL-TEL");
     expect(db.select().from(tariffLineage).all().map((l) => l.householdId)).toEqual([a.scope.householdId]);
-    expect(getReviewView(db, b.scope, b.reviewId, TODAY).persons[0]!.line.renewalStatus).not.toBe("MATCHED");
+    expect(getReviewView(db, b.scope, b.reviewId, TODAY).lines[0]!.line.renewalStatus).not.toBe("MATCHED");
   });
 
   it("les coordonnées des caisses, partagées, sont réservées à l'administrateur", () => {

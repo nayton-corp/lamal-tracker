@@ -26,7 +26,7 @@ export interface CompareOptions {
   /** « strategy » : classement de la stratégie du rituel (par défaut quand elle est choisie). */
   sort?: SortKey | "strategy";
   /** Ignore les exclusions et modèles préférés de la personne. */
-  all?: boolean;
+  ignorePersonPreferences?: boolean;
   /** Toutes les offres de chaque caisse, au lieu de sa meilleure seulement. */
   everyOffer?: boolean;
 }
@@ -78,7 +78,7 @@ export interface CompareView {
   strategy: Strategy | null;
   sort: SortKey | "strategy";
   /** Filtres appliqués (après besoins et paramètres d'URL). */
-  effective: { models: ModelType[]; franchiseChf: number | null };
+  appliedFilters: { models: ModelType[]; franchiseChf: number | null };
   /** Points de solidité de chaque caisse (−3 à +3), pour l'équilibre. */
   quality: Record<number, number>;
   /** Meilleure offre selon chacune des trois stratégies. */
@@ -87,9 +87,9 @@ export interface CompareView {
 
 export function compareForLine(db: Db, scope: Scope, lineId: number, opts: CompareOptions = {}): CompareView {
   const c = lineContext(db, scope, lineId, opts.healthCostsRp);
-  const { line, review: r, person: p, policy, ctx, allowedFranchises } = c;
-  const params = ctx.params;
-  const healthCostsRp = ctx.healthCostsRp;
+  const { line, review: r, person: p, policy, costContext, allowedFranchises } = c;
+  const params = costContext.params;
+  const healthCostsRp = costContext.healthCostsRp;
   const all = c.offers;
 
   const renewal =
@@ -103,15 +103,15 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
         };
 
   const needs = effectiveNeeds(c);
-  const models = opts.models ?? (opts.all ? [] : needs.models);
+  const models = opts.models ?? (opts.ignorePersonPreferences ? [] : needs.models);
   const franchises = opts.franchises ?? (needs.franchiseChf === null ? [] : [needs.franchiseChf]);
   const filtered = filterOffers(all, {
     models,
     franchises,
-    excludedInsurerIds: opts.all ? [] : p.excludedInsurerIds,
+    excludedInsurerIds: opts.ignorePersonPreferences ? [] : p.excludedInsurerIds,
   });
   const sort = opts.sort ?? (r.strategy ? "strategy" : "total");
-  const byCost = rankOffers(filtered, { ...ctx, referenceTotalRp: renewal?.totalRp ?? null }, sort === "premium" ? "premium" : "total");
+  const byCost = rankOffers(filtered, { ...costContext, referenceTotalRp: renewal?.totalRp ?? null }, sort === "premium" ? "premium" : "total");
   const rankedAll = sort === "strategy" && r.strategy ? rankForStrategy(byCost, r.strategy, c.quality) : byCost;
   const ranked = opts.everyOffer ? rankedAll : bestPerInsurer(rankedAll);
 
@@ -177,7 +177,7 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     market: marketStats(all.filter((o) => o.franchiseChf === (renewal?.franchiseChf ?? policy.franchiseChf)).map((o) => o.monthlyPremiumRp)),
     strategy: r.strategy,
     sort,
-    effective: { models, franchiseChf: franchises.length === 1 ? franchises[0]! : null },
+    appliedFilters: { models, franchiseChf: franchises.length === 1 ? franchises[0]! : null },
     quality: c.qualityById,
     picks: picksFor(c),
   };

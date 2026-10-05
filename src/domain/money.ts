@@ -1,6 +1,9 @@
 /**
  * Montants en centimes (Rappen), toujours entiers. Jamais de float pour de l'argent :
- * les conversions passent par ici et nulle part ailleurs.
+ * les conversions passent par ici et nulle part ailleurs. Suffixe des noms : `*Rp`.
+ *
+ * Taux, entiers eux aussi : `*Bp` en points de base (1/10 000, 1000 Bp = 10 %), `*Permille`
+ * en pour-mille (1/1 000, 32 ‰ = 3,2 %).
  */
 export type Rappen = number;
 

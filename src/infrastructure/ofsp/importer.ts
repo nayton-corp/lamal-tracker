@@ -22,6 +22,13 @@ export interface ImportOptions {
 
 const BATCH = 2000;
 
+/** Lignes lues avant d'abandonner la recherche de l'en-tête. */
+const MAX_HEADER_SCAN_ROWS = 30;
+/** Une ligne sur N est échantillonnée pour le rapport (nombre premier : pas d'alignement sur un motif du fichier). */
+const SAMPLE_EVERY_N_ROWS = 997;
+const SAMPLES_PER_COLUMN = 6;
+const SAMPLE_MAX_CHARS = 60;
+
 /**
  * Importe un fichier de primes OFSP comme nouveau jeu immuable.
  * Idempotent par empreinte : le même fichier n'est jamais importé deux fois.
@@ -48,7 +55,7 @@ export async function importPremiumFile(
     .returning()
     .get();
 
-  const acc = new ImportAccumulator();
+  const stats = new ImportAccumulator();
   const cantonFilter = opts.cantons?.length ? new Set(opts.cantons) : null;
   const insurerIds = new Map<number, number>(
     db.select({ id: insurer.id, bag: insurer.bagNumber }).from(insurer).all().map((r) => [r.bag, r.id]),
@@ -73,34 +80,36 @@ export async function importPremiumFile(
         insurerId = (insertInsurer.get(r.insurerBag, insurerName(r.insurerBag)) as { id: number }).id;
         insurerIds.set(r.insurerBag, insurerId);
       }
-      const tKey = `${insurerId}|${r.tariffCode}`;
-      let tariffId = tariffIds.get(tKey);
+      const tariffKey = `${insurerId}|${r.tariffCode}`;
+      let tariffId = tariffIds.get(tariffKey);
       if (tariffId === undefined) {
         tariffId = (insertTariff.get(dataset.id, insurerId, r.tariffCode, r.tariffLabel, r.tariffTypeRaw, r.modelType) as { id: number }).id;
-        tariffIds.set(tKey, tariffId);
+        tariffIds.set(tariffKey, tariffId);
       }
       const res = insertPremium.run(
         dataset.id, tariffId, r.canton, r.region, r.ageClass, r.subgroup, r.accident ? 1 : 0, r.franchiseChf, r.monthlyPremiumRp,
       );
-      if (res.changes === 0) acc.duplicate();
-      else acc.keep(r);
+      if (res.changes === 0) stats.duplicate();
+      else stats.keep(r);
     }
   });
 
+  /** Position de chaque colonne connue, une fois l'en-tête trouvé. */
+  let index: Partial<Record<Column, number>> | null = null;
   // Quelques valeurs brutes par colonne, gardées pour le rapport (diagnostic d'un format inattendu).
   const samples: Record<string, Set<string>> = {};
   const sample = (cells: readonly unknown[]) => {
     for (const [col, i] of Object.entries(index ?? {})) {
       const set = (samples[col] ??= new Set());
       const v = cells[i as number];
-      if (set.size < 6 && v !== undefined && v !== null) set.add(typeof v === "object" ? JSON.stringify(v).slice(0, 60) : String(v).slice(0, 60));
+      if (set.size < SAMPLES_PER_COLUMN && v !== undefined && v !== null) set.add((typeof v === "object" ? JSON.stringify(v) : String(v)).slice(0, SAMPLE_MAX_CHARS));
     }
   };
-  let index: Partial<Record<Column, number>> | null = null;
   let missing: string[] = [];
   let batch: PremiumRow[] = [];
   let scanned = 0;
-  let filtered = 0;
+  /** Lignes écartées parce que hors des cantons retenus (IMPORT_CANTONS). */
+  let skippedByCanton = 0;
 
   try {
     for await (const cells of readRows(file)) {
@@ -114,31 +123,31 @@ export async function importPremiumFile(
           missing = [];
         } else {
           if (scanned === 0 || header.missing.length < missing.length) missing = header.missing;
-          if (++scanned >= 30) break;
+          if (++scanned >= MAX_HEADER_SCAN_ROWS) break;
         }
         continue;
       }
-      if (acc.rowsRead % 997 === 0) sample(cells);
+      if (stats.rowsRead % SAMPLE_EVERY_N_ROWS === 0) sample(cells);
       const result = normalizeRow(cells, index);
       if (!result.ok) {
-        acc.skip(result.reason);
+        stats.skip(result.reason);
         continue;
       }
       if (cantonFilter && !cantonFilter.has(result.row.canton)) {
-        filtered++;
+        skippedByCanton++;
         continue;
       }
       batch.push(result.row);
       if (batch.length >= BATCH) {
         writeBatch(batch);
         batch = [];
-        opts.onProgress?.(acc.rowsRead + filtered);
+        opts.onProgress?.(stats.rowsRead + skippedByCanton);
         await new Promise((r) => setImmediate(r));
       }
     }
     if (batch.length) writeBatch(batch);
   } catch (error) {
-    const report = acc.report(missing);
+    const report = stats.report(missing);
     report.samples = Object.fromEntries(Object.entries(samples).map(([k, v]) => [k, [...v]]));
     report.ok = false;
     report.errors.push(`Lecture impossible : ${error instanceof Error ? error.message : String(error)}`);
@@ -146,11 +155,11 @@ export async function importPremiumFile(
   }
 
   if (index === null && missing.length === 0) missing = ["(en-tête introuvable)"];
-  const draft = acc.report(missing);
+  const draft = stats.report(missing);
   const previous = draft.year === null ? undefined : previousMedians(db, draft.year - 1);
-  const report = acc.report(missing, previous);
+  const report = stats.report(missing, previous);
   report.samples = Object.fromEntries(Object.entries(samples).map(([k, v]) => [k, [...v]]));
-  if (filtered) report.warnings.push(`${filtered} lignes hors des cantons retenus (${[...cantonFilter!].join(", ")}) ignorées.`);
+  if (skippedByCanton) report.warnings.push(`${skippedByCanton} lignes hors des cantons retenus (${[...cantonFilter!].join(", ")}) ignorées.`);
 
   if (!report.ok || report.year === null) return fail(db, dataset.id, report);
 

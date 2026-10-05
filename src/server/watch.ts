@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { opsTick } from "@/application/ops";
 import { reminderTick } from "@/application/reminders";
-import { getSetting, setSetting } from "@/infrastructure/db/settings";
+import { getSetting, setSetting, SETTING_KEYS } from "@/infrastructure/db/settings";
 import { householdKey, notify } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
 import { yearAttemptKey, yearRetryDue } from "@/infrastructure/ofsp/retry";
@@ -12,7 +12,7 @@ import { purgeAudit } from "@/application/audit";
 import { purgeExpiredTokens } from "@/application/tokens";
 import { inactivityTick } from "@/application/data-rights";
 import { mailDeps } from "./accounts";
-import { currentYear, db, nowIso, ritualYear, today } from "./context";
+import { currentYear, db, nowIso, reviewTargetYear, today } from "./context";
 import { pingenTick } from "./pingen";
 import { referenceTick } from "./reference";
 import { importJob, startBootstrapImport, startImport, startYearImport } from "./jobs";
@@ -30,17 +30,17 @@ export async function checkForNewPremiums(force = false): Promise<string> {
   } catch (error) {
     if (!force) throw error;
   }
-  const previous = getSetting<RemoteSignature>(db(), "ofsp.signature");
+  const previous = getSetting<RemoteSignature>(db(), SETTING_KEYS.ofspSignature);
   const changed = !previous || !sig || previous.etag !== sig.etag || previous.lastModified !== sig.lastModified || previous.length !== sig.length || previous.url !== sig.url;
   if (!changed && !force) {
-    setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), url, ok: true });
+    setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), url, ok: true });
     return "Aucune nouvelle publication.";
   }
 
   const started = startImport({ kind: "download", url }, async (outcome) => {
     // Signature mémorisée seulement si le fichier a été pris en compte : un import refusé
     // (FAILED) sera retenté au prochain contrôle sans attendre une nouvelle publication.
-    if (sig && (outcome.status === "IMPORTED" || outcome.status === "ALREADY")) setSetting(db(), "ofsp.signature", sig);
+    if (sig && (outcome.status === "IMPORTED" || outcome.status === "ALREADY")) setSetting(db(), SETTING_KEYS.ofspSignature, sig);
     if (outcome.status === "IMPORTED" && outcome.report.year) {
       const year = outcome.report.year;
       await notify(
@@ -52,7 +52,7 @@ export async function checkForNewPremiums(force = false): Promise<string> {
     }
   });
   // Le contrôle ne compte que si l'import a pu démarrer ; sinon on réessaie à la prochaine passe.
-  if (started) setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), url, ok: Boolean(sig) });
+  if (started) setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), url, ok: Boolean(sig) });
   return started ? "Import lancé." : "Un import est déjà en cours.";
 }
 
@@ -61,7 +61,7 @@ export async function checkForNewPremiums(force = false): Promise<string> {
  * relances quand une caisse tarde à confirmer.
  */
 export async function sendDeadlineReminders(): Promise<void> {
-  const year = ritualYear();
+  const year = reviewTargetYear();
   if (!activeDataset(db(), year)) return;
   await reminderTick(
     db(),
@@ -88,7 +88,7 @@ function ensureBaseDatasets(): boolean {
   const year = currentYear();
   if (latestActiveYear(db()) === null) {
     return startBootstrapImport(year, async (outcome) => {
-      if (outcome.status === "IMPORTED") setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), ok: true });
+      if (outcome.status === "IMPORTED") setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), ok: true });
     });
   }
   if (!activeDataset(db(), year)) {
@@ -107,7 +107,7 @@ export async function schedulerTick(): Promise<void> {
     console.log("[watch] import initial des primes lancé");
     return;
   }
-  const last = getSetting<{ at: string }>(db(), "ofsp.lastCheck");
+  const last = getSetting<{ at: string }>(db(), SETTING_KEYS.ofspLastCheck);
   const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
   const every = inPublicationSeason(today()) ? 20 : 24 * 7;
   if (process.env.OFSP_AUTO_CHECK !== "false" && ageH >= every) {
@@ -115,7 +115,7 @@ export async function schedulerTick(): Promise<void> {
       console.log("[watch]", await checkForNewPremiums());
     } catch (error) {
       console.error("[watch] contrôle OFSP impossible :", error instanceof Error ? error.message : error);
-      setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), ok: false });
+      setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), ok: false });
     }
   }
   try {

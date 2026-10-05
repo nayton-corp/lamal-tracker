@@ -18,12 +18,12 @@ import { pageScope } from "@/server/auth";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Foyer" };
 
-export default async function FoyerPage() {
+export default async function HouseholdPage() {
   const scope = await pageScope();
-  const h = getHousehold(db(), scope);
-  if (!h) redirect("/bienvenue");
+  const householdRow = getHousehold(db(), scope);
+  if (!householdRow) redirect("/bienvenue");
   const year = currentYear();
-  const persons = listPersons(db(), h.id);
+  const persons = listPersons(db(), householdRow.id);
   const solo = getHouseholdMode(db(), scope) === "SOLO" && persons.length <= 1;
   const first = persons[0];
 
@@ -31,7 +31,7 @@ export default async function FoyerPage() {
     <Page wide>
       <PageHeader title={solo ? "Moi" : "Foyer"} />
 
-      <HouseholdCard household={h} person={solo ? (first ? { firstName: first.firstName, lastName: first.lastName, birthDate: first.birthDate } : null) : undefined} />
+      <HouseholdCard household={householdRow} person={solo ? (first ? { firstName: first.firstName, lastName: first.lastName, birthDate: first.birthDate } : null) : undefined} />
 
       {(
         <Section

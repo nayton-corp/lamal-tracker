@@ -13,20 +13,20 @@ import { renewalFor, currentPolicy } from "./lines";
  * décidées ne sont pas touchées, les autres sont recalculées sur le jeu actif.
  */
 export function openReview(db: Db, scope: Scope, targetYear: number): { reviewId: number; skipped: string[] } {
-  const h = { id: householdIdOf(scope) };
+  const householdRow = { id: householdIdOf(scope) };
   const dataset = activeDataset(db, targetYear);
   if (!dataset) throw new UserError(`Les primes ${targetYear} ne sont pas encore importées (page Données).`);
 
-  let row = db.select().from(review).where(and(eq(review.householdId, h.id), eq(review.targetYear, targetYear))).get();
+  let row = db.select().from(review).where(and(eq(review.householdId, householdRow.id), eq(review.targetYear, targetYear))).get();
   if (!row) {
-    row = db.insert(review).values({ householdId: h.id, targetYear, datasetId: dataset.id, status: "OPEN" }).returning().get();
+    row = db.insert(review).values({ householdId: householdRow.id, targetYear, datasetId: dataset.id, status: "OPEN" }).returning().get();
   } else if (row.datasetId !== dataset.id && row.status !== "CLOSED") {
     db.update(review).set({ datasetId: dataset.id }).where(eq(review.id, row.id)).run();
     row = { ...row, datasetId: dataset.id };
   }
   if (row.status === "CLOSED") return { reviewId: row.id, skipped: [] };
 
-  const persons = listPersons(db, h.id);
+  const persons = listPersons(db, householdRow.id);
   if (!persons.some((p) => currentPolicy(db, p.id, targetYear - 1))) {
     db.delete(review).where(and(eq(review.id, row.id), eq(review.status, "OPEN"))).run();
     throw new UserError(`Indiquez d'abord ${persons.length > 1 ? "les contrats" : "votre contrat"} ${targetYear - 1}.`);
@@ -54,10 +54,11 @@ export function openReview(db: Db, scope: Scope, targetYear: number): { reviewId
 }
 
 /**
- * Pendant la fenêtre du rituel, l'analyse s'ouvre d'elle-même dès que les primes de l'année
- * cible sont publiées et qu'au moins une personne a son contrat de l'année en cours.
+ * Ouvre le rituel de l'année cible si c'est possible : primes de l'année cible importées et au
+ * moins un contrat de l'année en cours. Retourne son id, sinon null. Ne vérifie pas la fenêtre du
+ * rituel (`isReviewWindowOpen`) : c'est à l'appelant de le faire.
  */
-export function ensureReview(db: Db, scope: Scope, targetYear: number): number | null {
+export function openReviewIfPossible(db: Db, scope: Scope, targetYear: number): number | null {
   const existing = getReviewByYear(db, scope, targetYear);
   if (existing) return existing.id;
   if (scope.householdId === null || !activeDataset(db, targetYear)) return null;

@@ -12,7 +12,7 @@ import { SubmitButton } from "@/ui/submit";
 export function SignupInviteForm() {
   const [state, action] = useActionState(createSignupInviteAction, null);
   const [copied, setCopied] = useState(false);
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
   return (
     <div className="space-y-4">
       <form action={action} className="space-y-4">
@@ -20,10 +20,10 @@ export function SignupInviteForm() {
           <Input id="invite-label" name="label" maxLength={80} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Utilisations" htmlFor="invite-uses" error={fe.maxUses}>
+          <Field label="Utilisations" htmlFor="invite-uses" error={fieldErrors.maxUses}>
             <Input id="invite-uses" name="maxUses" type="number" min={1} max={100} defaultValue={1} required />
           </Field>
-          <Field label="Valable (jours)" htmlFor="invite-days" error={fe.days}>
+          <Field label="Valable (jours)" htmlFor="invite-days" error={fieldErrors.days}>
             <Input id="invite-days" name="days" type="number" min={1} max={60} defaultValue={14} required />
           </Field>
         </div>

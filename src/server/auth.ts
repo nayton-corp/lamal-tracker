@@ -55,7 +55,7 @@ export async function requireAdminScope(): Promise<Scope & { sessionId: string }
  */
 export async function pageScope(): Promise<Scope & { sessionId: string }> {
   const scope = await accountPageScope();
-  if (scope.admin && adminNeedsFactor(db(), scope.userId)) redirect("/compte?requis=1");
+  if (scope.isAdmin && adminNeedsFactor(db(), scope.userId)) redirect("/compte?requis=1");
   return scope;
 }
 
@@ -67,8 +67,8 @@ export async function accountPageScope(): Promise<Scope & { sessionId: string }>
 }
 
 async function startSession(userId: number, confirmed: boolean): Promise<string> {
-  const h = await headers();
-  const device = describeDevice(h.get("user-agent"));
+  const householdRow = await headers();
+  const device = describeDevice(householdRow.get("user-agent"));
   const { token } = openSession(db(), userId, device, nowIso(), confirmed);
   await writeCookie(COOKIE.session, token, SESSION_MAX_DAYS * 86_400);
   return device;

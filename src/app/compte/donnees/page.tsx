@@ -65,7 +65,7 @@ export default async function MyDataPage() {
         </Card>
       </Section>
 
-      {scope.admin && (
+      {scope.isAdmin && (
         <Section title="Sauvegarde de l'instance">
           <Card id="sauvegarde" className="scroll-mt-20 space-y-3">
             <p className="text-sm text-muted">

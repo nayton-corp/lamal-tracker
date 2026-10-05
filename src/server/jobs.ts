@@ -19,11 +19,11 @@ export interface ImportJob {
   error: string | null;
 }
 
-const g = globalThis as unknown as { __importJob?: ImportJob };
+const globalForImportJob = globalThis as unknown as { __importJob?: ImportJob };
 
 function state(): ImportJob {
-  g.__importJob ??= { running: false, phase: "idle", label: "", rowsRead: 0, startedAt: null, finishedAt: null, outcome: null, log: [], error: null };
-  return g.__importJob;
+  globalForImportJob.__importJob ??= { running: false, phase: "idle", label: "", rowsRead: 0, startedAt: null, finishedAt: null, outcome: null, log: [], error: null };
+  return globalForImportJob.__importJob;
 }
 
 export function importJob(): ImportJob {
@@ -43,32 +43,32 @@ function cantonFilter(): string[] | undefined {
  * Importe un fichier téléchargé ou téléversé, puis le supprime : son empreinte SHA-256 reste en
  * base (idempotence) et la carte SD du Pi n'accumule pas des dizaines de Mo par publication.
  */
-async function importOne(s: ImportJob, file: string, origin: string): Promise<ImportOutcome> {
-  s.phase = "import";
-  s.rowsRead = 0;
+async function importOne(job: ImportJob, file: string, origin: string): Promise<ImportOutcome> {
+  job.phase = "import";
+  job.rowsRead = 0;
   try {
-    return await importPremiumFile(db(), file, origin, { cantons: cantonFilter(), onProgress: (n) => (s.rowsRead = n) });
+    return await importPremiumFile(db(), file, origin, { cantons: cantonFilter(), onProgress: (n) => (job.rowsRead = n) });
   } finally {
     fs.rmSync(file, { force: true });
   }
 }
 
 /** Exécute un import en arrière-plan ; un seul à la fois. Retourne false si un import tourne déjà. */
-function run(label: string, work: (s: ImportJob) => Promise<void>): boolean {
-  const s = state();
-  if (s.running) return false;
-  Object.assign(s, { running: true, phase: "download", label, rowsRead: 0, startedAt: new Date().toISOString(), finishedAt: null, outcome: null, log: [], error: null });
+function run(label: string, work: (job: ImportJob) => Promise<void>): boolean {
+  const job = state();
+  if (job.running) return false;
+  Object.assign(job, { running: true, phase: "download", label, rowsRead: 0, startedAt: new Date().toISOString(), finishedAt: null, outcome: null, log: [], error: null });
   void (async () => {
     try {
-      await work(s);
-      s.phase = "done";
+      await work(job);
+      job.phase = "done";
     } catch (error) {
-      s.phase = "error";
-      s.error = error instanceof Error ? error.message : String(error);
+      job.phase = "error";
+      job.error = error instanceof Error ? error.message : String(error);
       console.error("[import]", error);
     } finally {
-      s.running = false;
-      s.finishedAt = new Date().toISOString();
+      job.running = false;
+      job.finishedAt = new Date().toISOString();
     }
   })();
   return true;
@@ -79,7 +79,7 @@ export function startImport(
   onDone?: (outcome: ImportOutcome) => void | Promise<void>,
 ): boolean {
   const label = source.kind === "file" ? source.name : "Téléchargement depuis opendata.swiss";
-  return run(label, async (s) => {
+  return run(label, async (job) => {
     let file: string;
     let origin: string;
     if (source.kind === "download") {
@@ -89,8 +89,8 @@ export function startImport(
       file = source.file;
       origin = `fichier : ${source.name}`;
     }
-    s.outcome = await importOne(s, file, origin);
-    await onDone?.(s.outcome);
+    job.outcome = await importOne(job, file, origin);
+    await onDone?.(job.outcome);
   });
 }
 
@@ -101,13 +101,13 @@ export function startImport(
  * et le retélécharger à chaque demande occuperait l'unique créneau d'import pour rien.
  */
 export function startYearImport(year: number): boolean {
-  return run(`Primes ${year}`, async (s) => {
+  return run(`Primes ${year}`, async (job) => {
     if (activeDataset(db(), year)) return;
     const archive = (await listArchives()).find((a) => a.year === year);
     if (!archive && year < currentYear()) throw new Error(`Aucune archive OFSP pour ${year}.`);
     const url = archive?.url ?? (await resolvePremiumsUrl());
     const file = await download(url, path.join(dataDir(), "downloads"));
-    s.outcome = await importOne(s, file, url);
+    job.outcome = await importOne(job, file, url);
   });
 }
 
@@ -116,18 +116,18 @@ export function startYearImport(year: number): boolean {
  * (contrats actuels pré-remplis sans rien faire).
  */
 export function startBootstrapImport(currentYear: number, onLatest?: (outcome: ImportOutcome) => void | Promise<void>): boolean {
-  return run("Première importation des primes", async (s) => {
+  return run("Première importation des primes", async (job) => {
     const url = await resolvePremiumsUrl();
     const file = await download(url, path.join(dataDir(), "downloads"));
-    s.outcome = await importOne(s, file, url);
-    await onLatest?.(s.outcome);
+    job.outcome = await importOne(job, file, url);
+    await onLatest?.(job.outcome);
     if (!activeDataset(db(), currentYear)) {
       const archive = (await listArchives()).find((a) => a.year === currentYear);
       if (archive) {
-        s.phase = "download";
-        s.label = `Archive ${currentYear}`;
+        job.phase = "download";
+        job.label = `Archive ${currentYear}`;
         const f = await download(archive.url, path.join(dataDir(), "downloads"));
-        s.outcome = await importOne(s, f, archive.url);
+        job.outcome = await importOne(job, f, archive.url);
       }
     }
   });
@@ -135,20 +135,20 @@ export function startBootstrapImport(currentYear: number, onLatest?: (outcome: I
 
 /** Importe les archives OFSP des années précédentes qui ne sont pas encore dans la base. */
 export function startArchivesImport(): boolean {
-  return run("Archives des années précédentes", async (s) => {
+  return run("Archives des années précédentes", async (job) => {
     const archives = await listArchives();
     for (const a of archives) {
       if (activeDataset(db(), a.year)) {
-        s.log.push(`${a.year} : déjà présent.`);
+        job.log.push(`${a.year} : déjà présent.`);
         continue;
       }
-      s.phase = "download";
-      s.label = `Archive ${a.year}`;
+      job.phase = "download";
+      job.label = `Archive ${a.year}`;
       try {
         const file = await download(a.url, path.join(dataDir(), "downloads"));
-        const outcome = await importOne(s, file, a.url);
-        s.outcome = outcome;
-        s.log.push(
+        const outcome = await importOne(job, file, a.url);
+        job.outcome = outcome;
+        job.log.push(
           outcome.status === "IMPORTED"
             ? `${outcome.report.year} : ${outcome.report.stats.rowsKept.toLocaleString("fr-CH")} primes importées.`
             : outcome.status === "ALREADY"
@@ -156,7 +156,7 @@ export function startArchivesImport(): boolean {
               : `${a.year} : refusé (${outcome.report.errors.join(" ")}).`,
         );
       } catch (error) {
-        s.log.push(`${a.year} : indisponible (${error instanceof Error ? error.message : String(error)}).`);
+        job.log.push(`${a.year} : indisponible (${error instanceof Error ? error.message : String(error)}).`);
       }
     }
   });

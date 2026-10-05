@@ -4,7 +4,7 @@
  */
 export const YEAR_RETRY_HOURS = 24;
 
-export function yearAttemptKey(year: number): string {
+export function yearAttemptKey(year: number): `ofsp.yearAttempt.${number}` {
   return `ofsp.yearAttempt.${year}`;
 }
 

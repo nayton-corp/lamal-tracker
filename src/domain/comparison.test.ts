@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cheapestPerFranchise, filterOffers, marketStats, percentileOf, rankOffers, type Offer } from "./comparison";
+import { cheapestPerFranchise, filterOffers, marketStats, rankOffers, type Offer } from "./comparison";
 import { defaultParameters } from "./parameters";
 
 function offer(p: Partial<Offer> & Pick<Offer, "tariffId" | "monthlyPremiumRp">): Offer {
@@ -55,7 +55,6 @@ describe("comparaison", () => {
 
   it("statistiques de marché", () => {
     expect(marketStats([3, 1, 2, 10])).toEqual({ count: 4, minRp: 1, medianRp: 3, maxRp: 10 });
-    expect(percentileOf(3, [1, 2, 3, 4])).toBe(50);
     expect(marketStats([])).toBeNull();
   });
 });

@@ -17,13 +17,13 @@ export type PersonRow = typeof person.$inferSelect;
 export type PolicyRow = typeof lamalPolicy.$inferSelect;
 
 /** Profil de primes d'une ligne : région du foyer de la revue, classe d'âge, accident. */
-export function offerScope(db: Db, reviewRow: typeof review.$inferSelect, line: Pick<LineRow, "targetAgeClass" | "accident" | "subgroup">) {
-  const h = db.select().from(household).where(eq(household.id, reviewRow.householdId)).get();
-  if (!h) throw new UserError("Foyer non configuré.");
+export function premiumProfileFor(db: Db, reviewRow: typeof review.$inferSelect, line: Pick<LineRow, "targetAgeClass" | "accident" | "subgroup">) {
+  const householdRow = db.select().from(household).where(eq(household.id, reviewRow.householdId)).get();
+  if (!householdRow) throw new UserError("Foyer non configuré.");
   return {
     datasetId: reviewRow.datasetId,
-    canton: h.canton,
-    region: h.region,
+    canton: householdRow.canton,
+    region: householdRow.region,
     ageClass: line.targetAgeClass,
     accident: line.accident,
     subgroup: line.subgroup,
@@ -35,7 +35,7 @@ export function renewalFor(db: Db, reviewRow: typeof review.$inferSelect, p: Per
   const subgroup = subgroupFor(ageClass, p.kidSubgroup);
   const accident = policy.accident;
   const params = parametersFor(db, reviewRow.targetYear);
-  const offers = offersFor(db, offerScope(db, reviewRow, { targetAgeClass: ageClass, accident, subgroup }));
+  const offers = offersFor(db, premiumProfileFor(db, reviewRow, { targetAgeClass: ageClass, accident, subgroup }));
   const lineage = policy.tariffCode
     ? db
         .select()
@@ -77,9 +77,9 @@ export function loadLine(db: Db, scope: Scope, lineId: number) {
   const line = ownedLine(db, scope, lineId);
   const r = db.select().from(review).where(eq(review.id, line.reviewId)).get()!;
   const policy = db.select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
-  const p = db.select().from(person).where(eq(person.id, line.personId)).get()!;
+  const personRow = db.select().from(person).where(eq(person.id, line.personId)).get()!;
   if (r.status === "CLOSED") throw new UserError("Cette revue est clôturée.");
-  return { line, review: r, policy, person: p };
+  return { line, review: r, policy, person: personRow };
 }
 
 export function linesWithSentLetter(db: Db, reviewId: number): Set<number> {

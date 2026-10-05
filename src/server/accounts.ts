@@ -110,9 +110,9 @@ export function rateLimit(keys: string[], limit: number, windowMinutes: number) 
 export async function requestOrigin(): Promise<string> {
   const configured = appUrl();
   if (configured) return configured;
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto")?.split(",")[0]?.trim() || "http";
-  return `${proto}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost"}`;
+  const householdRow = await headers();
+  const proto = householdRow.get("x-forwarded-proto")?.split(",")[0]?.trim() || "http";
+  return `${proto}://${householdRow.get("x-forwarded-host") ?? householdRow.get("host") ?? "localhost"}`;
 }
 
 /** Site WebAuthn : le nom de domaine de l'app. Les passkeys exigent HTTPS (ou localhost). */

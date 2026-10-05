@@ -6,7 +6,7 @@ import { offersFor, parametersFor } from "@/infrastructure/db/queries";
 import { person, reviewLine, tariffLineage } from "@/infrastructure/db/schema";
 import { UserError } from "../errors";
 import { ownedLine, type Scope } from "../scope";
-import { offerScope, renewalFor, loadLine, linesWithSentLetter } from "./lines";
+import { premiumProfileFor, renewalFor, loadLine, linesWithSentLetter } from "./lines";
 
 /** Confirme à quel tarif de l'année cible correspond le tarif actuel, puis recalcule la ligne. */
 export function confirmLineage(db: Db, scope: Scope, lineId: number, toCode: string) {
@@ -30,7 +30,7 @@ export interface Choice {
 /** Enregistre un choix : la décision (garder, changer de caisse, ajuster) en découle. Valeurs figées. */
 export function decide(db: Db, scope: Scope, lineId: number, choice: Choice, nowIso: string) {
   const { line, review: r, policy, person: p } = loadLine(db, scope, lineId);
-  const offers = offersFor(db, offerScope(db, r, line));
+  const offers = offersFor(db, premiumProfileFor(db, r, line));
   const offer = offers.find((o) => o.tariffId === choice.tariffId && o.franchiseChf === choice.franchiseChf);
   if (!offer) throw new UserError("Offre introuvable pour ce profil.");
   const params = parametersFor(db, r.targetYear);

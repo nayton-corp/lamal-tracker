@@ -92,7 +92,7 @@ describe("rituel annuel", () => {
     const { reviewId, skipped } = openReview(db, scope, 2027);
     expect(skipped).toEqual([]);
     const view = getReviewView(db, scope, reviewId, TODAY);
-    const [adult, teen] = view.persons;
+    const [adult, teen] = view.lines;
     lines = { adult: adult!.line.id, teen: teen!.line.id };
     // Code Telmed renommé entre 2026 et 2027 : un seul tarif Telmed chez HEL → probable.
     expect(adult!.line.renewalStatus).toBe("PROBABLE");
@@ -101,9 +101,9 @@ describe("rituel annuel", () => {
     // 2008 → 19 ans en 2027 : jeune adulte, franchise enfant 0 → 300.
     expect(teen!.line.targetAgeClass).toBe("YOUNG");
     expect(teen!.line.renewalFranchiseChf).toBe(300);
-    expect(teen!.transition).toMatch(/jeune adulte/);
+    expect(teen!.ageTransitionMessage).toMatch(/jeune adulte/);
     expect(view.deadlines.receiptDeadline).toBe("2026-11-30");
-    expect(adult!.best?.insurerName).toBe("Assura");
+    expect(adult!.bestOffer?.insurerName).toBe("Assura");
     expect(view.totals.potentialAnnualSavingsRp).toBeGreaterThan(0);
     expect(adult!.lcaWarnings[0]!.level).toBe("danger");
   });
@@ -111,7 +111,7 @@ describe("rituel annuel", () => {
   it("confirme une lignée", () => {
     confirmLineage(db, scope, lines.adult, "HEL-TEL");
     const view = getReviewView(db, scope, 1, TODAY);
-    expect(view.persons[0]!.line.renewalStatus).toBe("MATCHED");
+    expect(view.lines[0]!.line.renewalStatus).toBe("MATCHED");
   });
 
   it("compare les trois stratégies, puis applique la stratégie et les besoins", () => {
@@ -133,7 +133,7 @@ describe("rituel annuel", () => {
     setStrategy(db, scope, 1, "KEEP");
     const kept = compareForLine(db, scope, lines.adult);
     expect(kept.sort).toBe("strategy");
-    expect(kept.effective).toEqual({ models: ["TELMED"], franchiseChf: 2500 });
+    expect(kept.appliedFilters).toEqual({ models: ["TELMED"], franchiseChf: 2500 });
     expect(kept.offers.every((o) => o.modelType === "TELMED" && o.franchiseChf === 2500)).toBe(true);
     expect(kept.picks).toHaveLength(3);
     // Un filtre explicite (URL) l'emporte sur les besoins ; [] = tous.
@@ -144,7 +144,7 @@ describe("rituel annuel", () => {
       { lineId: lines.adult, franchiseChf: null, models: ["TELMED", "STANDARD", "BOGUS"], healthCostsRp: 120_000, doctorName: "Dr Martin" },
     ], NOW);
     const cmp = compareForLine(db, scope, lines.adult);
-    expect(cmp.effective).toEqual({ models: ["TELMED", "STANDARD"], franchiseChf: null });
+    expect(cmp.appliedFilters).toEqual({ models: ["TELMED", "STANDARD"], franchiseChf: null });
     expect(cmp.healthCostsRp).toBe(120_000);
     view = getReviewView(db, scope, 1, TODAY);
     expect(view.review.strategy).toBe("ECONOMY");
@@ -171,7 +171,7 @@ describe("rituel annuel", () => {
     const best = cmp.offers[0]!;
     expect(decide(db, scope, lines.adult, { tariffId: best.tariffId, franchiseChf: best.franchiseChf }, NOW)).toBe("SWITCH");
 
-    const teenCmp = compareForLine(db, scope, lines.teen, { all: true, everyOffer: true });
+    const teenCmp = compareForLine(db, scope, lines.teen, { ignorePersonPreferences: true, everyOffer: true });
     const sameInsurerOther = teenCmp.offers.find((o) => o.insurerId === insurerId(8) && o.tariffCode === "CSS-TEL")!;
     expect(decide(db, scope, lines.teen, { tariffId: sameInsurerOther.tariffId, franchiseChf: sameInsurerOther.franchiseChf }, NOW)).toBe("ADJUST");
   });
@@ -195,7 +195,7 @@ describe("rituel annuel", () => {
 
     // Envoyée : vaut demande d'affiliation, et n'est plus régénérée.
     markOfferRequestSent(db, scope, again!.id, TODAY);
-    expect(getReviewView(db, scope, 1, TODAY).persons[0]!.line.affiliationRequestedAt).toBe(TODAY);
+    expect(getReviewView(db, scope, 1, TODAY).lines[0]!.line.affiliationRequestedAt).toBe(TODAY);
     expect(generateOfferRequests(db, scope, 1, TODAY)).toEqual([]);
   });
 
@@ -240,7 +240,7 @@ describe("rituel annuel", () => {
     expect(letters[0]!.kind).toBe("TERMINATION");
     expect(letters[0]!.sentAt).toBe(TODAY);
     // On rétablit la décision du scénario (changement de modèle chez CSS).
-    const teenCmp = compareForLine(db, scope, lines.teen, { all: true, everyOffer: true });
+    const teenCmp = compareForLine(db, scope, lines.teen, { ignorePersonPreferences: true, everyOffer: true });
     const other = teenCmp.offers.find((o) => o.insurerId === insurerId(8) && o.tariffCode === "CSS-TEL")!;
     expect(decide(db, scope, lines.teen, { tariffId: other.tariffId, franchiseChf: other.franchiseChf }, NOW)).toBe("ADJUST");
     expect(generateLetters(db, scope, 1, TODAY).created).toHaveLength(1);
@@ -262,9 +262,9 @@ describe("rituel annuel", () => {
     // Statistiques : total payé, économie du rituel 2027, position dans le marché.
     const s = history.stats;
     expect(s.totalPaidRp).toBe(history.persons.reduce((a, x) => a + x.points.reduce((b, pt) => b + pt.billedMonthlyRp * 12, 0), 0));
-    expect(s.ritualSavings).toHaveLength(1);
-    expect(s.ritualSavings[0]!.year).toBe(2027);
-    expect(s.ritualSavings[0]!.annualRp).toBeGreaterThan(0);
+    expect(s.reviewSavings).toHaveLength(1);
+    expect(s.reviewSavings[0]!.year).toBe(2027);
+    expect(s.reviewSavings[0]!.annualRp).toBeGreaterThan(0);
     expect(s.avgChangePermille).not.toBeNull();
     expect(history.totals[1]!.marketMinMonthlyRp).toBeLessThanOrEqual(history.totals[1]!.marketMedianMonthlyRp!);
     expect(s.gapToCheapestAnnualRp).toBeGreaterThanOrEqual(0);
@@ -274,14 +274,14 @@ describe("rituel annuel", () => {
     reopenReview(db, scope, 1);
     expect(getReviewByYear(db, scope, 2027)?.status).toBe("OPEN");
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(0);
-    expect(getReviewView(db, scope, 1, TODAY).persons.every((p) => p.line.decision !== "UNDECIDED")).toBe(true);
+    expect(getReviewView(db, scope, 1, TODAY).lines.every((p) => p.line.decision !== "UNDECIDED")).toBe(true);
     closeReview(db, scope, 1, NOW);
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(2);
   });
 
   it("à la clôture, un contrat de l'année cible déjà présent est mis à jour, sauf s'il est manuel", () => {
     reopenReview(db, scope, 1);
-    const adult = getReviewView(db, scope, 1, TODAY).persons[0]!;
+    const adult = getReviewView(db, scope, 1, TODAY).lines[0]!;
     const byPerson = and(eq(lamalPolicy.personId, adult.person.id), eq(lamalPolicy.coverageYear, 2027));
     const manualId = savePolicy(db, scope, {
       personId: adult.person.id, coverageYear: 2027, insurerId: insurerId(1562), policyNumber: "HEL-2027",
@@ -309,6 +309,6 @@ describe("rituel annuel", () => {
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(0);
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2026)).all()).toHaveLength(2);
     const { reviewId } = openReview(db, scope, 2027);
-    expect(getReviewView(db, scope, reviewId, TODAY).persons.every((p) => p.line.decision === "UNDECIDED")).toBe(true);
+    expect(getReviewView(db, scope, reviewId, TODAY).lines.every((p) => p.line.decision === "UNDECIDED")).toBe(true);
   });
 });

@@ -28,6 +28,6 @@ export function currentYear(): number {
 }
 
 /** Année visée par le rituel d'automne : toujours l'année prochaine. */
-export function ritualYear(): number {
+export function reviewTargetYear(): number {
   return currentYear() + 1;
 }

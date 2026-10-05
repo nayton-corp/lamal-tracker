@@ -18,10 +18,10 @@ export async function chooseModeAction(form: FormData) {
   const scope = await requireScope();
   let mode = String(form.get("mode")) as HouseholdMode;
   // Plusieurs personnes enregistrées : « pour moi seul·e » n'a plus de sens.
-  const h = getHousehold(db(), scope);
-  if (mode === "SOLO" && h && listPersons(db(), h.id).length > 1) mode = "FAMILY";
+  const householdRow = getHousehold(db(), scope);
+  if (mode === "SOLO" && householdRow && listPersons(db(), householdRow.id).length > 1) mode = "FAMILY";
   // Avant que le foyer existe, le choix attend sa création (voir saveHouseholdAction).
-  if (h) {
+  if (householdRow) {
     if (getHouseholdMode(db(), scope) !== mode) setHouseholdMode(db(), scope, mode);
   } else await rememberMode(mode);
   revalidatePath("/", "layout");

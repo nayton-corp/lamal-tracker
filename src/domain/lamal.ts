@@ -106,7 +106,10 @@ export function displayTariffLabel(label: string | null | undefined, modelType: 
   return l;
 }
 
-/** Un modèle alternatif impose un premier recours : le médecin traitant doit être vérifié. */
+/**
+ * Modèles où l'on choisit son médecin de premier recours dans une liste (médecin de famille, HMO,
+ * flexible, autre) : il faut vérifier que le sien y figure. Télémédecine et pharmacie n'en ont pas.
+ */
 export function requiresDoctorCheck(model: ModelType): boolean {
   return model === "PRAXIS" || model === "FLEX" || model === "OTHER";
 }

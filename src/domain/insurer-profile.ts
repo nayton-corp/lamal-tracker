@@ -14,7 +14,7 @@ export interface InsurerFigures {
   reservesPerInsuredRp: Rappen | null;
 }
 
-export type Level = "LOW" | "MID" | "HIGH";
+export type TercileLevel = "LOW" | "MID" | "HIGH";
 export type TrendLevel = "BETTER" | "SIMILAR" | "WORSE";
 
 export interface InsurerProfile {
@@ -23,9 +23,9 @@ export interface InsurerProfile {
   insured: number | null;
   /** Réserves exprimées en mois de primes (1 décimale). */
   reservesMonths: number | null;
-  reservesLevel: Level | null;
+  reservesLevel: TercileLevel | null;
   adminPerInsuredRp: Rappen | null;
-  adminLevel: Level | null;
+  adminLevel: TercileLevel | null;
   trend: PremiumTrend | null;
   trendLevel: TrendLevel | null;
 }
@@ -53,7 +53,7 @@ export function annualGrowthPermille(series: ReadonlyMap<number, Rappen>): { fro
 }
 
 /** Tiers (bas, moyen, haut) d'une valeur parmi celles du marché. */
-export function tercile(value: number, values: readonly number[]): Level {
+export function tercile(value: number, values: readonly number[]): TercileLevel {
   const sorted = [...values].sort((a, b) => a - b);
   const below = sorted.filter((v) => v < value).length;
   const share = sorted.length ? below / sorted.length : 0.5;

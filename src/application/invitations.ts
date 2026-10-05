@@ -95,7 +95,7 @@ export function listHouseholdInvitations(db: Db, scope: Scope, nowIso: string) {
 /** Révocation : l'administrateur pour les inscriptions, le propriétaire pour son foyer. */
 export function revokeInvitation(db: Db, scope: Scope, id: number, nowIso: string) {
   const row = db.select().from(invitation).where(eq(invitation.id, id)).get();
-  const allowed = row && (row.kind === "SIGNUP" ? scope.admin : row.householdId === scope.householdId && scope.householdRole === "OWNER");
+  const allowed = row && (row.kind === "SIGNUP" ? scope.isAdmin : row.householdId === scope.householdId && scope.householdRole === "OWNER");
   if (!row || !allowed) throw new NotFoundError("Invitation");
   db.update(invitation).set({ revokedAt: nowIso }).where(eq(invitation.id, id)).run();
   audit(db, scope.userId, "INVITE_REVOKED", { householdId: row.householdId, nowIso });

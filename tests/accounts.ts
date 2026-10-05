@@ -5,7 +5,7 @@ import { createHouseholdFor, withHousehold, type Scope } from "@/application/sco
 /** Compte de test sans mot de passe utilisable (hachage factice), sans foyer. */
 export function testAccount(db: Db, role: "ADMIN" | "USER" = "USER"): Scope {
   const id = db.insert(appUser).values({ password: { salt: "", hash: "", cost: 2 }, role }).returning().get().id;
-  return { userId: id, householdId: null, householdRole: null, admin: role === "ADMIN" };
+  return { userId: id, householdId: null, householdRole: null, isAdmin: role === "ADMIN" };
 }
 
 /** Compte de test propriétaire d'un nouveau foyer. */

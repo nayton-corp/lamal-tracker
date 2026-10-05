@@ -29,12 +29,12 @@ import { requireScope } from "@/server/auth";
 import { chosenMode } from "@/server/onboarding";
 import { withHousehold, type Scope } from "@/application/scope";
 
-const str = (f: FormData, k: string) => {
+const formText = (f: FormData, k: string) => {
   const v = f.get(k);
   return v === null ? undefined : String(v);
 };
-const opt = (f: FormData, k: string) => {
-  const v = str(f, k)?.trim();
+const formTextOrNull = (f: FormData, k: string) => {
+  const v = formText(f, k)?.trim();
   return v ? v : null;
 };
 
@@ -42,14 +42,14 @@ export async function saveHouseholdAction(_: ActionState, form: FormData): Promi
   const scope = await requireScope();
   try {
     const id = saveHousehold(db(), scope, {
-      name: str(form, "name") ?? "",
-      street: str(form, "street"),
-      postalCode: str(form, "postalCode"),
-      city: str(form, "city"),
-      commune: str(form, "commune"),
-      bfsNumber: opt(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
-      canton: (str(form, "canton") ?? "") as never,
-      region: Number(str(form, "region")),
+      name: formText(form, "name") ?? "",
+      street: formText(form, "street"),
+      postalCode: formText(form, "postalCode"),
+      city: formText(form, "city"),
+      commune: formText(form, "commune"),
+      bfsNumber: formTextOrNull(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
+      canton: (formText(form, "canton") ?? "") as never,
+      region: Number(formText(form, "region")),
     });
     const mine = withHousehold(scope, id);
     if (!getHouseholdMode(db(), mine)) setHouseholdMode(db(), mine, (await chosenMode(scope)) ?? "FAMILY");
@@ -66,17 +66,17 @@ export async function savePersonAction(_: ActionState, form: FormData): Promise<
   const scope = await requireScope();
   let id: number;
   try {
-    const h = getHousehold(db(), scope);
-    if (!h) throw new UserError("Enregistrez d'abord l'adresse.");
+    const householdRow = getHousehold(db(), scope);
+    if (!householdRow) throw new UserError("Enregistrez d'abord l'adresse.");
     // Les préférences du comparateur (frais, modèles, médecin, caisses exclues) viennent du
     // questionnaire des besoins : on les conserve telles quelles à la modification.
-    const existing = opt(form, "id") ? listPersons(db(), h.id).find((p) => p.id === Number(form.get("id"))) : undefined;
+    const existing = formTextOrNull(form, "id") ? listPersons(db(), householdRow.id).find((p) => p.id === Number(form.get("id"))) : undefined;
     id = savePerson(db(), scope, {
       id: existing?.id,
-      firstName: str(form, "firstName") ?? "",
-      lastName: str(form, "lastName") ?? "",
-      birthDate: str(form, "birthDate") ?? "",
-      kidSubgroup: str(form, "kidSubgroup") ?? DEFAULT_KID_SUBGROUP,
+      firstName: formText(form, "firstName") ?? "",
+      lastName: formText(form, "lastName") ?? "",
+      birthDate: formText(form, "birthDate") ?? "",
+      kidSubgroup: formText(form, "kidSubgroup") ?? DEFAULT_KID_SUBGROUP,
       employedAccidentCover: form.has("employedAccidentCover") ? form.get("employedAccidentCover") === "on" : (existing?.employedAccidentCover ?? false),
       healthCostsRp: existing?.healthCostsRp ?? DEFAULT_HEALTH_COSTS_RP,
       allowedModels: (existing?.allowedModels ?? []) as never,
@@ -96,12 +96,12 @@ export async function savePersonAction(_: ActionState, form: FormData): Promise<
 
 /** Une 2e personne fait passer en mode foyer ; le nom du foyer se déduit de la première personne. */
 function afterPersonSaved(scope: Scope) {
-  const h = getHousehold(db(), scope)!;
-  const persons = listPersons(db(), h.id);
+  const householdRow = getHousehold(db(), scope)!;
+  const persons = listPersons(db(), householdRow.id);
   if (persons.length > 1 && getHouseholdMode(db(), scope) !== "FAMILY") setHouseholdMode(db(), scope, "FAMILY");
-  if (!h.name.trim() && persons[0]) {
+  if (!householdRow.name.trim() && persons[0]) {
     const first = persons[0];
-    saveHousehold(db(), scope, { ...h, canton: h.canton as never, name: persons.length === 1 ? `${first.firstName} ${first.lastName}` : `Famille ${first.lastName}` });
+    saveHousehold(db(), scope, { ...householdRow, canton: householdRow.canton as never, name: persons.length === 1 ? `${first.firstName} ${first.lastName}` : `Famille ${first.lastName}` });
   }
 }
 
@@ -109,26 +109,26 @@ function afterPersonSaved(scope: Scope) {
 export async function saveSoloAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
-    const firstName = str(form, "firstName") ?? "";
-    const lastName = str(form, "lastName") ?? "";
-    const h = getHousehold(db(), scope);
+    const firstName = formText(form, "firstName") ?? "";
+    const lastName = formText(form, "lastName") ?? "";
+    const householdRow = getHousehold(db(), scope);
     const id = saveHousehold(db(), scope, {
       name: `${firstName} ${lastName}`.trim(),
-      street: str(form, "street"),
-      postalCode: str(form, "postalCode"),
-      city: str(form, "city"),
-      commune: str(form, "commune"),
-      bfsNumber: opt(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
-      canton: (str(form, "canton") ?? "") as never,
-      region: Number(str(form, "region")),
+      street: formText(form, "street"),
+      postalCode: formText(form, "postalCode"),
+      city: formText(form, "city"),
+      commune: formText(form, "commune"),
+      bfsNumber: formTextOrNull(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
+      canton: (formText(form, "canton") ?? "") as never,
+      region: Number(formText(form, "region")),
     });
-    const existing = h ? listPersons(db(), h.id)[0] : undefined;
+    const existing = householdRow ? listPersons(db(), householdRow.id)[0] : undefined;
     const mine = withHousehold(scope, id);
     savePerson(db(), mine, {
       id: existing?.id,
       firstName,
       lastName,
-      birthDate: str(form, "birthDate") ?? "",
+      birthDate: formText(form, "birthDate") ?? "",
       kidSubgroup: existing?.kidSubgroup ?? DEFAULT_KID_SUBGROUP,
       employedAccidentCover: existing?.employedAccidentCover ?? false,
       healthCostsRp: existing?.healthCostsRp ?? DEFAULT_HEALTH_COSTS_RP,
@@ -163,18 +163,18 @@ export async function savePolicyAction(_: ActionState, form: FormData): Promise<
     const billed = chfField(form.get("billedMonthly"));
     if (billed === null) throw new UserError("Indiquez la prime mensuelle facturée.");
     savePolicy(db(), scope, {
-      id: opt(form, "id") ? Number(form.get("id")) : undefined,
+      id: formTextOrNull(form, "id") ? Number(form.get("id")) : undefined,
       personId: Number(form.get("personId")),
       coverageYear: Number(form.get("coverageYear")),
       insurerId: Number(form.get("insurerId")),
-      policyNumber: opt(form, "policyNumber"),
-      tariffCode: opt(form, "tariffCode"),
-      tariffLabel: opt(form, "tariffLabel"),
-      modelType: str(form, "modelType") ?? "STANDARD",
+      policyNumber: formTextOrNull(form, "policyNumber"),
+      tariffCode: formTextOrNull(form, "tariffCode"),
+      tariffLabel: formTextOrNull(form, "tariffLabel"),
+      modelType: formText(form, "modelType") ?? "STANDARD",
       franchiseChf: Number(form.get("franchiseChf")),
       accident: form.get("accident") === "on",
       billedMonthlyRp: billed,
-    }, opt(form, "tariffCode") ? "OFSP" : "MANUAL");
+    }, formTextOrNull(form, "tariffCode") ? "OFSP" : "MANUAL");
   } catch (e) {
     return toActionError(e);
   }
@@ -196,16 +196,16 @@ export async function saveLcaAction(_: ActionState, form: FormData): Promise<Act
   const scope = await requireScope();
   try {
     saveLca(db(), scope, {
-      id: opt(form, "id") ? Number(form.get("id")) : undefined,
+      id: formTextOrNull(form, "id") ? Number(form.get("id")) : undefined,
       personId: Number(form.get("personId")),
-      insurerName: str(form, "insurerName") ?? "",
-      linkedInsurerId: opt(form, "linkedInsurerId") ? Number(form.get("linkedInsurerId")) : null,
-      guarantee: (str(form, "guarantee") ?? "") as never,
-      productName: opt(form, "productName"),
-      policyNumber: opt(form, "policyNumber"),
+      insurerName: formText(form, "insurerName") ?? "",
+      linkedInsurerId: formTextOrNull(form, "linkedInsurerId") ? Number(form.get("linkedInsurerId")) : null,
+      guarantee: (formText(form, "guarantee") ?? "") as never,
+      productName: formTextOrNull(form, "productName"),
+      policyNumber: formTextOrNull(form, "policyNumber"),
       monthlyRp: chfField(form.get("monthly")),
-      minTermEnd: opt(form, "minTermEnd"),
-      noticeMonths: opt(form, "noticeMonths") ? Number(form.get("noticeMonths")) : null,
+      minTermEnd: formTextOrNull(form, "minTermEnd"),
+      noticeMonths: formTextOrNull(form, "noticeMonths") ? Number(form.get("noticeMonths")) : null,
       active: form.getAll("active").includes("on"),
     });
   } catch (e) {

@@ -15,7 +15,7 @@ import {
   openReview,
   reopenReview,
   getReviewView,
-  reviewMembers,
+  listReviewLineTabs,
   setHealthCosts,
   setLineFlags,
   undoDecision,
@@ -30,15 +30,15 @@ import { pingenClientFor, pingenDeps } from "@/server/pingen";
 /** Après un choix : la personne suivante sans choix, sinon l'étape suivante du rituel (LCA, démarches…). */
 function afterDecision(scope: Scope, year: number, lineId: number) {
   const line = findLine(db(), scope, lineId);
-  if (!line) return done(year);
-  const next = reviewMembers(db(), scope, line.reviewId).find((l) => l.decision === "UNDECIDED");
-  if (next) return done(year, `/personne/${next.id}`);
+  if (!line) return redirectToReview(year);
+  const next = listReviewLineTabs(db(), scope, line.reviewId).find((l) => l.decision === "UNDECIDED");
+  if (next) return redirectToReview(year, `/personne/${next.id}`);
   const step = nextStep(getReviewView(db(), scope, line.reviewId, today()));
   revalidatePath("/", "layout");
   redirect(step.kind === "close" || step.kind === "none" ? `/rituel/${year}#ligne-${lineId}` : step.href);
 }
 
-function done(year: number, path = "") {
+function redirectToReview(year: number, path = "") {
   revalidatePath("/", "layout");
   redirect(`/rituel/${year}${path}`);
 }
@@ -55,7 +55,7 @@ export async function openReviewAction(_: ActionState, form: FormData): Promise<
   } catch (e) {
     return toActionError(e);
   }
-  done(year);
+  redirectToReview(year);
   return null;
 }
 
@@ -183,7 +183,7 @@ export async function closeReviewAction(_: ActionState, form: FormData): Promise
   } catch (e) {
     return toActionError(e);
   }
-  done(year);
+  redirectToReview(year);
   return null;
 }
 
@@ -195,7 +195,7 @@ export async function reopenReviewAction(_: ActionState, form: FormData): Promis
   } catch (e) {
     return toActionError(e);
   }
-  done(year);
+  redirectToReview(year);
   return null;
 }
 
@@ -207,7 +207,7 @@ export async function deleteReviewAction(_: ActionState, form: FormData): Promis
   } catch (e) {
     return toActionError(e);
   }
-  done(year);
+  redirectToReview(year);
   return null;
 }
 

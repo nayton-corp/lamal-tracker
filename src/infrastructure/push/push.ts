@@ -3,7 +3,7 @@ import webpush from "web-push";
 import { z } from "zod";
 import type { Db } from "../db/client";
 import { householdMember, notificationLog, pushSubscription } from "../db/schema";
-import { getSetting, setSetting } from "../db/settings";
+import { getSetting, setSetting, SETTING_KEYS } from "../db/settings";
 
 interface Vapid {
   publicKey: string;
@@ -12,10 +12,10 @@ interface Vapid {
 
 /** Clés VAPID générées au premier besoin et conservées en base. */
 export function vapidKeys(db: Db): Vapid {
-  let keys = getSetting<Vapid>(db, "push.vapid");
+  let keys = getSetting<Vapid>(db, SETTING_KEYS.pushVapid);
   if (!keys) {
     keys = webpush.generateVAPIDKeys();
-    setSetting(db, "push.vapid", keys);
+    setSetting(db, SETTING_KEYS.pushVapid, keys);
   }
   return keys;
 }

@@ -2,7 +2,7 @@ import { daysBetween, formatDateLong, type IsoDate } from "./dates";
 import { REMINDER_OFFSETS, type ReviewDeadlines } from "./deadlines";
 
 /** Où en est un foyer dans l'envoi de ses courriers papier, pour une année cible. */
-export interface PaperProgress {
+export interface LetterProgress {
   /** Rituel clôturé : plus aucun rappel. */
   closed: boolean;
   /** Personnes du foyer, et celles qui ont décidé de garder leur contrat. */
@@ -40,7 +40,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
  * des courriers à poster, ou si le foyer n'a encore rien préparé), un dernier rappel juste après,
  * puis une relance par envoi resté sans confirmation de la caisse.
  */
-export function paperReminders(today: IsoDate, targetYear: number, deadlines: ReviewDeadlines, p: PaperProgress): Reminder[] {
+export function letterReminders(today: IsoDate, targetYear: number, deadlines: ReviewDeadlines, p: LetterProgress): Reminder[] {
   if (p.closed || p.persons === 0) return [];
   const out: Reminder[] = [];
   const url = `/rituel/${targetYear}`;

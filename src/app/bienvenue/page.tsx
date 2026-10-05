@@ -38,11 +38,11 @@ const FAMILY_STEPS: { key: StepKey; label: string }[] = [
 export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ etape?: string }> }) {
   const scope = await pageScope();
   const asked = (await searchParams).etape as StepKey | undefined;
-  const h = getHousehold(db(), scope);
+  const householdRow = getHousehold(db(), scope);
   const mode = await chosenMode(scope);
   const solo = mode === "SOLO";
   const year = currentYear();
-  const persons = h ? listPersons(db(), h.id) : [];
+  const persons = householdRow ? listPersons(db(), householdRow.id) : [];
   const withContracts = persons.map((p) => {
     const current = listPolicies(db(), p.id).find((x) => x.policy.coverageYear === year);
     return {
@@ -57,8 +57,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   const steps = solo ? SOLO_STEPS : FAMILY_STEPS;
   const done: Record<StepKey, boolean> = {
     structure: mode !== null,
-    vous: Boolean(h) && persons.length > 0,
-    adresse: Boolean(h),
+    vous: Boolean(householdRow) && persons.length > 0,
+    adresse: Boolean(householdRow),
     membres: persons.length > 0,
     contrats: persons.length > 0 && withContracts.every((p) => p.contract),
   };
@@ -105,7 +105,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
 
       {(step === "vous" || step === "adresse") && (
         <IdentityStep
-          household={h}
+          household={householdRow}
           person={solo ? (first ? { firstName: first.firstName, lastName: first.lastName, birthDate: first.birthDate } : null) : undefined}
           insurers={insurers}
           years={years}

@@ -56,6 +56,6 @@ export function dueReminder(today: IsoDate, deadlines: ReviewDeadlines): number 
  * Fenêtre du rituel : les primes de l'année prochaine sont publiées et le délai de résiliation
  * (réception au 30 novembre) n'est pas passé. C'est le moment où l'app met le rituel en avant.
  */
-export function ritualWindowOpen(today: IsoDate, targetYear: number, premiumsPublished: boolean): boolean {
+export function isReviewWindowOpen(today: IsoDate, targetYear: number, premiumsPublished: boolean): boolean {
   return premiumsPublished && daysBetween(today, reviewDeadlines(targetYear).receiptDeadline) >= 0;
 }

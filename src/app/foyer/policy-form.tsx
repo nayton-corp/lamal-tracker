@@ -75,7 +75,7 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
   const custom = customPremium ?? inherited;
   const premiumValue = custom ?? rpToInput(official ?? policy.billedMonthlyRp);
   const franchises = options?.franchises ?? [0, 100, 200, 300, 400, 500, 600, 1000, 1500, 2000, 2500];
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
 
   async function importYear() {
     setImporting(true);
@@ -112,7 +112,7 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
             ))}
           </Select>
         </Field>
-        <Field label="Caisse-maladie" htmlFor="insurerId" error={fe.insurerId}>
+        <Field label="Caisse-maladie" htmlFor="insurerId" error={fieldErrors.insurerId}>
           <Select id="insurerId" name="insurerId" required value={insurerId ?? ""} onChange={(e) => { setInsurerId(Number(e.target.value)); setTariffCode(""); setCustomPremium(null); setChanged(true); }}>
             <option value="" disabled>
               Choisir…
@@ -133,7 +133,7 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
       )}
 
       {ofspMode ? (
-        <Field label="Produit" htmlFor="tariffPick" error={fe.modelType}>
+        <Field label="Produit" htmlFor="tariffPick" error={fieldErrors.modelType}>
           <Select id="tariffPick" required value={tariffCode} onChange={(e) => { setTariffCode(e.target.value); setCustomPremium(null); setChanged(true); }}>
             <option value="" disabled>
               Choisir le produit…
@@ -208,7 +208,7 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
           <Field
             label="Prime mensuelle facturée (CHF)"
             htmlFor="billedMonthlyInput"
-            error={fe.billedMonthlyRp}
+            error={fieldErrors.billedMonthlyRp}
             hint={official !== null ? `Prime officielle : ${formatChf(official)}. Montant brut de la police, avant redistribution CO2.` : "Montant brut figurant sur la police, avant redistribution CO2."}
           >
             <Input

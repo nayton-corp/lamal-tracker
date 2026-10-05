@@ -1,6 +1,13 @@
 import type { IsoDate } from "./dates";
 
+/**
+ * Garde-fous des courriers (checkLetter) et avertissements sur les complémentaires LCA, plus le
+ * vocabulaire des décisions du rituel.
+ */
+
+/** Seuls OPEN et CLOSED sont écrits ; DECIDED et LETTERS_SENT sont des valeurs historiques du schéma. */
 export type ReviewStatus = "OPEN" | "DECIDED" | "LETTERS_SENT" | "CLOSED";
+/** Décision pour une personne : à décider, garder, changer de caisse, changer de franchise ou de modèle. */
 export type Decision = "UNDECIDED" | "KEEP" | "SWITCH" | "ADJUST";
 
 export const DECISION_LABEL: Record<Decision, string> = {

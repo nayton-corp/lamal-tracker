@@ -164,7 +164,7 @@ describe("inscription sur invitation", () => {
     expect(() => confirmEmail(db, token, NOW)).toThrow(UserError);
     expect(login(db, { email: "alex@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: true })).toEqual({ kind: "ok", userId });
     // Le nouveau compte n'a pas de foyer et n'est pas administrateur.
-    expect(scopeForUser(db, userId)).toEqual({ userId, householdId: null, householdRole: null, admin: false });
+    expect(scopeForUser(db, userId)).toEqual({ userId, householdId: null, householdRole: null, isAdmin: false });
   });
 
   it("refait au coût actuel une empreinte ancienne, à la connexion", () => {
@@ -283,7 +283,7 @@ describe("foyer partagé", () => {
 
   it("le conjoint invité rejoint le foyer comme membre ; le lien ne sert qu'une fois", async () => {
     const { code, hid, owner, member } = await setup();
-    expect(member).toMatchObject({ householdId: hid, householdRole: "MEMBER", admin: false });
+    expect(member).toMatchObject({ householdId: hid, householdRole: "MEMBER", isAdmin: false });
     expect(householdMembers(db, owner).map((m) => [m.email, m.role])).toEqual([
       ["proprio@exemple.ch", "OWNER"],
       ["conjoint@exemple.ch", "MEMBER"],

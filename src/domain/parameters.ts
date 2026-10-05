@@ -14,18 +14,30 @@ export interface LamalParameters {
   co2AnnualRp: Rappen | null;
 }
 
+/*
+ * Valeurs de la loi en vigueur (OAMal art. 93 et 103). Elles ne servent que de repli, tant que la
+ * table `lamal_parameters` n'a pas de ligne pour l'année : c'est elle qui fait foi, année par année.
+ */
+export const LEGAL_DEFAULT_FRANCHISES_ADULT = [300, 500, 1000, 1500, 2000, 2500];
+export const LEGAL_DEFAULT_FRANCHISES_KID = [0, 100, 200, 300, 400, 500, 600];
+/** Quote-part : 10 % des frais au-delà de la franchise. */
+export const LEGAL_DEFAULT_COINSURANCE_RATE_BP = 1000;
+/** Plafond annuel de la quote-part : CHF 700 (adulte), CHF 350 (enfant). */
+export const LEGAL_DEFAULT_COINSURANCE_MAX_ADULT_RP = 70_000;
+export const LEGAL_DEFAULT_COINSURANCE_MAX_KID_RP = 35_000;
+
 /**
- * Paramètres légaux par défaut d'une année. La redistribution CO2 vient du référentiel officiel
- * (OFEV), fourni par l'appelant : le domaine ne connaît aucun montant en dur.
+ * Paramètres de repli d'une année (voir ci-dessus). La redistribution CO2 change chaque année et
+ * vient du référentiel officiel (OFEV) : l'appelant la fournit.
  */
 export function defaultParameters(year: number, co2AnnualRp: Rappen | null = null): LamalParameters {
   return {
     year,
-    franchisesAdult: [300, 500, 1000, 1500, 2000, 2500],
-    franchisesKid: [0, 100, 200, 300, 400, 500, 600],
-    coinsuranceRateBp: 1000,
-    coinsuranceMaxAdultRp: 70000,
-    coinsuranceMaxKidRp: 35000,
+    franchisesAdult: LEGAL_DEFAULT_FRANCHISES_ADULT,
+    franchisesKid: LEGAL_DEFAULT_FRANCHISES_KID,
+    coinsuranceRateBp: LEGAL_DEFAULT_COINSURANCE_RATE_BP,
+    coinsuranceMaxAdultRp: LEGAL_DEFAULT_COINSURANCE_MAX_ADULT_RP,
+    coinsuranceMaxKidRp: LEGAL_DEFAULT_COINSURANCE_MAX_KID_RP,
     co2AnnualRp,
   };
 }

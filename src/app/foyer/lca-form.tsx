@@ -46,12 +46,12 @@ export function LcaForm({
   useEffect(() => {
     if (state?.ok) onDone?.();
   }, [state, onDone]);
-  const fe = state?.fieldErrors ?? {};
+  const fieldErrors = state?.fieldErrors ?? {};
   return (
     <form action={action} className="space-y-4">
       {lca?.id && <input type="hidden" name="id" value={lca.id} />}
       <input type="hidden" name="personId" value={personId} />
-      <Field label="Garantie" htmlFor="guarantee" error={fe.guarantee}>
+      <Field label="Garantie" htmlFor="guarantee" error={fieldErrors.guarantee}>
         <Select id="guarantee" name="guarantee" required defaultValue={lca?.guarantee ?? ""}>
           <option value="" disabled>
             Choisir…
@@ -81,7 +81,7 @@ export function LcaForm({
           ))}
         </Select>
       </Field>
-      <Field label="Assureur LCA" htmlFor="insurerName" error={fe.insurerName} hint="Prérempli d'après la caisse LAMal ; précisez la société de votre police si elle diffère.">
+      <Field label="Assureur LCA" htmlFor="insurerName" error={fieldErrors.insurerName} hint="Prérempli d'après la caisse LAMal ; précisez la société de votre police si elle diffère.">
         <Input
           id="insurerName"
           name="insurerName"

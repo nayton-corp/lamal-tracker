@@ -5,7 +5,7 @@ import { defaultParameters, type LamalParameters } from "@/domain/parameters";
 import type { Db } from "./client";
 import { insurer, lamalParameters, premium, tariff, tariffDataset } from "./schema";
 
-export interface OfferScope {
+export interface PremiumProfile {
   datasetId: number;
   canton: string;
   region: number;
@@ -15,7 +15,7 @@ export interface OfferScope {
 }
 
 /** Toutes les offres d'un profil (canton, région, classe d'âge, accident, sous-groupe). */
-export function offersFor(db: Db, scope: OfferScope): Offer[] {
+export function offersFor(db: Db, scope: PremiumProfile): Offer[] {
   return db
     .select({
       tariffId: tariff.id,
