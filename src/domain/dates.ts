@@ -16,6 +16,7 @@ export function addDays(d: IsoDate, days: number): IsoDate {
   return fromUtc(date);
 }
 
+/** Nombre de jours de `from` à `to` ; négatif si `to` est avant `from`. */
 export function daysBetween(from: IsoDate, to: IsoDate): number {
   return Math.round((toUtc(to).getTime() - toUtc(from).getTime()) / 86_400_000);
 }
@@ -31,12 +32,14 @@ const MONTHS = [
 ];
 const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 
+/** « 1er janvier 2027 » (« vendredi 1er janvier 2027 » avec `withWeekday`), pour les textes et les lettres. */
 export function formatDateLong(d: IsoDate, withWeekday = false): string {
   const date = toUtc(d);
   const base = `${date.getUTCDate()}${date.getUTCDate() === 1 ? "er" : ""} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
   return withWeekday ? `${WEEKDAYS[date.getUTCDay()]} ${base}` : base;
 }
 
+/** « 31.12.2026 » : format court suisse. */
 export function formatDateShort(d: IsoDate): string {
   const [y, m, day] = d.split("-");
   return `${day}.${m}.${y}`;

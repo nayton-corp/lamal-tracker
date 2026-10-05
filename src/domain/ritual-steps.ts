@@ -53,6 +53,7 @@ export interface RitualFacts {
 /** Une décision demande-t-elle un courrier ? Changer de caisse (résiliation) ou de franchise/modèle. */
 export const needsLetter = (decision: Decision) => decision === "SWITCH" || decision === "ADJUST";
 
+/** Frise des six étapes, cochées d'après l'état des lignes et chaînées (voir l'en-tête). */
 export function ritualSteps(facts: RitualFacts): RitualStep[] {
   const { lines } = facts;
   const switching = lines.filter((l) => l.decision === "SWITCH");

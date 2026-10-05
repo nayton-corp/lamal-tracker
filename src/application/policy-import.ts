@@ -13,6 +13,12 @@ import { withHousehold, type Scope } from "./scope";
 import { getHousehold, listInsurers, listLca, listPersons, saveHousehold, saveLca, savePerson, savePolicy, setHouseholdMode } from "./household";
 import { UserError } from "./errors";
 
+/*
+ * Import d'une police PDF : le domaine lit le texte (policy-import.ts), on retrouve ici le tarif
+ * officiel grâce au montant exact de la prime, puis on enregistre ce que l'utilisateur a confirmé.
+ * Sert aussi à créer le foyer à l'accueil, à partir de la police.
+ */
+
 export interface ImportedPerson {
   personId: number;
   name: string;

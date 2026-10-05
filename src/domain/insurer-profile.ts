@@ -60,6 +60,7 @@ export function tercile(value: number, values: readonly number[]): TercileLevel 
   return share < 1 / 3 ? "LOW" : share < 2 / 3 ? "MID" : "HIGH";
 }
 
+/** Médiane arrondie à l'entier ; null si la liste est vide. */
 export function median(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   const s = [...values].sort((a, b) => a - b);

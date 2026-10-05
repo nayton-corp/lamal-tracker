@@ -22,6 +22,7 @@ import { COOKIE } from "./cookie-names";
  */
 /** Jeton d'appareil de longue durée : reconnaît un appareil déjà utilisé (alerte sinon). */
 
+/** Session du cookie, prolongée au passage ; null si absente ou expirée. */
 export async function currentSession(): Promise<SessionInfo | null> {
   return touchSession(db(), await readCookie(COOKIE.session), nowIso());
 }
@@ -100,6 +101,7 @@ export function landingAfterLogin(userId: number, next: string): string {
   return adminNeedsFactor(db(), userId) ? "/compte?requis=1" : next;
 }
 
+/** Déconnexion : ferme la session en base et efface le cookie. */
 export async function endSession() {
   closeSession(db(), await readCookie(COOKIE.session));
   await deleteCookie(COOKIE.session);
@@ -110,6 +112,7 @@ export async function redirectIfSignedIn(to = "/") {
   if (await currentSession()) redirect(to);
 }
 
+/** Un compte administrateur avec mot de passe existe-t-il ? Sinon, tout mène à sa création. */
 export function accountExists(): boolean {
   return !passwordToDefine(db());
 }

@@ -6,6 +6,11 @@ import { importPremiumFile, type ImportOutcome } from "@/infrastructure/ofsp/imp
 import { download, listArchives, resolvePremiumsUrl } from "@/infrastructure/ofsp/source";
 import { currentYear, db } from "./context";
 
+/*
+ * Imports des primes OFSP en arrière-plan (téléchargement ou fichier téléversé), un seul à la
+ * fois. L'état est gardé en mémoire du processus et affiché par la page d'administration.
+ */
+
 export interface ImportJob {
   running: boolean;
   phase: "idle" | "download" | "import" | "done" | "error";
@@ -26,10 +31,12 @@ function state(): ImportJob {
   return globalForImportJob.__importJob;
 }
 
+/** Copie de l'état de l'import en cours ou du dernier terminé. */
 export function importJob(): ImportJob {
   return { ...state(), log: [...state().log] };
 }
 
+/** Dossier de la base (DATABASE_PATH) ; les fichiers téléchargés y passent aussi. */
 export function dataDir(): string {
   return path.dirname(process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "lamal.db"));
 }
@@ -74,6 +81,10 @@ function run(label: string, work: (job: ImportJob) => Promise<void>): boolean {
   return true;
 }
 
+/**
+ * Lance un import en arrière-plan : téléchargement (fichier courant de l'OFSP par défaut) ou
+ * fichier téléversé. Renvoie false si un import tourne déjà ; `onDone` reçoit le bilan.
+ */
 export function startImport(
   source: { kind: "download"; url?: string } | { kind: "file"; file: string; name: string },
   onDone?: (outcome: ImportOutcome) => void | Promise<void>,

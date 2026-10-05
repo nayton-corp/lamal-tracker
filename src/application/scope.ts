@@ -59,6 +59,10 @@ export function createHouseholdFor(db: Db, scope: Scope, values: typeof househol
 
 // ───────────────────────── Propriété des objets ─────────────────────────
 
+/*
+ * find* : l'objet s'il appartient au foyer de l'appelant, sinon null. owned* : idem, mais lève
+ * NotFoundError (même réponse qu'un objet inexistant). Sans foyer, l'id -1 ne correspond à rien.
+ */
 const householdIdOrNone = (scope: Scope) => scope.householdId ?? -1;
 
 export function findPerson(db: Db, scope: Scope, personId: number) {

@@ -8,9 +8,15 @@ import { LCA_GUARANTEE_KEYS, guaranteeInfo } from "@/domain/lca";
 import { UserError } from "./errors";
 import { createHouseholdFor, householdIdOf, requireAdmin, requireOwner, ownedLca, ownedPerson, ownedPolicy, findPerson, type Scope } from "./scope";
 
+/*
+ * Foyer : adresse (canton et région de primes), personnes, contrats LAMal par année et
+ * complémentaires LCA. Tout objet désigné par son identifiant est vérifié par scope.ts.
+ */
+
 /** Une personne seule ou un foyer de plusieurs membres : change le vocabulaire et l'accueil. */
 export type HouseholdMode = "SOLO" | "FAMILY";
 
+/** Mode choisi à l'accueil ; null tant qu'il n'est pas choisi (ou sans foyer). */
 export function getHouseholdMode(db: Db, scope: Scope): HouseholdMode | null {
   if (scope.householdId === null) return null;
   const row = db
@@ -35,6 +41,7 @@ const SHORT_TEXT = 200;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const text = () => z.string().trim().max(SHORT_TEXT, `${SHORT_TEXT} caractères au plus`);
 
+/** `region` : région de primes de la commune (0 à 3) ; `bfsNumber` : numéro OFS de la commune. */
 export const householdInput = z.object({
   name: text().default(""),
   street: text().default(""),
@@ -111,6 +118,7 @@ export function resetHousehold(db: Db, scope: Scope, nowIso = new Date().toISOSt
   for (const m of members) audit(db, m.userId, "HOUSEHOLD_DELETED", { nowIso });
 }
 
+/** Foyer de l'appelant ; null tant que l'accueil ne l'a pas créé. */
 export function getHousehold(db: Db, scope: Scope) {
   if (scope.householdId === null) return null;
   return db.select().from(household).where(eq(household.id, scope.householdId)).get() ?? null;
@@ -138,6 +146,7 @@ export function getPerson(db: Db, scope: Scope, id: number) {
   return findPerson(db, scope, id);
 }
 
+/** Crée une personne, ou modifie celle désignée par `id` (qui doit appartenir au foyer). Renvoie son id. */
 export function savePerson(db: Db, scope: Scope, input: z.input<typeof personInput>) {
   const householdId = householdIdOf(scope);
   const { id, ...data } = personInput.parse(input);
@@ -149,6 +158,7 @@ export function savePerson(db: Db, scope: Scope, input: z.input<typeof personInp
   return db.insert(person).values({ ...data, householdId }).returning().get().id;
 }
 
+/** Supprime une personne ; ses contrats, complémentaires, signature et lignes de rituel partent avec (cascade). */
 export function deletePerson(db: Db, scope: Scope, id: number) {
   ownedPerson(db, scope, id);
   db.delete(person).where(eq(person.id, id)).run();
@@ -165,6 +175,10 @@ export function listPolicies(db: Db, personId: number) {
     .all();
 }
 
+/**
+ * Crée ou modifie un contrat LAMal. Sans `id`, un contrat existant de la même personne pour la
+ * même année est remplacé (un seul par année). `source` : d'où vient le contrat (saisie, clôture…).
+ */
 export function savePolicy(db: Db, scope: Scope, input: z.input<typeof policyInput>, source: "MANUAL" | "OFSP" | "REVIEW" = "MANUAL") {
   const { id, ...data } = policyInput.parse(input);
   ownedPerson(db, scope, data.personId);
@@ -193,6 +207,7 @@ export function listLca(db: Db, personId: number) {
   return db.select().from(lcaPolicy).where(eq(lcaPolicy.personId, personId)).orderBy(asc(lcaPolicy.id)).all();
 }
 
+/** Crée ou modifie une complémentaire ; la catégorie découle de la garantie choisie. */
 export function saveLca(db: Db, scope: Scope, input: z.input<typeof lcaInput>) {
   const { id, guarantee, productName, ...rest } = lcaInput.parse(input);
   ownedPerson(db, scope, rest.personId);
@@ -211,6 +226,7 @@ export function deleteLca(db: Db, scope: Scope, id: number) {
   db.delete(lcaPolicy).where(eq(lcaPolicy.id, id)).run();
 }
 
+/** Toutes les caisses (référentiel partagé), par raison sociale. */
 export function listInsurers(db: Db) {
   return db.select().from(insurer).orderBy(asc(insurer.name)).all();
 }

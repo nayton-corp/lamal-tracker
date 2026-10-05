@@ -33,6 +33,7 @@ export function logMailError(context: string) {
   };
 }
 
+/** Transport choisi d'après l'environnement : SMTP_URL d'abord, sinon MAIL_DIR ; null si aucun. */
 export function mailerFromEnv(env: Record<string, string | undefined> = process.env): Mailer | null {
   const from = env.MAIL_FROM?.trim() || "Primes LAMal <no-reply@localhost>";
   const smtp = env.SMTP_URL?.trim();

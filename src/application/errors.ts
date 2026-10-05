@@ -1,3 +1,8 @@
+/*
+ * Erreurs des cas d'usage. Une `UserError` (et ses sous-classes) est montrée telle quelle à
+ * l'utilisateur par server/action.ts ; toute autre erreur est une vraie panne.
+ */
+
 /** Erreur attendue, affichable telle quelle à l'utilisateur. */
 export class UserError extends Error {}
 

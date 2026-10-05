@@ -24,11 +24,13 @@ export const SETTING_KEYS = {
 /** Clé connue, ou date du dernier essai d'import d'une année (`ofsp.yearAttempt.AAAA`, voir ofsp/retry.ts). */
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS] | `ofsp.yearAttempt.${number}`;
 
+/** Valeur d'un réglage, ou null ; le type `T` n'est pas vérifié à la lecture. */
 export function getSetting<T>(db: Db, key: SettingKey): T | null {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
   return row ? (row.value as T) : null;
 }
 
+/** Crée ou remplace un réglage (valeur sérialisée en JSON). */
 export function setSetting(db: Db, key: SettingKey, value: unknown) {
   db.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run();
 }

@@ -22,6 +22,7 @@ export function verifyEmailMail(to: string, link: string): Mail {
   };
 }
 
+/** Envoyé à la place de la confirmation quand l'adresse a déjà un compte : l'inscription ne révèle pas qui est inscrit. */
 export function alreadyRegisteredMail(to: string, loginUrl: string, resetUrl: string): Mail {
   return {
     to,
@@ -46,6 +47,7 @@ export function passwordResetDoneMail(to: string): Mail {
   };
 }
 
+/** Alerte de connexion depuis un appareil inconnu (sans cookie d'appareil connu). */
 export function newDeviceMail(to: string, device: string, when: string): Mail {
   return {
     to,

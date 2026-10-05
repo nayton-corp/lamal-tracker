@@ -21,8 +21,10 @@ export interface LineForLetter {
   decision: Decision;
   currentInsurerId: number;
   chosenInsurerId: number | null;
+  /** Contrôle LCA confirmé par l'utilisateur ; null = pas encore (une résiliation est alors bloquée). */
   lcaAckAt: string | null;
   insurerHasAddress: boolean;
+  /** Numéro à rappeler dans la lettre (n° d'assuré, sinon AVS, sinon n° de police). */
   policyNumber: string | null;
   affiliationRequestedAt: IsoDate | null;
 }

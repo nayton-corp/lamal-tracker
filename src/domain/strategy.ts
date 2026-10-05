@@ -46,7 +46,11 @@ export interface StrategyBaseline {
   franchiseChf: number;
 }
 
-/** Réglages proposés d'office pour une stratégie (la personne peut les modifier ensuite). */
+/**
+ * Réglages proposés d'office pour une stratégie (la personne peut les modifier ensuite).
+ * `franchiseChf` null = l'app choisit la franchise la plus avantageuse ; `models` [] = tous les
+ * modèles, null = les modèles acceptés par la personne.
+ */
 export function strategyDefaults(strategy: Strategy, current: StrategyBaseline): { franchiseChf: number | null; models: ModelType[] | null } {
   switch (strategy) {
     case "KEEP":

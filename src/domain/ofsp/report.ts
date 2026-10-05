@@ -2,6 +2,12 @@ import { CANTONS } from "../lamal";
 import type { Rappen } from "../money";
 import type { PremiumRow, SkipReason } from "./normalize";
 
+/*
+ * Rapport de validation d'un import OFSP : erreurs bloquantes (colonnes manquantes, années
+ * mélangées, aucune ligne), avertissements (cantons absents, lignes illisibles, médianes qui
+ * bougent de plus de 30 % sur un an) et statistiques affichées à l'administrateur.
+ */
+
 export interface ValidationReport {
   ok: boolean;
   /** Échantillon de valeurs brutes par colonne : diagnostic quand le format change. */
@@ -65,6 +71,7 @@ export class ImportAccumulator {
   }
 
   /**
+   * Bilan final : `ok` seulement sans erreur ; les avertissements n'empêchent pas l'import.
    * @param previousMedians médianes adulte par canton du jeu de l'année précédente, pour
    *        signaler une variation invraisemblable (codes mal lus, mauvaise colonne).
    */

@@ -1,6 +1,11 @@
 import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { EXTRA_ROWS_PLACEHOLDER, PERSONS_PLACEHOLDER, type LetterContent } from "@/domain/letter";
 
+/*
+ * Rendu PDF d'un courrier (lettre ou demande d'offre) à partir de son contenu figé, avec les
+ * signatures dessinées apposées si elles sont fournies.
+ */
+
 // A4 ; destinataire placé pour une enveloppe C5/C4 à fenêtre à droite (norme suisse).
 // Mise en page « pingen » : adresse dans la zone lue par Pingen (118 × 60 mm, 85,5 × 25,5 mm),
 // zone d'affranchissement vide (116 × 40 mm, 89,5 × 47,5 mm) et coin inférieur gauche libre.
@@ -97,6 +102,7 @@ export function LetterDocument({ content, signed = {}, layout = "print" }: { con
   );
 }
 
+/** `signed` : signatures (data URL) par nom complet ; `layout` « pingen » pour l'envoi par Pingen, « print » sinon. */
 export function renderLetterPdf(content: LetterContent, signed?: Record<string, string>, layout: LetterLayout = "print"): Promise<Buffer> {
   return renderToBuffer(<LetterDocument content={content} signed={signed} layout={layout} />);
 }

@@ -9,7 +9,13 @@ import { readWorkbook } from "@/infrastructure/reference/workbook";
 import { db } from "./context";
 
 import type { ReferenceCheck } from "@/application/reference-data";
+
 export type { ReferenceCheck };
+
+/*
+ * Mise à jour des référentiels officiels (annuaire des caisses, données de surveillance, CO2)
+ * depuis admin.ch : chaque semaine par le planificateur, ou à la demande de l'administrateur.
+ */
 
 /**
  * Rafraîchit les référentiels officiels depuis admin.ch : annuaire des caisses (adresses),

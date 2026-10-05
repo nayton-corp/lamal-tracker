@@ -6,6 +6,11 @@ import { openForHousehold, sealForHousehold } from "@/infrastructure/crypto/vaul
 import { UserError } from "./errors";
 import { ownedPerson, type Scope } from "./scope";
 
+/*
+ * Signatures dessinées des personnes du foyer : chiffrées en base par la clé du foyer, apposées sur
+ * les courriers au rendu PDF (et exigées pour l'envoi par Pingen).
+ */
+
 const MAX_BYTES = 300_000;
 
 /**

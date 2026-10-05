@@ -23,6 +23,7 @@ export interface OpsDeps {
 
 const SIGNATURE = "\n\n— Primes LAMal (alerte automatique)";
 
+/** Passe du planificateur : envoie les alertes dues aux administrateurs ; renvoie les clés de celles envoyées. */
 export async function opsTick(db: Db, deps: OpsDeps, nowIso: string): Promise<string[]> {
   const alerts: { key: string; subject: string; text: string }[] = [];
   const day = nowIso.slice(0, 10);

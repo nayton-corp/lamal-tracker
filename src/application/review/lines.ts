@@ -30,6 +30,11 @@ export function premiumProfileFor(db: Db, reviewRow: typeof review.$inferSelect,
   };
 }
 
+/**
+ * Prime reconduite d'une personne pour l'année cible : classe d'âge et sous-groupe de cette année,
+ * tarif successeur (avec la correspondance déjà confirmée par le foyer). Renvoie les colonnes à
+ * enregistrer sur la ligne.
+ */
 export function renewalFor(db: Db, reviewRow: typeof review.$inferSelect, p: PersonRow, policy: PolicyRow) {
   const ageClass = ageClassForYear(p.birthDate, reviewRow.targetYear);
   const subgroup = subgroupFor(ageClass, p.kidSubgroup);
@@ -69,10 +74,12 @@ export function renewalFor(db: Db, reviewRow: typeof review.$inferSelect, p: Per
   };
 }
 
+/** Contrat LAMal de la personne pour une année ; null s'il n'y en a pas. */
 export function currentPolicy(db: Db, personId: number, year: number) {
   return db.select().from(lamalPolicy).where(and(eq(lamalPolicy.personId, personId), eq(lamalPolicy.coverageYear, year))).get() ?? null;
 }
 
+/** Ligne du foyer avec sa revue, son contrat et sa personne ; refusée si la revue est clôturée. */
 export function loadLine(db: Db, scope: Scope, lineId: number) {
   const line = ownedLine(db, scope, lineId);
   const r = db.select().from(review).where(eq(review.id, line.reviewId)).get()!;
@@ -82,6 +89,7 @@ export function loadLine(db: Db, scope: Scope, lineId: number) {
   return { line, review: r, policy, person: personRow };
 }
 
+/** Lignes couvertes par une lettre déjà envoyée : leur décision ne peut plus changer. */
 export function linesWithSentLetter(db: Db, reviewId: number): Set<number> {
   const sent = db.select().from(letter).where(eq(letter.reviewId, reviewId)).all().filter((l) => l.sentAt);
   return new Set(sent.flatMap((l) => l.lineIds));

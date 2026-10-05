@@ -24,6 +24,7 @@ const input = z.object({
   page: z.string().trim().max(200).regex(/^\/[^\s]*$/).nullable().catch(null),
 });
 
+/** Enregistre un avis (au plus `FEEDBACK_PER_DAY` sur 24 heures glissantes) et prévient les administrateurs, sans le texte. */
 export async function sendFeedback(db: Db, scope: Scope, raw: { kind: unknown; message: unknown; page: unknown }, mail: MailDeps | null, nowIso: string): Promise<void> {
   const parsed = input.safeParse(raw);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Avis incomplet.");
@@ -56,6 +57,7 @@ export interface FeedbackRow {
   read: boolean;
 }
 
+/** Derniers avis pour l'administration, avec le courriel de leur auteur. */
 export function listFeedback(db: Db, scope: Scope, limit = 50): FeedbackRow[] {
   requireAdmin(scope);
   return db

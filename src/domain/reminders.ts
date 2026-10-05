@@ -1,6 +1,11 @@
 import { daysBetween, formatDateLong, type IsoDate } from "./dates";
 import { REMINDER_OFFSETS, type ReviewDeadlines } from "./deadlines";
 
+/*
+ * Rappels du rituel pour l'envoi des courriers postaux (notifications push, parfois aussi par
+ * courriel) : avant la date d'envoi conseillée, juste après, puis relance sans confirmation.
+ */
+
 /** Où en est un foyer dans l'envoi de ses courriers papier, pour une année cible. */
 export interface LetterProgress {
   /** Rituel clôturé : plus aucun rappel. */

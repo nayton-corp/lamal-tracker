@@ -10,9 +10,15 @@ import { authToken } from "@/infrastructure/db/schema";
 
 export type TokenKind = (typeof authToken.$inferSelect)["kind"];
 
+/** Empreinte SHA-256 (base64url) sous laquelle un jeton ou un code est rangé en base. */
 export const digest = (value: string) => createHash("sha256").update(value).digest("base64url");
+/** Valeur aléatoire sûre pour une URL ou un cookie (32 octets par défaut). */
 export const randomToken = (bytes = 32) => randomBytes(bytes).toString("base64url");
 
+/**
+ * Crée un jeton valable `ttlMs` et renvoie sa valeur en clair, la seule fois où elle existe.
+ * `data` : contexte attaché au jeton (défi WebAuthn, secret TOTP provisoire chiffré…).
+ */
 export function issueToken(
   db: Db,
   input: { userId: number | null; kind: TokenKind; ttlMs: number; data?: Record<string, unknown> },
@@ -61,10 +67,12 @@ export function countAttempt(db: Db, id: number, max: number): boolean {
   return true;
 }
 
+/** Invalide les jetons de ce type d'un compte (ex. un ancien lien quand un nouveau part). */
 export function deleteUserTokens(db: Db, userId: number, kind: TokenKind) {
   db.delete(authToken).where(and(eq(authToken.userId, userId), eq(authToken.kind, kind))).run();
 }
 
+/** Efface les jetons expirés : à chaque émission, et lors du ménage du planificateur. */
 export function purgeExpiredTokens(db: Db, nowIso: string) {
   db.delete(authToken).where(lt(authToken.expiresAt, nowIso)).run();
 }

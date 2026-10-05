@@ -1,9 +1,16 @@
 import { formatDateLong, type IsoDate } from "./dates";
 
+/*
+ * Contenu des courriers postaux (lettres) : résiliation ou changement de franchise/modèle adressé
+ * à la caisse actuelle, demande d'offre à une nouvelle caisse. Indépendant du rendu (PDF, aperçu).
+ */
+
 export interface LetterPerson {
   fullName: string;
   birthDate: IsoDate;
+  /** Numéro à rappeler à la caisse : n° d'assuré, sinon n° AVS, sinon n° de police. */
   policyNumber: string | null;
+  /** Un mineur ne signe pas : son représentant légal signe pour lui. */
   isMinor: boolean;
 }
 

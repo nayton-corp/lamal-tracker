@@ -127,6 +127,7 @@ export async function listArchives(fetchImpl: typeof fetch = fetch): Promise<Arc
   return [year, year - 1, year - 2].map((y) => ({ year: y, url: guessedArchiveUrl(y), listed: false }));
 }
 
+/** URL du fichier de primes courant : OFSP_PREMIUMS_URL si posée, sinon le catalogue CKAN, sinon l'URL connue. */
 export async function resolvePremiumsUrl(fetchImpl: typeof fetch = fetch): Promise<string> {
   if (process.env.OFSP_PREMIUMS_URL) return process.env.OFSP_PREMIUMS_URL;
   try {
@@ -173,6 +174,10 @@ async function* capped(body: AsyncIterable<Uint8Array>, max: number, url: string
   }
 }
 
+/**
+ * Télécharge un fichier officiel dans `dir` et renvoie son chemin. Refusé hors des sources
+ * officielles et au-delà de `MAX_DOWNLOAD_BYTES` ; écrit d'abord un `.part`, jamais un fichier tronqué.
+ */
 export async function download(url: string, dir: string): Promise<string> {
   fs.mkdirSync(dir, { recursive: true });
   if (!isOfficialUrl(url)) throw new Error(`Téléchargement refusé : ${url} n'est pas une source officielle.`);
@@ -197,6 +202,7 @@ export async function download(url: string, dir: string): Promise<string> {
   return target;
 }
 
+/** Empreinte SHA-256 du fichier, calculée en flux : reconnaît un fichier déjà importé. */
 export async function sha256File(file: string): Promise<string> {
   const hash = createHash("sha256");
   await pipeline(fs.createReadStream(file), hash);

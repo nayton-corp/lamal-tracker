@@ -1,5 +1,10 @@
 import { addDays, daysBetween, isWeekend, type IsoDate } from "./dates";
 
+/*
+ * Échéances du rituel : délai de résiliation (lettre reçue au 30 novembre), date d'envoi
+ * conseillée, niveau d'urgence et jours de rappel. La date du jour est toujours fournie.
+ */
+
 export interface ReviewDeadlines {
   /** Fin de l'année en cours : date d'effet de la résiliation. */
   effectiveEnd: IsoDate;
@@ -36,6 +41,10 @@ export function reviewDeadlines(targetYear: number): ReviewDeadlines {
 
 export type Urgency = "calm" | "soon" | "urgent" | "late";
 
+/**
+ * late : délai de réception dépassé ; urgent : date d'envoi conseillée dépassée (encore possible
+ * de justesse) ; soon : envoi conseillé dans `SOON_THRESHOLD_DAYS` jours au plus.
+ */
 export function urgency(today: IsoDate, deadlines: ReviewDeadlines): Urgency {
   if (daysBetween(today, deadlines.receiptDeadline) < 0) return "late";
   const toSend = daysBetween(today, deadlines.sendBy);
@@ -47,6 +56,7 @@ export function urgency(today: IsoDate, deadlines: ReviewDeadlines): Urgency {
 /** Jours de rappel avant la date d'envoi recommandée. */
 export const REMINDER_OFFSETS = [30, 14, 7, 3, 1] as const;
 
+/** Jours restants avant la date d'envoi si aujourd'hui est un jour de rappel (`REMINDER_OFFSETS`), sinon null. */
 export function dueReminder(today: IsoDate, deadlines: ReviewDeadlines): number | null {
   const left = daysBetween(today, deadlines.sendBy);
   return (REMINDER_OFFSETS as readonly number[]).includes(left) ? left : null;

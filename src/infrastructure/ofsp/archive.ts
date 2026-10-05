@@ -3,6 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+/*
+ * Archives annuelles de l'OFSP (zip) : repérer le fichier des primes « Prämien_CH » parmi les
+ * autres et l'extraire, avec un plafond de taille.
+ */
+
 /** Un fichier xlsx est lui-même un zip : on le reconnaît à son [Content_Types].xml. */
 export function isXlsxZip(file: string): boolean {
   try {

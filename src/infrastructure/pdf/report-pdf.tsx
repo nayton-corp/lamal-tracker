@@ -115,6 +115,7 @@ export function ReportDocument({ report }: { report: Report }) {
   );
 }
 
+/** PDF du récapitulatif (export des données d'un compte). */
 export async function renderReportPdf(report: Report): Promise<Buffer> {
   return renderToBuffer(<ReportDocument report={report} />);
 }

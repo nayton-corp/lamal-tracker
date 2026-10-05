@@ -10,6 +10,11 @@ import { renderLetterPdf } from "@/infrastructure/pdf/letter-pdf";
 import { householdKey, notify } from "@/infrastructure/push/push";
 import { db, nowIso } from "./context";
 
+/*
+ * Branchement de Pingen côté serveur : client configuré par l'environnement, autorisation par
+ * foyer, rendu PDF en mise en page Pingen et suivi des lettres par le planificateur.
+ */
+
 const globalForPingen = globalThis as unknown as { __pingen?: { key: string; client: PingenClient } };
 
 /** Client Pingen si l'envoi est configuré (variables PINGEN_*), sinon null : l'option est masquée. */
@@ -26,6 +31,7 @@ export function pingenClientFor(scope: Scope): PingenClient | null {
   return pingenAllowed(db(), scope) ? pingenClient() : null;
 }
 
+/** Dépendances d'un envoi : le client et un rendu PDF dont l'adresse tombe dans la zone lue par Pingen. */
 export function pingenDeps(client: PingenClient): PingenDeps {
   return { client, render: (content, signed) => renderLetterPdf(content, signed, "pingen") };
 }

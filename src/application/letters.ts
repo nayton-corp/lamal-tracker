@@ -12,6 +12,12 @@ import { getReviewView } from "./review";
 import { findLetter, ownedLetter, type Scope } from "./scope";
 import { bumpUsage } from "./usage";
 
+/*
+ * Lettres (courriers postaux) du rituel adressées à la caisse actuelle : résiliation ou
+ * changement de franchise/modèle. Génération, rendu, puis suivi (envoi, n° de suivi, confirmation
+ * de la caisse). Une lettre envoyée est figée.
+ */
+
 export interface GenerateLettersResult {
   created: number[];
   blocked: { person: string; reasons: string[] }[];
@@ -85,6 +91,7 @@ export function generateLetters(db: Db, scope: Scope, reviewId: number, today: I
   return { created, blocked };
 }
 
+/** Lettre du foyer ; null si elle n'existe pas ou appartient à un autre foyer. */
 export function getLetter(db: Db, scope: Scope, id: number) {
   const row = findLetter(db, scope, id);
   if (!row) return null;
@@ -102,6 +109,7 @@ export function letterDocument(db: Db, scope: Scope, id: number) {
 
 // ───────────────────────── Suivi des courriers ─────────────────────────
 
+/** Supprime une lettre pas encore envoyée ; sans effet si elle est introuvable. */
 export function deleteLetter(db: Db, scope: Scope, letterId: number) {
   const l = findLetter(db, scope, letterId);
   if (!l) return;
@@ -109,6 +117,7 @@ export function deleteLetter(db: Db, scope: Scope, letterId: number) {
   db.delete(letter).where(eq(letter.id, letterId)).run();
 }
 
+/** Lettre postée (date AAAA-MM-JJ, n° de suivi du recommandé facultatif) ; le compteur d'usage n'avance qu'une fois. */
 export function markLetterSent(db: Db, scope: Scope, letterId: number, sentAt: string, trackingNumber: string | null) {
   const row = ownedLetter(db, scope, letterId);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(sentAt)) throw new UserError("Date d'envoi au format AAAA-MM-JJ.");
@@ -119,6 +128,7 @@ export function markLetterSent(db: Db, scope: Scope, letterId: number, sentAt: s
   });
 }
 
+/** Réception confirmée par la caisse à la date `at` ; null annule la confirmation. */
 export function markLetterAcknowledged(db: Db, scope: Scope, letterId: number, at: string | null) {
   ownedLetter(db, scope, letterId);
   db.update(letter).set({ acknowledgedAt: at }).where(eq(letter.id, letterId)).run();

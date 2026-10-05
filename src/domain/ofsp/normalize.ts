@@ -14,6 +14,7 @@ import { foldForSearch } from "../text";
  * elle est rejetée avec une raison et comptée dans le rapport d'import.
  */
 
+/** Colonnes du fichier OFSP (en-têtes en allemand) sans lesquelles l'import est refusé. */
 export const REQUIRED_COLUMNS = [
   "Versicherer",
   "Kanton",
@@ -52,6 +53,11 @@ export function mapHeader(header: readonly unknown[]): {
   return { index, missing };
 }
 
+/**
+ * Ligne de prime normalisée. `insurerBag` : n° OFSP de la caisse ; `region` : région de prime
+ * (0 à 3) ; `subgroup` : sous-groupe d'âge OFSP (K1…K5, J1, E1) ; `tariffTypeRaw` : type de tarif
+ * tel que lu, gardé pour diagnostic ; `monthlyPremiumRp` : prime mensuelle en centimes.
+ */
 export interface PremiumRow {
   year: number;
   insurerBag: number;
@@ -110,6 +116,7 @@ export function parseSwissTerritory(v: string): boolean | null {
   return /CH$|^CHE$|SCHWEIZ|SUISSE|SVIZZERA/.test(u);
 }
 
+/** « PR-REG CH1 », « PR_REG_1 » → 1 ; seul le dernier chiffre compte (0 à 3). */
 export function parseRegion(v: string): number | null {
   const m = /(\d)\s*$/.exec(v);
   if (!m) return null;
@@ -117,6 +124,7 @@ export function parseRegion(v: string): number | null {
   return n >= 0 && n <= 3 ? n : null;
 }
 
+/** « AKL-KIN », « AKA_03_ERW »… → classe d'âge, d'après les abréviations allemandes (Kinder, Jugendliche, Erwachsene). */
 export function parseAgeClass(v: string): AgeClass | null {
   const u = v.toUpperCase();
   if (u.includes("KIN")) return "KID";
@@ -125,6 +133,7 @@ export function parseAgeClass(v: string): AgeClass | null {
   return null;
 }
 
+/** « MIT-UNF » → avec accident, « OHN-UNF » / « OHN_UNF » → sans. */
 export function parseAccident(v: string): boolean | null {
   const u = v.toUpperCase();
   if (u.startsWith("MIT")) return true;
@@ -140,6 +149,7 @@ export function parseFranchise(v: string): number | null {
   return Number.isInteger(n) && n >= 0 && n <= 5000 ? n : null;
 }
 
+/** Prime mensuelle en CHF (nombre ou texte) → centimes ; null si vide ou hors de 0 à 5000 CHF. */
 export function parsePremium(v: unknown): Rappen | null {
   const s = typeof v === "number" ? v : Number(text(v).replace(",", ".").replace(/['’\s]/g, ""));
   if (!Number.isFinite(s) || s <= 0 || s > 5000) return null;
@@ -154,6 +164,7 @@ const FLEX = /flex|combi|multi|choice/i;
 const TELMED = /tele|télé|telmed|medgate|callmed|smart|digi|app\b|online|med ?call|tel|contact|24\b|-24/i;
 const PRAXIS = /hmo|hausarzt|médecin|medecin|praxis|famil|centre|gesundheits?netz|zentrum|casa|réseau|netz/i;
 
+/** Famille de modèle d'après le type de tarif OFSP ; les anciens tarifs « divers » sont classés d'après leur libellé. */
 export function classifyModel(tariffType: string, label: string): ModelType {
   const t = tariffType.toUpperCase().replace(/^TAR[-_]/, "");
   switch (t) {
@@ -179,6 +190,7 @@ export function classifyModel(tariffType: string, label: string): ModelType {
   }
 }
 
+/** Ligne brute → prime normalisée, ou première raison de rejet rencontrée (rien n'est deviné). */
 export function normalizeRow(
   cells: readonly unknown[],
   index: Partial<Record<Column, number>>,

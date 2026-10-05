@@ -10,6 +10,7 @@ import { COOKIE } from "./cookie-names";
  * dans un cookie, puis s'applique au foyer dès sa création.
  */
 
+/** Garde le choix une semaine, le temps de créer le foyer. */
 export async function rememberMode(mode: HouseholdMode) {
   await writeCookie(COOKIE.householdMode, mode, 60 * 60 * 24 * 7);
 }

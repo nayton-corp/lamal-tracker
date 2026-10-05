@@ -1,6 +1,11 @@
 import type { IsoDate } from "./dates";
 import type { AgeClass } from "./lamal";
 
+/*
+ * Classe d'âge LAMal (enfant, jeune adulte, adulte) : elle détermine la prime, les franchises
+ * possibles et le plafond de quote-part. Seule l'année de naissance compte, pas le jour.
+ */
+
 /**
  * Classe d'âge LAMal pour une année de couverture : elle dépend de l'année de
  * naissance seulement (enfant jusqu'à l'année des 18 ans, jeune adulte de 19 à 25).
@@ -23,6 +28,7 @@ export interface AgeTransition {
   message: string;
 }
 
+/** Changement de classe d'âge entre l'année en cours et `targetYear` (avertissement du rituel) ; null si aucun. */
 export function ageTransition(birthDate: string, targetYear: number): AgeTransition | null {
   const from = ageClassForYear(birthDate, targetYear - 1);
   const to = ageClassForYear(birthDate, targetYear);

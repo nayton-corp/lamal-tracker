@@ -3,6 +3,11 @@ import { ZodError } from "zod";
 import { parseChf } from "@/domain/money";
 import { UserError } from "@/application/errors";
 
+/*
+ * Outils des server actions (src/app/actions) : erreurs traduites en message de formulaire,
+ * montants saisis convertis en centimes.
+ */
+
 export type ActionState = { ok?: string; error?: string; fieldErrors?: Record<string, string> } | null;
 
 /** Traduit les erreurs connues en message affichable ; les autres remontent (vraie panne). */

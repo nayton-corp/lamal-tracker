@@ -114,6 +114,7 @@ async function errorDetail(r: Response): Promise<string> {
 
 const tokens = new Map<string, { token: string; expiresAt: number }>();
 
+/** Client Pingen ; le jeton OAuth est gardé en mémoire et renouvelé une minute avant son expiration. */
 export function createPingenClient(config: PingenConfig, fetchImpl: Fetch = fetch): PingenClient {
   const cacheKey = `${config.identityUrl}|${config.clientId}`;
 

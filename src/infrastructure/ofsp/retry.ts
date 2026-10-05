@@ -4,6 +4,7 @@
  */
 export const YEAR_RETRY_HOURS = 24;
 
+/** Clé de réglage où est notée la dernière tentative d'import de l'année. */
 export function yearAttemptKey(year: number): `ofsp.yearAttempt.${number}` {
   return `ofsp.yearAttempt.${year}`;
 }

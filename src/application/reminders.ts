@@ -8,6 +8,11 @@ import { appUser, household, householdMember, insurer, letter, notificationLog, 
 import type { MailDeps } from "./account-mail";
 import { logMailError } from "@/infrastructure/mail/mailer";
 
+/*
+ * Rappels du rituel, envoyés par le planificateur (server/watch.ts) : avancement des courriers de
+ * chaque foyer, puis notifications push et courriels, dédoublonnés dans `notification_log`.
+ */
+
 const SIGNATURE = "\n\n— Primes LAMal\nCe message est automatique : n'y répondez pas.";
 
 /** Avancement des courriers d'un foyer pour l'année cible (sans rituel ouvert : rien de préparé). */

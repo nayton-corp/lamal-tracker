@@ -8,6 +8,11 @@ import { premium, tariff } from "@/infrastructure/db/schema";
 import { getHousehold, getPerson } from "./household";
 import type { Scope } from "./scope";
 
+/*
+ * Tarifs officiels d'une caisse, pour pré-remplir la saisie d'un contrat (franchise, modèle,
+ * prime avec ou sans accident) au lieu de tout retaper.
+ */
+
 export interface TariffOption {
   code: string;
   label: string;

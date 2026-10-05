@@ -88,6 +88,7 @@ export function readAmounts(text: string): Rappen[] {
 
 const FRANCHISE_KEY = /(franchise|jahresfranchise|franchigia|franchise annuelle)/i;
 
+/** Premier montant après « franchise » (fr, de, it) qui fait partie des franchises autorisées ; null sinon. */
 export function readFranchise(text: string, allowed: readonly number[]): number | null {
   for (const m of text.matchAll(new RegExp(FRANCHISE_KEY.source + "[^\\d]{0,40}(\\d{1,2}['’ ]?\\d{3}|\\d{1,4})", "gi"))) {
     const v = Number(m[2]!.replace(/['’ ]/g, ""));
@@ -108,6 +109,7 @@ export function readAccident(text: string): boolean | null {
   return null;
 }
 
+/** Modèle deviné par mots-clés (fr, de, it), du plus spécifique (télémédecine) au plus général (standard). */
 export function readModel(text: string): ModelType | null {
   const t = norm(text);
   if (/telmed|tel-?doc|telemed|telemedecine|telefonmedizin|callmed|medcall|santé24|sante24|medi24|smartmed|telcare|benefit plus telmed|premed-24/.test(t)) return "TELMED";
@@ -351,6 +353,7 @@ export function readLca(text: string): PersonExtract["lca"] {
   return found;
 }
 
+/** Année de couverture la plus citée : « 01.01.AAAA » pèse plus qu'une année après « primes », « police »… ; à égalité, la plus récente. */
 export function readYear(text: string, minYear: number, maxYear: number): number | null {
   const counts = new Map<number, number>();
   for (const m of text.matchAll(/0?1[./]0?1[./](20\d{2})/g)) counts.set(Number(m[1]), (counts.get(Number(m[1])) ?? 0) + 3);
@@ -408,6 +411,10 @@ export function splitByPerson(text: string, persons: readonly ImportPerson[]): {
 /** Longueur maximale de texte analysée (une police tient en quelques pages). */
 export const MAX_POLICY_TEXT = 200_000;
 
+/**
+ * Point d'entrée : tout ce qu'on lit d'une police pour les personnes du foyer. Ce qui manque dans
+ * la partie d'une personne est repris de la police entière. `noText` : PDF sans texte (scanné).
+ */
 export function extractPolicy(
   text: string,
   ctx: { persons: readonly ImportPerson[]; insurers: readonly ImportInsurer[]; franchises: readonly number[]; minYear: number; maxYear: number },

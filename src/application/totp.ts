@@ -10,6 +10,7 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const STEP_SECONDS = 30;
 const DIGITS = 6;
 
+/** Base32 (RFC 4648, sans « = ») : format des secrets affichés ou scannés dans l'application. */
 export function base32Encode(bytes: Uint8Array): string {
   let bits = 0;
   let value = 0;
@@ -26,6 +27,7 @@ export function base32Encode(bytes: Uint8Array): string {
   return out;
 }
 
+/** Tolère espaces, tirets et minuscules (secret recopié à la main) ; lève une erreur sinon. */
 export function base32Decode(text: string): Buffer {
   const clean = text.replace(/[\s=-]/g, "").toUpperCase();
   let bits = 0;
@@ -44,14 +46,17 @@ export function base32Decode(text: string): Buffer {
   return Buffer.from(out);
 }
 
+/** Secret aléatoire de 160 bits, en base32. */
 export function newTotpSecret(): string {
   return base32Encode(randomBytes(20));
 }
 
+/** Numéro du pas de 30 s : un code vaut pendant tout son pas. */
 export function totpStep(nowMs: number): number {
   return Math.floor(nowMs / 1000 / STEP_SECONDS);
 }
 
+/** Code à 6 chiffres d'un pas (troncature dynamique de HOTP, RFC 4226). */
 export function totpCode(secret: string, step: number): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(step));

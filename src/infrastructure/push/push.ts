@@ -5,6 +5,11 @@ import type { Db } from "../db/client";
 import { householdMember, notificationLog, pushSubscription } from "../db/schema";
 import { getSetting, setSetting, SETTING_KEYS } from "../db/settings";
 
+/*
+ * Notifications push (Web Push, clés VAPID) : abonnements des appareils par compte, envoi à un
+ * compte, à un foyer ou à tous, dédoublonné par `notification_log`.
+ */
+
 interface Vapid {
   publicKey: string;
   privateKey: string;
@@ -32,6 +37,7 @@ const PUSH_HOSTS = [
   /\.push\.services\.mozilla\.com$/,
 ];
 
+/** Adresse HTTPS d'un service push connu (voir `PUSH_HOSTS`). */
 export function isPushEndpoint(endpoint: string): boolean {
   let url: URL;
   try {
@@ -67,6 +73,7 @@ export function saveSubscription(db: Db, userId: number, sub: PushSubscriptionIn
     .run();
 }
 
+/** Désabonne un appareil, seulement s'il appartient à ce compte. */
 export function removeSubscription(db: Db, userId: number, endpoint: string) {
   db.delete(pushSubscription).where(and(eq(pushSubscription.userId, userId), eq(pushSubscription.endpoint, endpoint))).run();
 }

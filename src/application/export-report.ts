@@ -19,6 +19,7 @@ const chf = (rp: number | null | undefined) => (rp === null || rp === undefined 
 const DECISION_SHORT_LABEL: Record<Decision, string> = { UNDECIDED: "pas décidé", KEEP: "garder", SWITCH: "changer de caisse", ADJUST: "adapter le contrat" };
 const REVIEW_STATUS: Record<ReviewStatus, string> = { OPEN: "en cours", DECIDED: "décidé", LETTERS_SENT: "lettres envoyées", CLOSED: "clôturé" };
 
+/** Sections du PDF récapitulatif, construites à partir de l'export JSON du compte (data-rights.ts). */
 export function exportReport(data: DataExport): Report {
   const sections: ReportSection[] = [];
   const c = data.compte;

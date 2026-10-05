@@ -9,6 +9,12 @@ import { premium, tariff, tariffDataset } from "./schema";
 import { seedReference } from "./seed";
 import { sealLegacyData } from "../crypto/legacy";
 
+/*
+ * Ouverture de la base SQLite : réglages (WAL, clés étrangères, effacement sûr), copie avant
+ * migration, migrations Drizzle (dossier drizzle/), reprise des imports interrompus, chiffrement
+ * des anciennes données et référentiel de départ.
+ */
+
 export type Db = BetterSQLite3Database<typeof schema> & { $client: Database.Database };
 
 function migrationsFolder(): string {

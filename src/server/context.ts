@@ -7,6 +7,7 @@ import { DISPLAY_TIME_ZONE, type IsoDate } from "@/domain/dates";
  * Le domaine ne lit jamais l'heure lui-même ; on lui passe `today()` ou `nowIso()`.
  */
 
+/** Base SQLite du processus (une seule connexion, partagée). */
 export function db() {
   return getDb();
 }

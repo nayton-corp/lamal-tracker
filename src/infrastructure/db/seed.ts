@@ -10,6 +10,11 @@ import type { DirectoryEntry } from "../reference/insurer-directory";
 import type { SupervisoryRow } from "../reference/supervisory";
 import { getSetting, setSetting, SETTING_KEYS } from "./settings";
 
+/*
+ * Référentiel de départ, appliqué à chaque ouverture de la base : caisses connues, paramètres
+ * légaux des années récentes, données officielles embarquées dans l'image (annuaire, surveillance, CO2).
+ */
+
 type SupervisoryTuple = [number, number, number, number, number | null, number | null, number | null];
 
 /** Données de surveillance embarquées (tableau compact) sous forme d'objets. */

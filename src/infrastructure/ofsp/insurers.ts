@@ -36,6 +36,7 @@ export const KNOWN_INSURERS: Record<number, string> = {
   1568: "sana24 AG",
 };
 
+/** Raison sociale d'un n° OFSP connu, sinon un nom provisoire « Assureur n° … ». */
 export function insurerName(bag: number): string {
   return KNOWN_INSURERS[bag] ?? `Assureur n° ${bag}`;
 }

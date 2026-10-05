@@ -48,6 +48,7 @@ export function createSignupInvitation(db: Db, scope: Scope, input: z.input<type
   return code;
 }
 
+/** Invitations d'inscription pour l'administration (sans le code : seule son empreinte est gardée). */
 export function listSignupInvitations(db: Db, scope: Scope) {
   requireAdmin(scope);
   return db
@@ -140,6 +141,7 @@ export function claimInvitation(tx: Tx, row: Invitation, nowIso: string) {
 
 // ───────────────────────── Membres du foyer ─────────────────────────
 
+/** Comptes membres du foyer de l'appelant, propriétaire d'abord ; `you` désigne l'appelant. */
 export function householdMembers(db: Db, scope: Scope) {
   const householdId = householdIdOf(scope);
   return db

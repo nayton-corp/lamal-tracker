@@ -1,12 +1,19 @@
 import type { Rappen } from "./money";
 
+/*
+ * Coût annuel attendu d'une assurance de base : prime, franchise et quote-part, en centimes.
+ * Sert au classement des offres, au simulateur de franchise et aux stratégies du rituel.
+ */
+
 export interface CostInput {
   monthlyPremiumRp: Rappen;
   franchiseChf: number;
   /** Frais de santé annuels attendus (factures avant participation). */
   healthCostsRp: Rappen;
+  /** Taux de quote-part en points de base (1000 = 10 %). */
   coinsuranceRateBp: number;
   coinsuranceMaxRp: Rappen;
+  /** Redistribution CO2 annuelle, déduite de la prime ; null = inconnue (comptée 0). */
   co2AnnualRp: Rappen | null;
 }
 

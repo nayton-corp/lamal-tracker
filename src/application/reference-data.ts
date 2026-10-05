@@ -39,10 +39,12 @@ export function lastDataChecks(db: Db) {
   };
 }
 
+/** Jeux de primes importés (actifs, remplacés, en échec), le plus récent d'abord. */
 export function listDatasets(db: Db) {
   return db.select().from(tariffDataset).orderBy(desc(tariffDataset.id)).all();
 }
 
+/** Paramètres légaux enregistrés, de l'année la plus récente à la plus ancienne. */
 export function listParameters(db: Db) {
   return db.select().from(lamalParameters).orderBy(desc(lamalParameters.year)).all();
 }
@@ -62,6 +64,7 @@ export function resetCo2(db: Db, scope: Scope, year: number) {
     .run();
 }
 
+/** Efface l'adresse de résiliation saisie : les lettres reprennent celle de l'annuaire officiel. */
 export function resetInsurerAddress(db: Db, scope: Scope, insurerId: number) {
   requireAdmin(scope);
   db.update(insurer).set({ terminationAddress: null, addressVerifiedAt: null }).where(eq(insurer.id, insurerId)).run();

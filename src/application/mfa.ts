@@ -96,6 +96,7 @@ export function confirmTotpSetup(db: Db, userId: number, token: string | undefin
   return replaceRecoveryCodes(db, userId);
 }
 
+/** Remplace tous les codes de secours (les anciens ne valent plus rien) ; mot de passe exigé. */
 export function regenerateRecoveryCodes(db: Db, userId: number, password: string, nowIso: string): string[] {
   if (!userRow(db, userId).totpEnabledAt) throw new UserError("Activez d'abord le double facteur.");
   requirePassword(db, userId, password, nowIso);
@@ -103,6 +104,7 @@ export function regenerateRecoveryCodes(db: Db, userId: number, password: string
   return replaceRecoveryCodes(db, userId);
 }
 
+/** Désactive le double facteur et efface les codes de secours ; refusé à un administrateur sans passkey. */
 export function disableTotp(db: Db, userId: number, password: string, nowIso: string) {
   const user = userRow(db, userId);
   if (!user.totpEnabledAt) return;
@@ -169,12 +171,14 @@ export function startMfaLogin(db: Db, userId: number, nowIso: string): string {
   return issueToken(db, { userId, kind: "LOGIN_MFA", ttlMs: LOGIN_MINUTES * 60_000 }, nowIso);
 }
 
+/** Une connexion attend-elle son code de double facteur (jeton du cookie encore valable) ? */
 export function pendingMfaLogin(db: Db, token: string | undefined, nowIso: string): boolean {
   return peekToken(db, "LOGIN_MFA", token, nowIso) !== null;
 }
 
 export type MfaOutcome = { ok: true; userId: number } | { ok: false; error: string; restart: boolean };
 
+/** Seconde étape de la connexion. `restart` : le jeton est perdu (expiré, bloqué, trop d'essais), retour au mot de passe. */
 export function finishMfaLogin(db: Db, token: string | undefined, code: string, nowMs: number, nowIso: string): MfaOutcome {
   const row = peekToken(db, "LOGIN_MFA", token, nowIso);
   if (!row?.userId) return { ok: false, error: "Étape expirée : reconnectez-vous.", restart: true };

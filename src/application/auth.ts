@@ -45,6 +45,7 @@ function hashed(password: string): StoredPassword {
   return { salt: salt.toString("base64"), hash: hashPassword(password, salt, COST).toString("base64"), cost: COST };
 }
 
+/** Hachage scrypt (sel et coût inclus) d'un nouveau mot de passe, après contrôle de sa longueur. */
 export function storedPassword(password: string): StoredPassword {
   validatePassword(password);
   return hashed(password);
@@ -77,6 +78,7 @@ export function passwordToDefine(db: Db): boolean {
   return !db.select({ password: appUser.password }).from(appUser).where(eq(appUser.id, id)).get()!.password.hash;
 }
 
+/** Contrôle de longueur seul, sans réseau ; `checkNewPassword` y ajoute les fuites connues. */
 export function validatePassword(password: string) {
   if (password.length < MIN_PASSWORD_LENGTH) throw new UserError(`Le mot de passe doit compter au moins ${MIN_PASSWORD_LENGTH} caractères.`);
   if (password.length > 200) throw new UserError("Mot de passe trop long.");
@@ -124,6 +126,7 @@ export function userEmail(db: Db, userId: number): string | null {
   return db.select({ email: appUser.email }).from(appUser).where(eq(appUser.id, userId)).get()?.email ?? null;
 }
 
+/** `email` doit être déjà normalisé (`normalizeEmail`) : la recherche est exacte. */
 export function findUserByEmail(db: Db, email: string) {
   return db.select().from(appUser).where(eq(appUser.email, email)).get() ?? null;
 }
@@ -133,10 +136,12 @@ export function primaryUserId(db: Db): number | null {
   return db.select({ id: appUser.id }).from(appUser).where(eq(appUser.role, "ADMIN")).orderBy(asc(appUser.id)).limit(1).get()?.id ?? null;
 }
 
+/** Remplace le mot de passe et lève le verrouillage ; les sessions ouvertes restent (à l'appelant de les fermer). */
 export function setPassword(db: Db, userId: number, password: string) {
   db.update(appUser).set({ password: storedPassword(password), failedLogins: 0, lockedUntil: null }).where(eq(appUser.id, userId)).run();
 }
 
+/** Comparaison en temps constant, sans compter d'échec : la connexion passe par `attemptLogin`. */
 export function verifyPassword(db: Db, userId: number, password: string): boolean {
   const user = db.select({ password: appUser.password }).from(appUser).where(eq(appUser.id, userId)).get();
   if (!user) return false;
@@ -273,10 +278,10 @@ export function markActive(db: Db, userId: number, nowIso: string) {
   db.update(appUser).set({ lastActiveAt: nowIso, inactivityNotices: 0, inactivityNoticeAt: null }).where(eq(appUser.id, userId)).run();
 }
 
-/** Ouvre une session et renvoie le jeton à placer dans le cookie (jamais conservé en clair). */
 /**
- * Ouvre une session. `confirmed` : l'identité vient d'être prouvée (mot de passe, passkey), la
- * session est « fraîche » quelques minutes ; un lien de courriel, lui, ne prouve que l'accès à la boîte.
+ * Ouvre une session et renvoie le jeton à placer dans le cookie (jamais conservé en clair).
+ * `confirmed` : l'identité vient d'être prouvée (mot de passe, passkey), la session est
+ * « fraîche » quelques minutes ; un lien de courriel, lui, ne prouve que l'accès à la boîte.
  */
 export function openSession(db: Db, userId: number, device: string, nowIso: string, confirmed = true): { id: string; token: string; expiresAt: string } {
   purgeExpiredSessions(db, nowIso);
@@ -322,6 +327,7 @@ export function touchSession(db: Db, token: string | undefined, nowIso: string):
   return { id: row.id, userId: row.userId, device: row.device, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt };
 }
 
+/** Déconnexion : supprime la session de ce jeton (sans effet s'il est absent). */
 export function closeSession(db: Db, token: string | undefined) {
   if (!token) return;
   db.delete(session).where(eq(session.tokenHash, tokenHash(token))).run();
@@ -389,6 +395,7 @@ export function closeOtherSessions(db: Db, userId: number, keepId: string) {
   db.delete(session).where(and(eq(session.userId, userId), ne(session.id, keepId))).run();
 }
 
+/** Sessions actives du compte (les expirées sont purgées au passage), la plus récemment utilisée d'abord. */
 export function listSessions(db: Db, userId: number, nowIso: string): Omit<SessionInfo, "userId">[] {
   purgeExpiredSessions(db, nowIso);
   return db

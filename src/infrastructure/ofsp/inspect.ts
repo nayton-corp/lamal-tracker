@@ -5,6 +5,11 @@ import path from "node:path";
 import { extractPremiumFile, isXlsxZip } from "./archive";
 import { readRows } from "./reader";
 
+/*
+ * Outil de diagnostic de la ligne de commande (src/cli) : montre ce que contient un fichier OFSP
+ * quand son import échoue ou que son format a changé.
+ */
+
 /** Diagnostic d'un fichier OFSP inattendu : contenu de l'archive, feuilles, premières lignes. */
 export async function inspectFile(file: string, maxRows = 6): Promise<string[]> {
   const out: string[] = [];

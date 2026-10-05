@@ -54,6 +54,7 @@ export async function passkeyRegistrationOptions(db: Db, userId: number, rp: Rel
   return { options, token };
 }
 
+/** Vérifie la réponse de l'appareil au défi (jeton du cookie, à usage unique) et enregistre la passkey. */
 export async function finishPasskeyRegistration(
   db: Db,
   userId: number,

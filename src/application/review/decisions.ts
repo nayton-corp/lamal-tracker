@@ -78,6 +78,7 @@ export function keepAsIs(db: Db, scope: Scope, lineId: number, nowIso: string) {
     .run();
 }
 
+/** Remet la personne « à décider » ; impossible une fois sa lettre envoyée. */
 export function undoDecision(db: Db, scope: Scope, lineId: number) {
   const { line } = loadLine(db, scope, lineId);
   const sent = linesWithSentLetter(db, line.reviewId);
@@ -98,11 +99,16 @@ export function undoDecision(db: Db, scope: Scope, lineId: number) {
     .run();
 }
 
+/** Contrôle des complémentaires LCA confirmé : condition pour préparer une résiliation (domain/review.ts). */
 export function acknowledgeLca(db: Db, scope: Scope, lineId: number, nowIso: string) {
   loadLine(db, scope, lineId);
   db.update(reviewLine).set({ lcaAckAt: nowIso }).where(eq(reviewLine.id, lineId)).run();
 }
 
+/**
+ * Cases à cocher d'une ligne : médecin vérifié dans la liste du modèle (`doctorCheck`), affiliation
+ * demandée ou confirmée par la nouvelle caisse (dates ; null annule).
+ */
 export function setLineFlags(
   db: Db,
   scope: Scope,

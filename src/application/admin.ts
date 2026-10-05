@@ -26,6 +26,7 @@ export interface AccountRow {
   pingen: boolean;
 }
 
+/** Comptes de l'instance pour l'administration : facteurs, foyer, dernière activité ; rien du contenu des foyers. */
 export function listAccounts(db: Db, scope: Scope): AccountRow[] {
   requireAdmin(scope);
   const users = db.select().from(appUser).orderBy(asc(appUser.id)).all();
@@ -86,6 +87,7 @@ export function pingenAllowed(db: Db, scope: Scope): boolean {
   return row?.value === true;
 }
 
+/** Autorise (ou retire) l'envoi par Pingen pour un foyer : l'envoi est facturé à l'exploitant. */
 export function setPingenAllowed(db: Db, scope: Scope, householdId: number, allowed: boolean) {
   requireAdmin(scope);
   const exists = db.select({ id: householdMember.householdId }).from(householdMember).where(eq(householdMember.householdId, householdId)).limit(1).get();

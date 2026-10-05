@@ -2,6 +2,11 @@ import type { Offer } from "./comparison";
 import type { ModelType } from "./lamal";
 import { foldForSearch } from "./text";
 
+/*
+ * Renouvellement : retrouve, dans les primes de l'année cible, le tarif qui succède au contrat
+ * actuel chez la même caisse (code tarif, correspondance confirmée par le foyer, libellé, modèle).
+ */
+
 export interface RenewalSourcePolicy {
   insurerId: number;
   tariffCode: string | null;
@@ -10,6 +15,10 @@ export interface RenewalSourcePolicy {
   franchiseChf: number;
 }
 
+/**
+ * MATCHED : certain (code identique ou correspondance confirmée) ; PROBABLE : déduit du libellé ou
+ * du modèle, à faire confirmer ; AMBIGUOUS : plusieurs candidats ; MISSING : aucune offre de la caisse.
+ */
 export type RenewalStatus = "MATCHED" | "PROBABLE" | "AMBIGUOUS" | "MISSING";
 
 export interface RenewalResult {
@@ -22,6 +31,7 @@ export interface RenewalResult {
   alternatives: Offer[];
 }
 
+/** Franchise autorisée la plus proche (la plus basse à égalité), quand l'actuelle n'existe plus (passage enfant → adulte). */
 export function nearestFranchise(current: number, allowed: readonly number[]): number {
   if (allowed.includes(current)) return current;
   return [...allowed].sort((a, b) => Math.abs(a - current) - Math.abs(b - current) || a - b)[0] ?? current;

@@ -5,6 +5,12 @@ import { defaultParameters, type LamalParameters } from "@/domain/parameters";
 import type { Db } from "./client";
 import { insurer, lamalParameters, premium, tariff, tariffDataset } from "./schema";
 
+/*
+ * Requêtes du référentiel partagées par plusieurs cas d'usage : offres d'un profil de primes, jeu
+ * de primes actif d'une année, paramètres légaux d'une année.
+ */
+
+/** Ce qui détermine une prime : jeu de primes, lieu (canton, région), classe d'âge, accident, sous-groupe. */
 export interface PremiumProfile {
   datasetId: number;
   canton: string;
@@ -50,6 +56,7 @@ export function offersFor(db: Db, scope: PremiumProfile): Offer[] {
     }));
 }
 
+/** Jeu de primes actif de l'année (le dernier fichier importé avec succès) ; undefined si aucun. */
 export function activeDataset(db: Db, year: number) {
   return db
     .select()
@@ -58,6 +65,7 @@ export function activeDataset(db: Db, year: number) {
     .get();
 }
 
+/** Année la plus récente qui a des primes actives ; null avant tout import. */
 export function latestActiveYear(db: Db): number | null {
   return (
     db
@@ -69,6 +77,7 @@ export function latestActiveYear(db: Db): number | null {
   );
 }
 
+/** Paramètres légaux de l'année : la ligne de `lamal_parameters`, sinon la loi en vigueur (CO2 inconnu). */
 export function parametersFor(db: Db, year: number): LamalParameters {
   const row = db.select().from(lamalParameters).where(eq(lamalParameters.year, year)).get();
   if (!row) return defaultParameters(year);

@@ -9,6 +9,11 @@ import { officialCo2 } from "../reference/apply";
 import { readRows } from "./reader";
 import { sha256File } from "./source";
 
+/*
+ * Import d'un fichier de primes OFSP en base : lecture en flux (reader.ts), normalisation et
+ * rapport par le domaine (domain/ofsp), écriture du jeu, puis activation ou échec.
+ */
+
 export type ImportOutcome =
   | { status: "IMPORTED"; datasetId: number; report: ValidationReport }
   | { status: "ALREADY"; datasetId: number; year: number | null }

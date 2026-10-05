@@ -1,6 +1,11 @@
 import type { AgeClass } from "./lamal";
 import type { Rappen } from "./money";
 
+/*
+ * Paramètres légaux LAMal par année (franchises, quote-part, redistribution CO2), avec les valeurs
+ * de la loi en vigueur comme repli.
+ */
+
 /** Paramètres légaux d'une année. Jamais en dur dans le code métier : ils voyagent avec l'année. */
 export interface LamalParameters {
   year: number;
@@ -42,10 +47,12 @@ export function defaultParameters(year: number, co2AnnualRp: Rappen | null = nul
   };
 }
 
+/** Franchises possibles : les jeunes adultes ont celles des adultes, seuls les enfants diffèrent. */
 export function franchisesFor(params: LamalParameters, ageClass: AgeClass): number[] {
   return ageClass === "KID" ? params.franchisesKid : params.franchisesAdult;
 }
 
+/** Plafond annuel de quote-part : réduit pour les enfants, celui des adultes dès 19 ans. */
 export function coinsuranceMaxFor(params: LamalParameters, ageClass: AgeClass): Rappen {
   return ageClass === "KID" ? params.coinsuranceMaxKidRp : params.coinsuranceMaxAdultRp;
 }

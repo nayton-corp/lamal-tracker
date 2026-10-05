@@ -12,6 +12,11 @@ import { ownedLine, ownedReview, type Scope } from "./scope";
 import { insurerProfiles } from "./insurers";
 import { NotFoundError, UserError } from "./errors";
 
+/*
+ * Stratégie du rituel et questionnaire des besoins. `lineContext` rassemble ce qu'il faut pour
+ * classer les offres d'une personne ; le comparateur (compare.ts) s'en sert aussi.
+ */
+
 type LineRow = typeof reviewLine.$inferSelect;
 type ReviewRow = typeof review.$inferSelect;
 type PersonRow = typeof person.$inferSelect;
@@ -33,6 +38,10 @@ export interface LineContext {
   costContext: Parameters<typeof costOf>[1];
 }
 
+/**
+ * Contexte de calcul d'une personne du rituel (vérifie que la ligne appartient au foyer).
+ * `healthCostsRp` remplace les frais enregistrés, pour une simulation dans le comparateur.
+ */
 export function lineContext(db: Db, scope: Scope, lineId: number, healthCostsRp?: number): LineContext {
   const line = ownedLine(db, scope, lineId);
   const r = db.select().from(review).where(eq(review.id, line.reviewId)).get()!;

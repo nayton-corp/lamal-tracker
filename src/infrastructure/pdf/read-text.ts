@@ -1,5 +1,10 @@
 import { extractText, getDocumentProxy } from "unpdf";
 
+/*
+ * Extraction du texte d'une police d'assurance en PDF, pour l'import de police
+ * (application/policy-import.ts).
+ */
+
 /** Une police d'assurance tient en quelques pages ; au-delà, ce n'en est pas une (et l'analyse coûte cher). */
 export const MAX_PDF_PAGES = 30;
 

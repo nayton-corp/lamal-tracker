@@ -75,6 +75,7 @@ export function activeReview(db: Db, scope: Scope) {
   return db.select().from(review).where(and(eq(review.householdId, scope.householdId), eq(review.status, "OPEN"))).orderBy(desc(review.targetYear)).get() ?? null;
 }
 
+/** Rituel du foyer pour une année cible, quel que soit son statut ; null s'il n'existe pas. */
 export function getReviewByYear(db: Db, scope: Scope, targetYear: number) {
   if (scope.householdId === null) return null;
   return db.select().from(review).where(and(eq(review.householdId, scope.householdId), eq(review.targetYear, targetYear))).get() ?? null;

@@ -13,6 +13,11 @@ import { getReviewView } from "./review";
 import { bumpUsage } from "./usage";
 import { findOfferRequest, ownedLine, ownedOfferRequest, ownedReview, type Scope } from "./scope";
 
+/*
+ * Demandes d'offre : un courrier par nouvelle caisse choisie, qui vaut demande d'affiliation, avec
+ * les complémentaires LCA à y demander. Contenu figé à la génération, comme une lettre.
+ */
+
 /** Complémentaires à demander pour une ligne : celles choisies, sinon celles en cours. */
 export function lcaWishesFor(db: Db, line: { personId: number; lcaWishes: string[] | null }): LcaGuarantee[] {
   if (line.lcaWishes) return line.lcaWishes.filter((k): k is LcaGuarantee => (LCA_GUARANTEE_KEYS as string[]).includes(k));
@@ -24,6 +29,7 @@ export function lcaWishesFor(db: Db, line: { personId: number; lcaWishes: string
   return [...new Set(active.map((a) => a.guarantee).filter((g): g is LcaGuarantee => (LCA_GUARANTEE_KEYS as string[]).includes(g ?? "")))];
 }
 
+/** Complémentaires à demander (clés inconnues ignorées). Une liste vide = n'en demander aucune. */
 export function setLcaWishes(db: Db, scope: Scope, lineId: number, keys: string[]) {
   ownedLine(db, scope, lineId);
   const valid = keys.filter((k) => (LCA_GUARANTEE_KEYS as string[]).includes(k));
@@ -85,6 +91,7 @@ export function generateOfferRequests(db: Db, scope: Scope, reviewId: number, to
   return created;
 }
 
+/** Demandes d'offre d'un rituel, avec un lien `mailto:` prérempli quand la caisse publie une adresse. */
 export function listOfferRequests(db: Db, scope: Scope, reviewId: number) {
   ownedReview(db, scope, reviewId);
   return db
@@ -107,6 +114,7 @@ export function listOfferRequests(db: Db, scope: Scope, reviewId: number) {
     });
 }
 
+/** Demande du foyer ; null si elle n'existe pas ou appartient à un autre foyer. */
 export function getOfferRequest(db: Db, scope: Scope, id: number) {
   const row = findOfferRequest(db, scope, id);
   return row ? { ...row, content: row.content as LetterContent } : null;
@@ -135,6 +143,7 @@ export function markOfferRequestAnswered(db: Db, scope: Scope, id: number, at: I
   });
 }
 
+/** Supprime une demande pas encore envoyée ; une demande envoyée reste, sans erreur. */
 export function deleteOfferRequest(db: Db, scope: Scope, id: number) {
   if (!findOfferRequest(db, scope, id)) return;
   db.delete(offerRequest).where(and(eq(offerRequest.id, id), isNull(offerRequest.sentAt))).run();

@@ -10,6 +10,11 @@ import { insurer, lamalPolicy, person, review, reviewLine } from "@/infrastructu
 import { getHousehold } from "./household";
 import type { Scope } from "./scope";
 
+/*
+ * Historique pluriannuel du foyer (page Historique) : primes facturées par personne et par année,
+ * repères du marché pour le même profil, totaux du foyer et statistiques sur la période.
+ */
+
 export interface HistoryPoint {
   year: number;
   insurer: string;

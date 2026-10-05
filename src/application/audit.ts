@@ -47,6 +47,7 @@ export type AuditKind = keyof typeof AUDIT_LABELS;
 
 const RETENTION_DAYS = 365;
 
+/** Ajoute un événement au journal ; `detail` est tronqué à 120 caractères (jamais de donnée de santé). */
 export function audit(db: Db, userId: number | null, kind: AuditKind, options: { householdId?: number | null; detail?: string; nowIso?: string } = {}) {
   db.insert(auditEvent)
     .values({
@@ -87,6 +88,7 @@ export function householdAudit(db: Db, householdId: number, limit = 20): AuditEn
   return entries(db, eq(auditEvent.householdId, householdId), limit);
 }
 
+/** Efface les événements de plus de 12 mois (ménage du planificateur). */
 export function purgeAudit(db: Db, nowIso: string) {
   const limit = new Date(Date.parse(nowIso) - RETENTION_DAYS * 86_400_000).toISOString();
   db.delete(auditEvent).where(lt(auditEvent.createdAt, limit)).run();

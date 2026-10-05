@@ -78,6 +78,7 @@ function bestOfferFor(
   return { best: ranked[0] ?? null, renewalTotalRp };
 }
 
+/** Vue complète d'un rituel du foyer ; `today` sert aux échéances et à l'urgence affichée. */
 export function getReviewView(db: Db, scope: Scope, reviewId: number, today: IsoDate): ReviewView {
   const reviewRow = ownedReview(db, scope, reviewId);
   const deadlines = reviewDeadlines(reviewRow.targetYear);

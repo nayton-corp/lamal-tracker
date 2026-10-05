@@ -17,6 +17,11 @@ import { insurer } from "@/infrastructure/db/schema";
 import type { Scope } from "./scope";
 import { effectiveNeeds, lineContext, picksFor, type StrategyPick } from "./strategy";
 
+/*
+ * Comparateur d'une ligne de revue (une personne du rituel) : offres de l'année cible filtrées
+ * selon ses besoins, classées, avec scénarios de coût, courbe des franchises et portrait des caisses.
+ */
+
 export interface CompareOptions {
   /** Modèles retenus ; absent = besoins de la personne, vide = tous. */
   models?: ModelType[];
@@ -51,6 +56,7 @@ export interface DetailedOffer extends RankedOffer {
 const CURVE_MAX_HEALTH_COSTS_RP = { KID: 400_000, OTHER: 1_000_000 } as const;
 const CURVE_POINTS = 40;
 
+/** Identifiant d'une offre dans l'interface : un tarif a une prime par franchise. */
 export const offerKey = (o: { tariffId: number; franchiseChf: number }) => `${o.tariffId}-${o.franchiseChf}`;
 
 export interface CompareView {
@@ -85,6 +91,10 @@ export interface CompareView {
   picks: StrategyPick[];
 }
 
+/**
+ * Tout ce qu'affiche le comparateur pour une personne du rituel. Les options (paramètres d'URL)
+ * priment sur les besoins enregistrés ; la courbe des franchises ne suit que `opts.models`.
+ */
 export function compareForLine(db: Db, scope: Scope, lineId: number, opts: CompareOptions = {}): CompareView {
   const c = lineContext(db, scope, lineId, opts.healthCostsRp);
   const { line, review: r, person: p, policy, costContext, allowedFranchises } = c;

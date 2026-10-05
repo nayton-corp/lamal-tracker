@@ -18,6 +18,11 @@ import { referenceTick } from "./reference";
 import { importJob, startBootstrapImport, startImport, startYearImport } from "./jobs";
 import { latestActiveYear } from "@/infrastructure/db/queries";
 
+/*
+ * Planificateur, appelé chaque heure par instrumentation.ts : publications et imports OFSP,
+ * référentiels, rappels du rituel, suivi Pingen, comptes inactifs, alertes et ménage.
+ */
+
 /**
  * Vérifie si l'OFSP a publié un nouveau fichier (signature HTTP), et l'importe si oui.
  * Appelé par le planificateur ; peut aussi être forcé depuis l'interface.
