@@ -48,8 +48,8 @@ Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/rituel/2
 | Ligne (une personne du rituel) | `reviewLine`, `findLine`, `ownedLine` | `review_line` | `/rituel/[year]/personne/[lineId]` |
 | Hausse, reconduction | `renewal*`, `findRenewal`, `RenewalStatus` | `review_line.renewal_*` | `/rituel/[year]` |
 | Correspondance de tarif (lignée) | `tariffLineage`, `confirmLineage` | `tariff_lineage` | `/rituel/[year]/personne/[lineId]` |
-| Stratégie : Économie max / Maintien / Équilibre | `Strategy` : `ECONOMY` / `KEEP` / `BALANCE` | `review.strategy` | `/rituel/[year]/strategie` |
-| Besoins | `saveNeeds`, `UsageProfile` | `review.needs_confirmed_at`, `review_line.wish_*` | `/rituel/[year]/besoins` |
+| Stratégie : Payer le moins possible / Ne rien changer au quotidien | `Strategy` : `ECONOMY` / `KEEP` | `review.strategy` | `/rituel/[year]/preferences` |
+| Préférences (stratégie et besoins) | `savePreferences`, `UsageProfile` | `review.needs_confirmed_at`, `review_line.wish_*` | `/rituel/[year]/preferences` |
 | Comparateur | `compareForLine` (`src/application/compare.ts`), `rankForStrategy` | — | `/rituel/[year]/comparer`, `/rituel/[year]/personne/[lineId]` |
 | Comparer des offres (côte à côte) | — | — | `/rituel/[year]/personne/[lineId]/comparer` |
 | Je garde / Je change de caisse / Je change de franchise ou de modèle | `Decision` : `KEEP` / `SWITCH` / `ADJUST` (`UNDECIDED` = À décider) | `review_line.decision` | `/rituel/[year]/personne/[lineId]` |

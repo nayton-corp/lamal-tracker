@@ -151,8 +151,7 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
         affiliationRequested: x.line.affiliationRequestedAt !== null,
         letterSent: sentLineIds.has(x.line.id),
       })),
-      strategyChosen: reviewRow.strategy !== null,
-      needsConfirmed: reviewRow.needsConfirmedAt !== null,
+      preferencesSaved: reviewRow.needsConfirmedAt !== null,
     }),
   };
 }

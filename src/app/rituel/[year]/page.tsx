@@ -123,12 +123,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
       {!closed && view.review.strategy && (
         <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
           <span>
-            Stratégie : <strong>{STRATEGY_INFO[view.review.strategy].label}</strong>
+            Préférences : <strong>{STRATEGY_INFO[view.review.strategy].label}</strong>
           </span>
-          <span className="flex gap-3">
-            <Link className="text-primary underline" href={`/rituel/${year}/strategie`}>Changer</Link>
-            <Link className="text-primary underline" href={`/rituel/${year}/besoins`}>Mes besoins</Link>
-          </span>
+          <Link className="text-primary underline" href={`/rituel/${year}/preferences`}>Modifier</Link>
         </p>
       )}
 
@@ -213,7 +210,7 @@ function OtherActions({ year, reviewId, closed, sentCount }: { year: number; rev
 
 function Steps({ view }: { view: ReviewView }) {
   return (
-    <ol className="grid grid-cols-5 gap-1" aria-label="Étapes du rituel">
+    <ol className="grid grid-cols-4 gap-1" aria-label="Étapes du rituel">
       {view.steps.map((s, i) => (
         <li key={s.key} className="flex flex-col items-center gap-1 text-center">
           <span

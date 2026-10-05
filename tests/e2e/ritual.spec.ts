@@ -147,31 +147,41 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await shot(page, "04-personne");
   await expectAccessible(page);
 
-  // Rituel 2027 : reconduction, stratégie, besoins, comparaison
+  // Rituel 2027 : reconduction, préférences, comparaison
   await page.getByRole("link", { name: "Rituel" }).click();
   await expect(page.getByText("Sans rien faire, en 2027 vous paierez")).toBeVisible();
   // Le tarif renommé entre 2026 et 2027 est retrouvé sans rien demander.
   await expect(page.getByText("Produit à préciser")).toHaveCount(0);
   await shot(page, "05-rituel");
   await expectAccessible(page);
-  await page.getByRole("link", { name: "Choisir ma stratégie" }).first().click();
-  await expect(page.getByRole("heading", { name: "Quelle stratégie ?" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Maintien" })).toBeVisible();
-  await shot(page, "05b-strategie");
-  await expectAccessible(page);
-  await page.getByRole("button", { name: "Choisir « Économie max »" }).click();
-  await expect(page.getByRole("heading", { name: "Votre besoin" })).toBeVisible();
+  await page.getByRole("link", { name: "Régler mes préférences" }).first().click();
+  await expect(page.getByRole("heading", { name: "Vos préférences" })).toBeVisible();
+  // Changer de stratégie remet les réglages fins à ceux qu'elle propose.
+  await page.getByText("Ne rien changer au quotidien").click();
+  await expect(page.getByText(/Franchise \d+ · /)).toBeVisible();
+  await page.getByText("Payer le moins possible").click();
+  await expect(page.getByText("Franchise la plus avantageuse · tous les modèles")).toBeVisible();
   await page.getByRole("radio", { name: /Quelques consultations/ }).check();
-  await shot(page, "05c-besoins");
+  await shot(page, "05b-preferences");
   await expectAccessible(page);
   await page.getByRole("button", { name: "Comparer les offres" }).click();
 
-  // Comparateur : renouvellement connu, top 3 de la stratégie, choisir la meilleure offre
+  // Comparateur : renouvellement connu, top 3 par coût réel, choisir la meilleure offre
   await expect(page.getByText("Sans rien faire en 2027")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Top 3 · Économie max/ })).toBeVisible();
-  await expect(page.getByText("Selon chaque stratégie")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Top 3 en 2027" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Selon mes préférences" })).toBeChecked();
   await shot(page, "06-comparateur");
   await expectAccessible(page);
+  await page.getByRole("radio", { name: "Toutes les offres" }).click();
+  await expect(page).toHaveURL(/all=1/);
+  await expect(page.getByRole("radio", { name: "Toutes les offres" })).toBeChecked();
+  await page.getByRole("radio", { name: "Selon mes préférences" }).click();
+  await expect(page).not.toHaveURL(/all=1/);
+  // Les anciennes adresses mènent aux préférences.
+  const comparer = page.url();
+  await page.goto("/rituel/2027/strategie");
+  await expect(page).toHaveURL(/\/rituel\/2027\/preferences/);
+  await page.goto(comparer);
 
   // Deux offres côte à côte
   const offerCards = page.locator("ol > li > details");
@@ -356,7 +366,7 @@ test.describe("sur ordinateur", () => {
     await expect(page.getByRole("dialog")).toContainText("Les courriers déjà postés ne sont pas annulés.");
     await page.getByRole("dialog").getByRole("button", { name: "Recommencer", exact: true }).click();
     // Les primes sont publiées : une analyse vierge s'ouvre, sans aucun choix.
-    await expect(page.getByRole("link", { name: "Choisir ma stratégie" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Régler mes préférences" }).first()).toBeVisible();
     await expect(page.getByText("Je change de caisse")).toHaveCount(0);
     await shot(page, "d10-rituel-supprime");
   });

@@ -8,21 +8,20 @@ const line = (over: Partial<RitualLineFacts> = {}): RitualLineFacts => ({
   letterSent: false,
   ...over,
 });
-const facts = { strategyChosen: false, needsConfirmed: false };
+const facts = { preferencesSaved: false };
 
 describe("étapes du rituel", () => {
   it("ne coche rien après une étape manquante", () => {
-    const steps = ritualSteps({ ...facts, strategyChosen: false, needsConfirmed: true, lines: [line()] });
+    const steps = ritualSteps({ ...facts, lines: [line({ affiliationRequested: true, letterSent: true })] });
     expect(steps.map((s) => [s.key, s.done])).toEqual([
       ["renewal", true],
-      ["strategy", false],
-      ["needs", false],
+      ["preferences", false],
       ["decide", false],
       ["procedures", false],
     ]);
   });
 
-  it("tout décidé : stratégie et besoins ne bloquent plus", () => {
+  it("tout décidé : les préférences ne bloquent plus", () => {
     const steps = ritualSteps({ ...facts, lines: [line({ decision: "KEEP" })] });
     expect(isStepDone(steps, "decide")).toBe(true);
     // Garder sa caisse ne demande aucune démarche : le rituel est terminé.

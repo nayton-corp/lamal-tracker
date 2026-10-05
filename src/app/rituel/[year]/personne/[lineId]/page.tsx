@@ -5,7 +5,6 @@ import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/re
 import { compareForLine, offerKey, type CompareView, type DetailedOffer } from "@/application/compare";
 import { insurerLabel } from "@/domain/insurer";
 import { lineOverview, listReviewLineTabs } from "@/application/review";
-import { STRATEGY_INFO } from "@/domain/strategy";
 import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { db } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
@@ -18,14 +17,14 @@ import { Chf, Saving } from "@/ui/money";
 import { Page, PageHeader } from "@/ui/page";
 import { SubmitButton } from "@/ui/submit";
 import { CompareBar, CompareToggle } from "./compare-select";
-import { FilterBar } from "./filter-bar";
+import { FilterBar, ScopeToggle } from "./filter-bar";
 import { InsurerFacts, ModelBlock, OfferCosts } from "./offer-details";
 import { pageScope } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Comparateur" };
 
-type Search = { m?: string; f?: string; sort?: string; all?: string; n?: string; every?: string };
+type Search = { m?: string; f?: string; all?: string; n?: string; every?: string };
 
 export default async function ReviewLinePage({ params, searchParams }: { params: Promise<{ year: string; lineId: string }>; searchParams: Promise<Search> }) {
   const scope = await pageScope();
@@ -38,19 +37,17 @@ export default async function ReviewLinePage({ params, searchParams }: { params:
   if (overview.review.status === "CLOSED") redirect(`/rituel/${year}`);
   const { line, policy, currentInsurer } = overview;
 
-  // Sans paramètre, les besoins de la personne s'appliquent ; « all » lève le filtre.
+  // Sans paramètre, les préférences de la personne s'appliquent ; « all » lève le filtre.
   const models = sp.m === undefined ? undefined : sp.m.split(",").filter((m): m is ModelType => (MODEL_TYPES as readonly string[]).includes(m));
   const view = compareForLine(db(), scope, lineId, {
     models,
     franchises: sp.f === undefined ? undefined : sp.f === "all" ? [] : [Number(sp.f)],
-    sort: sp.sort === "premium" || sp.sort === "total" || sp.sort === "strategy" ? sp.sort : undefined,
-    ignorePersonPreferences: sp.all === "1",
+    allOffers: sp.all === "1",
     everyOffer: sp.every === "1",
   });
   const every = sp.every === "1";
   const limit = sp.n === "all" ? view.offers.length : 30;
   const members = listReviewLineTabs(db(), scope, line.reviewId);
-  const strategyLabel = view.strategy ? STRATEGY_INFO[view.strategy].label : null;
   const top = view.offers.slice(0, 3);
   const rest = view.offers.slice(3, limit);
 
@@ -99,21 +96,16 @@ export default async function ReviewLinePage({ params, searchParams }: { params:
         <RenewalBlock view={view} year={year} lineId={lineId} modelType={policy.modelType as ModelType} />
       </Card>
 
-      <Section title="Filtrer les offres">
-        <FilterBar franchises={view.allowedFranchises} activeFranchise={view.appliedFilters.franchiseChf} activeModels={view.appliedFilters.models} sort={view.sort} strategyLabel={strategyLabel} />
-        <p className="text-sm text-muted">
-          Le coût total compte la prime et ce que vous paieriez de votre poche (franchise, 10 % de quote-part) pour des frais de santé de{" "}
-          <Chf rp={view.healthCostsRp} whole /> par an.
-        </p>
-      </Section>
       </aside>
 
       <div className="space-y-6">
-      <Section title={view.sort === "strategy" && strategyLabel ? `Top ${top.length} · ${strategyLabel}` : `Top ${top.length} en ${year}`}>
-        <BestSummary view={view} every={every} />
+      <Section title={`Top ${top.length} en ${year}`}>
+        <ScopeToggle allOffers={view.allOffers} />
+        <FilterBar franchises={view.allowedFranchises} activeFranchise={view.appliedFilters.franchiseChf} activeModels={view.appliedFilters.models} />
+        <BestSummary view={view} every={every} year={year} />
         {view.offers.length === 0 ? (
           <Alert tone="info" title="Aucune offre avec ces filtres">
-            Choisissez « Toutes franchises » ou d&apos;autres modèles d&apos;assurance.
+            Passez à « Toutes les offres », ou élargissez les filtres.
           </Alert>
         ) : (
           <ol className="space-y-2">
@@ -124,7 +116,6 @@ export default async function ReviewLinePage({ params, searchParams }: { params:
             ))}
           </ol>
         )}
-        <Picks view={view} />
       </Section>
       {rest.length > 0 && (
       <Section title={every ? `Toutes les offres (${view.offers.length})` : `Les autres caisses (${view.offers.length - top.length})`}>
@@ -151,32 +142,7 @@ export default async function ReviewLinePage({ params, searchParams }: { params:
   );
 }
 
-/** La meilleure offre selon chacune des trois stratégies, pour voir ce qu'on gagne ou perd. */
-function Picks({ view }: { view: CompareView }) {
-  return (
-    <Card className="space-y-2">
-      <p className="text-sm font-medium">Selon chaque stratégie</p>
-      <ul className="divide-y divide-border text-sm">
-        {view.picks.map(({ strategy, offer }) => (
-          <li key={strategy} className="flex items-center justify-between gap-3 py-2">
-            <span className="min-w-0">
-              <span className={cn("block font-medium", strategy === view.strategy && "text-primary")}>
-                {STRATEGY_INFO[strategy].label}
-                {strategy === view.strategy && " (la vôtre)"}
-              </span>
-              <span className="block text-muted">
-                {offer ? `${offer.insurerName} · ${MODEL_LABEL[offer.modelType]} · franchise ${offer.franchiseChf}` : "aucune offre"}
-              </span>
-            </span>
-            {offer && <Saving rp={offer.savingsRp} className="shrink-0" />}
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
-function BestSummary({ view, every }: { view: CompareView; every: boolean }) {
+function BestSummary({ view, every, year }: { view: CompareView; every: boolean; year: number }) {
   const best = view.offers[0];
   if (!best) return null;
   return (
@@ -195,7 +161,9 @@ function BestSummary({ view, every }: { view: CompareView; every: boolean }) {
       <p className="text-sm text-muted">
         {every
           ? `${view.matchingOffers} offres sur ${view.totalOffers} pour ce profil.`
-          : `Meilleure offre de chaque caisse, parmi ${view.matchingOffers} offres (${view.totalOffers} pour ce profil).`}
+          : `Meilleure offre de chaque caisse, parmi ${view.matchingOffers} offres (${view.totalOffers} pour ce profil).`}{" "}
+        Classées par coût réel en {year} : la prime et ce que vous paieriez de votre poche (franchise, 10 % de quote-part) pour{" "}
+        <Chf rp={view.healthCostsRp} whole /> de frais de santé.
       </p>
     </Card>
   );

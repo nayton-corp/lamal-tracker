@@ -81,12 +81,12 @@ Chaque automne, l'app vous aide à vérifier que vous payez le juste prix pour l
 |---|---|
 | Fin septembre | L'OFSP publie les primes de l'an prochain. L'app les importe toute seule et envoie une notification. |
 | Dès la publication | Le rituel s'ouvre seul. L'accueil montre la **hausse** : ce que chaque personne paiera sans rien faire. |
-| Octobre – mi-novembre | Stratégie, besoins, comparaison, choix, envoi des courriers. |
+| Octobre – mi-novembre | Préférences, comparaison, choix, envoi des courriers. |
 | Avant le 30 novembre | Vos lettres doivent être **reçues** par la caisse. L'app indique la date d'envoi conseillée (environ une semaine avant). Le rituel se termine seul quand tout est envoyé. |
 | Décembre – janvier | Les caisses confirment par courrier : gardez ces confirmations. |
 
 Le rituel se trouve dans le menu *Rituel*. Une frise montre où vous en êtes :
-**Hausse → Stratégie → Besoins → Choix → Envoi**.
+**Hausse → Préférences → Choix → Envoi**.
 
 ### 1. La hausse
 
@@ -97,28 +97,32 @@ tarif qui succède au vôtre, elle vous demande de confirmer la correspondance.
 Si une personne change de classe d'âge (enfant → jeune adulte, jeune adulte → adulte), un
 avertissement l'indique.
 
-### 2. La stratégie
+### 2. Vos préférences
 
-Choisissez comment comparer :
+Une seule page, deux questions :
 
-- **Économie max** : le coût annuel le plus bas, quitte à changer de modèle ou de franchise ;
-- **Maintien** : même modèle, même franchise, seulement la caisse la moins chère ;
-- **Équilibre** : un bon prix chez une caisse solide (réserves, frais, hausses passées).
+1. **Qu'est-ce qui compte le plus ?**
+   - **Payer le moins possible** : tous les modèles et la franchise la moins chère sur l'année ;
+   - **Ne rien changer au quotidien** : même modèle, même franchise, seule la caisse change.
 
-### 3. Les besoins
+   Chaque choix affiche l'économie annuelle qu'il permettrait.
+2. **À quelle fréquence allez-vous chez le médecin ?** (presque jamais, quelques consultations,
+   suivi régulier, traitement lourd, ou vos frais exacts). L'app en déduit les frais de santé
+   attendus, qui servent au calcul du **coût total attendu** (prime nette de CO2, franchise et
+   quote-part).
 
-Pour chaque personne, indiquez la fréquence des consultations (presque jamais, quelques
-consultations, suivi régulier, traitement lourd), la franchise souhaitée, les modèles acceptés
-et, si besoin, votre médecin. L'app en déduit les frais de santé attendus, qui servent au calcul
-du **coût total attendu** (prime nette de CO2, franchise et quote-part).
+Sous **Affiner**, vous pouvez imposer une franchise, choisir les modèles acceptés et noter votre
+médecin. Tout reste modifiable depuis la page du rituel.
 
-### 4. Comparer et choisir
+### 3. Comparer et choisir
 
 Le comparateur s'ouvre sur la première personne sans choix, avec des onglets pour passer d'une
 personne à l'autre. Pour chacune :
 
-- le **top 3** selon votre stratégie, puis toutes les autres offres de votre région ;
-- des filtres (franchise, modèles, caisses exclues) ;
+- le **top 3** par coût total attendu, puis les autres caisses ;
+- un sélecteur **Selon mes préférences / Toutes les offres**, et des filtres repliés (franchise,
+  modèles, une ou toutes les offres de chaque caisse) ;
+- un badge **Caisse solide** pour les caisses aux bonnes réserves et aux hausses modérées ;
 - trois coûts par offre : sans frais, attendu, année chargée ;
 - le portrait de chaque caisse (réserves, frais administratifs, taille, évolution de ses primes)
   et l'explication de chaque modèle ;
@@ -127,7 +131,7 @@ personne à l'autre. Pour chacune :
 Choisir une offre enregistre la décision : *Je garde*, *Je change de caisse* ou *Je change de
 franchise ou de modèle*. Pour un modèle avec liste de médecins, vérifiez que le vôtre y figure.
 
-### 5. Les démarches
+### 4. Les démarches
 
 La page *Démarches* guide pas à pas, dans l'ordre :
 
@@ -155,7 +159,7 @@ La page *Démarches* guide pas à pas, dans l'ordre :
   de suivi et le prix reviennent seuls dans l'app. Une lettre refusée par Pingen (adresse
   illisible, par exemple) est signalée par une notification et peut être reprise.
 
-### 6. La fin du rituel
+### 5. La fin du rituel
 
 Le rituel se termine **tout seul** dès que le dernier courrier est marqué envoyé (ou, si tout le
 monde garde son contrat, dès le dernier choix) : les contrats de l'année suivante sont

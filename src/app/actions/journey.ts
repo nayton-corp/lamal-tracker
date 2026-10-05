@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getHousehold, getHouseholdMode, listPersons, setHouseholdMode, type HouseholdMode } from "@/application/household";
 import { UserError } from "@/application/errors";
 import { deleteSignature, saveSignature } from "@/application/signatures";
-import { saveNeeds, setStrategy } from "@/application/strategy";
+import { savePreferences } from "@/application/strategy";
 import { DEFAULT_HEALTH_COSTS_RP } from "@/domain/lamal";
 import { STRATEGIES, type Strategy } from "@/domain/strategy";
 import { chfField, toActionError, type ActionState } from "@/server/action";
@@ -28,30 +28,19 @@ export async function chooseModeAction(form: FormData) {
   redirect(mode === "SOLO" ? "/bienvenue?etape=vous" : "/bienvenue?etape=adresse");
 }
 
-export async function chooseStrategyAction(_: ActionState, form: FormData): Promise<ActionState> {
+/** Préférences du rituel : la stratégie, puis un groupe de champs par personne, suffixés par l'id de ligne. */
+export async function savePreferencesAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   const year = Number(form.get("year"));
   try {
     const strategy = String(form.get("strategy")) as Strategy;
-    if (!STRATEGIES.includes(strategy)) throw new UserError("Stratégie inconnue.");
-    setStrategy(db(), scope, Number(form.get("reviewId")), strategy);
-  } catch (e) {
-    return toActionError(e);
-  }
-  revalidatePath("/", "layout");
-  redirect(`/rituel/${year}/besoins`);
-}
-
-/** Questionnaire des besoins : un groupe de champs par personne, suffixés par l'id de ligne. */
-export async function saveNeedsAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const scope = await requireScope();
-  const year = Number(form.get("year"));
-  try {
+    if (!STRATEGIES.includes(strategy)) throw new UserError("Choisissez ce qui compte le plus pour vous.");
     const lineIds = form.getAll("lineId").map(Number);
-    saveNeeds(
+    savePreferences(
       db(),
       scope,
       Number(form.get("reviewId")),
+      strategy,
       lineIds.map((id) => {
         const franchise = String(form.get(`franchise-${id}`) ?? "");
         const health = chfField(form.get(`healthCosts-${id}`));

@@ -11,8 +11,8 @@ chacun avec ses comptes (inscription sur invitation, passkeys, double facteur).
 - **Import automatique des primes officielles** de l'OFSP dès leur publication, fin septembre.
 - **Reconduction tacite** : ce que le foyer paiera l'an prochain sans rien faire, personne par
   personne, avec le compte à rebours jusqu'au 30 novembre.
-- **Comparateur** classé selon le coût total attendu (prime, franchise et quote-part), avec
-  stratégies, questionnaire des besoins et portrait de chaque caisse.
+- **Comparateur** classé selon le coût total attendu (prime, franchise et quote-part), réglé par
+  une page de préférences (payer le moins possible ou ne rien changer) et portrait de chaque caisse.
 - **Rappel LCA** : la résiliation ne vise que l'assurance de base, les complémentaires sont
   rappelées sous chaque lettre.
 - **Démarches** : demande d'affiliation, lettre de résiliation PDF signée à l'écran, suivi du

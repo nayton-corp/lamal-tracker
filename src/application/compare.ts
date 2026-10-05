@@ -4,33 +4,30 @@ import {
   marketStats,
   rankOffers,
   type RankedOffer,
-  type SortKey,
 } from "@/domain/comparison";
 import { costScenarios, type CostScenarios } from "@/domain/cost";
 import type { InsurerProfile } from "@/domain/insurer-profile";
 import type { ModelType } from "@/domain/lamal";
 import { coinsuranceMaxFor } from "@/domain/parameters";
-import { rankForStrategy, type Strategy } from "@/domain/strategy";
+import type { Strategy } from "@/domain/strategy";
 import type { Db } from "@/infrastructure/db/client";
 import { insurer } from "@/infrastructure/db/schema";
 import type { Scope } from "./scope";
-import { effectiveNeeds, lineContext, picksFor, type StrategyPick } from "./strategy";
+import { effectiveNeeds, lineContext } from "./strategy";
 
 /*
  * Comparateur d'une ligne de revue (une personne du rituel) : offres de l'année cible filtrées
- * selon ses besoins, classées, avec scénarios de coût, courbe des franchises et portrait des caisses.
+ * selon ses préférences (ou toutes), classées par coût réel, avec scénarios de coût et portrait des caisses.
  */
 
 export interface CompareOptions {
-  /** Modèles retenus ; absent = besoins de la personne, vide = tous. */
+  /** Modèles retenus ; absent = préférences de la personne (aucun si `allOffers`), vide = tous. */
   models?: ModelType[];
-  /** Franchises retenues ; absent = besoins de la personne, vide = toutes. */
+  /** Franchises retenues ; absent = préférences de la personne (aucune si `allOffers`), vide = toutes. */
   franchises?: number[];
   healthCostsRp?: number;
-  /** « strategy » : classement de la stratégie du rituel (par défaut quand elle est choisie). */
-  sort?: SortKey | "strategy";
-  /** Ignore les exclusions et modèles préférés de la personne. */
-  ignorePersonPreferences?: boolean;
+  /** « Toutes les offres » : ignore les préférences et les caisses exclues de la personne. */
+  allOffers?: boolean;
   /** Toutes les offres de chaque caisse, au lieu de sa meilleure seulement. */
   everyOffer?: boolean;
 }
@@ -73,18 +70,16 @@ export interface CompareView {
   /** Nombre d'offres avant regroupement par caisse. */
   matchingOffers: number;
   strategy: Strategy | null;
-  sort: SortKey | "strategy";
-  /** Filtres appliqués (après besoins et paramètres d'URL). */
+  allOffers: boolean;
+  /** Filtres appliqués (après préférences et paramètres d'URL). */
   appliedFilters: { models: ModelType[]; franchiseChf: number | null };
-  /** Points de solidité de chaque caisse (−3 à +3), pour l'équilibre. */
+  /** Points de solidité de chaque caisse (−3 à +3), pour le badge « Caisse solide ». */
   quality: Record<number, number>;
-  /** Meilleure offre selon chacune des trois stratégies. */
-  picks: StrategyPick[];
 }
 
 /**
  * Tout ce qu'affiche le comparateur pour une personne du rituel. Les options (paramètres d'URL)
- * priment sur les besoins enregistrés ; la courbe des franchises ne suit que `opts.models`.
+ * priment sur les préférences enregistrées ; le classement suit toujours le coût réel de l'année.
  */
 export function compareForLine(db: Db, scope: Scope, lineId: number, opts: CompareOptions = {}): CompareView {
   const c = lineContext(db, scope, lineId, opts.healthCostsRp);
@@ -104,16 +99,15 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
         };
 
   const needs = effectiveNeeds(c);
-  const models = opts.models ?? (opts.ignorePersonPreferences ? [] : needs.models);
-  const franchises = opts.franchises ?? (needs.franchiseChf === null ? [] : [needs.franchiseChf]);
+  const allOffers = opts.allOffers ?? false;
+  const models = opts.models ?? (allOffers ? [] : needs.models);
+  const franchises = opts.franchises ?? (allOffers || needs.franchiseChf === null ? [] : [needs.franchiseChf]);
   const filtered = filterOffers(all, {
     models,
     franchises,
-    excludedInsurerIds: opts.ignorePersonPreferences ? [] : p.excludedInsurerIds,
+    excludedInsurerIds: allOffers ? [] : p.excludedInsurerIds,
   });
-  const sort = opts.sort ?? (r.strategy ? "strategy" : "total");
-  const byCost = rankOffers(filtered, { ...costContext, referenceTotalRp: renewal?.totalRp ?? null }, sort === "premium" ? "premium" : "total");
-  const rankedAll = sort === "strategy" && r.strategy ? rankForStrategy(byCost, r.strategy, c.quality) : byCost;
+  const rankedAll = rankOffers(filtered, { ...costContext, referenceTotalRp: renewal?.totalRp ?? null });
   const ranked = opts.everyOffer ? rankedAll : bestPerInsurer(rankedAll);
 
   const profiles = c.profiles;
@@ -165,9 +159,8 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     renewalStatus: line.renewalStatus,
     market: marketStats(all.filter((o) => o.franchiseChf === (renewal?.franchiseChf ?? policy.franchiseChf)).map((o) => o.monthlyPremiumRp)),
     strategy: r.strategy,
-    sort,
+    allOffers,
     appliedFilters: { models, franchiseChf: franchises.length === 1 ? franchises[0]! : null },
     quality: c.qualityById,
-    picks: picksFor(c),
   };
 }

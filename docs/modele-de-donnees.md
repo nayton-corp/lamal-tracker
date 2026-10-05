@@ -265,7 +265,7 @@ erDiagram
         int target_year
         int dataset_id FK
         text status "OPEN CLOSED"
-        text strategy "ECONOMY KEEP BALANCE"
+        text strategy "ECONOMY KEEP"
         text needs_confirmed_at
         text closed_at
     }
@@ -415,6 +415,7 @@ Les migrations sont dans [`drizzle/`](../drizzle) (SQL et journal `meta/_journal
 | `0007_accounts` | Comptes complets : `passkey`, `recovery_code`, `auth_token`, `invitation`, `known_device`, `audit_event` ; courriel confirmé, TOTP, consentement et suspension dans `app_user`. Pingen reste autorisé au foyer de l'administrateur existant. |
 | `0008_data_protection` | Clé de chiffrement par foyer (`household_key`), dernière activité et rappels d'inactivité, confirmation d'identité de la session (`confirmed_at`). |
 | `0009_feedback_usage` | Avis (`feedback`) et compteurs d'usage (`usage_counter`). |
+| `0010_strategy_two_choices` | Deux stratégies seulement : les rituels en « Équilibre » (`BALANCE`) passent à `ECONOMY`. |
 
 ## Modifier le schéma
 
