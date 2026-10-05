@@ -6,7 +6,7 @@ import { listSignatures, saveSignature, signaturesByName } from "@/application/s
 import { saveNeeds, setStrategy, strategyOverview } from "@/application/strategy";
 import { householdHistory } from "@/application/history";
 import { listInsurers, saveHousehold, saveInsurer, saveLca, savePerson, savePolicy } from "@/application/household";
-import { generateLetters, getLetter } from "@/application/letters";
+import { generateLetters, getLetter, markLetterSent } from "@/application/letters";
 import { generateOfferRequests, lcaWishesFor, listOfferRequests, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
   acknowledgeLca,
@@ -17,7 +17,6 @@ import {
   decide,
   getReviewView,
   keepAsIs,
-  markLetterSent,
   openReview,
   reopenReview,
   undoDecision,

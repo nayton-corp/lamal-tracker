@@ -20,7 +20,7 @@ import {
   savePolicy,
   setHouseholdMode,
 } from "@/application/household";
-import { generateLetters, getLetter } from "@/application/letters";
+import { deleteLetter, generateLetters, getLetter, markLetterAcknowledged, markLetterSent } from "@/application/letters";
 import {
   deleteOfferRequest,
   generateOfferRequests,
@@ -38,13 +38,10 @@ import {
   closeReview,
   confirmLineage,
   decide,
-  deleteLetter,
   deleteReview,
   getReviewByYear,
   getReviewView,
   keepAsIs,
-  markLetterAcknowledged,
-  markLetterSent,
   openReview,
   reopenReview,
   setLineFlags,

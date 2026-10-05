@@ -89,7 +89,7 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
   const offers = listOfferRequests(db(), scope, r.id);
   const terminations = view.letters.filter((l) => l.kind === "TERMINATION");
   const changes = view.letters.filter((l) => l.kind === "CHANGE");
-  const warnings = [...switching, ...adjusting].flatMap((p) => p.letterCheck.warnings.filter((w) => !/Demandez d'abord/.test(w)).map((w) => `${p.person.firstName} : ${w}`));
+  const warnings = [...switching, ...adjusting].flatMap((p) => p.letterCheck.warnings.filter((w) => w.code !== "AFFILIATION_FIRST").map((w) => `${p.person.firstName} : ${w.text}`));
   const lcaPending = switching.filter((p) => !p.line.lcaAckAt);
   const nothing = switching.length === 0 && adjusting.length === 0;
 

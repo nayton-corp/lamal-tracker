@@ -9,7 +9,8 @@ import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
 import { household, insurer, letter, review } from "@/infrastructure/db/schema";
 import { UserError } from "./errors";
 import { getReviewView } from "./review";
-import { findLetter, type Scope } from "./scope";
+import { findLetter, ownedLetter, type Scope } from "./scope";
+import { bumpUsage } from "./usage";
 
 export interface GenerateResult {
   created: number[];
@@ -97,4 +98,28 @@ export function letterDocument(db: Db, scope: Scope, id: number) {
   const ins = db.select().from(insurer).where(eq(insurer.id, row.insurerId)).get()!;
   const r = db.select({ targetYear: review.targetYear }).from(review).where(eq(review.id, row.reviewId)).get()!;
   return { ...row, insurerName: insurerLabel(ins), targetYear: r.targetYear };
+}
+
+// ───────────────────────── Suivi des courriers ─────────────────────────
+
+export function deleteLetter(db: Db, scope: Scope, letterId: number) {
+  const l = findLetter(db, scope, letterId);
+  if (!l) return;
+  if (l.sentAt) throw new UserError("Une lettre envoyée ne peut pas être supprimée.");
+  db.delete(letter).where(eq(letter.id, letterId)).run();
+}
+
+export function markLetterSent(db: Db, scope: Scope, letterId: number, sentAt: string, trackingNumber: string | null) {
+  const row = ownedLetter(db, scope, letterId);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sentAt)) throw new UserError("Date d'envoi au format AAAA-MM-JJ.");
+  if (trackingNumber && trackingNumber.length > 60) throw new UserError("Numéro de suivi trop long.");
+  db.transaction((tx) => {
+    tx.update(letter).set({ sentAt, trackingNumber }).where(eq(letter.id, letterId)).run();
+    if (!row.sentAt) bumpUsage(tx, "letters.sent");
+  });
+}
+
+export function markLetterAcknowledged(db: Db, scope: Scope, letterId: number, at: string | null) {
+  ownedLetter(db, scope, letterId);
+  db.update(letter).set({ acknowledgedAt: at }).where(eq(letter.id, letterId)).run();
 }

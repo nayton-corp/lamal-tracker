@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { generateLetters } from "@/application/letters";
+import { deleteLetter, generateLetters, markLetterAcknowledged, markLetterSent } from "@/application/letters";
 import { abandonPingen, sendLetterViaPingen, syncPingenLetters } from "@/application/pingen";
 import { deleteOfferRequest, generateOfferRequests, markOfferRequestAnswered, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
@@ -11,10 +11,7 @@ import {
   deleteReview,
   confirmLineage,
   decide,
-  deleteLetter,
   keepAsIs,
-  markLetterAcknowledged,
-  markLetterSent,
   openReview,
   reopenReview,
   getReviewView,
