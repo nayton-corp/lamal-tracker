@@ -17,6 +17,8 @@ const config: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["better-sqlite3", "exceljs", "@react-pdf/renderer", "web-push", "unpdf"],
   poweredByHeader: false,
+  // La base locale de développement (data/) ne doit jamais partir avec le build « standalone ».
+  outputFileTracingExcludes: { "*": ["data/**", "tests/**", "deploy/**", "**/*.db", "**/*.db-*"] },
   experimental: {
     // Plus gros envoi accepté : un fichier de primes OFSP complet (≈ 20 Mo, refusé au-delà de 25 Mo).
     // Les deux limites doivent suivre : le proxy (src/proxy.ts) lit le corps avant l'action, et

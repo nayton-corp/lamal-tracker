@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { and, count, eq, gt, isNull } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
 import { appUser, auditEvent, passkey, recoveryCode } from "@/infrastructure/db/schema";
@@ -12,7 +12,7 @@ import { newTotpSecret, totpUri, verifyTotp } from "./totp";
 
 /*
  * Double facteur : code à 6 chiffres d'une application d'authentification (TOTP), et dix codes de
- * secours à usage unique remis à l'activation. À la connexion, le mot de passe correct ouvre une
+ * secours à usage unique (16 caractères) remis à l'activation. À la connexion, le mot de passe correct ouvre une
  * étape d'attente de 5 minutes, limitée à 5 essais, avant la session. Le secret TOTP est gardé
  * chiffré par la clé maître, y compris pendant l'activation.
  */
@@ -32,12 +32,22 @@ const MAX_CODE_ATTEMPTS = 5;
 export const MAX_FACTOR_FAILURES_PER_DAY = 10;
 const RECOVERY_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
+/** 16 caractères parmi 31 ≈ 79 bits : impossible à deviner, même avec l'empreinte en main. */
+const RECOVERY_LENGTH = 16;
+/** Ancien format (10 caractères), encore accepté jusqu'à la prochaine régénération des codes. */
+const LEGACY_RECOVERY_LENGTH = 10;
+
 const normalizeRecovery = (code: string) => code.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+/** Empreinte d'un code de secours, propre au compte (deux comptes n'ont jamais la même). */
+function recoveryHash(userId: number, normalized: string): string {
+  return normalized.length === LEGACY_RECOVERY_LENGTH ? digest(normalized) : digest(`${userId}:${normalized}`);
+}
+
+/** « abcd-efgh-jkmn-pqrs » : tirage uniforme (randomInt, sans biais de modulo). */
 function newRecoveryCode(): string {
-  const bytes = randomBytes(10);
-  const chars = [...bytes].map((b) => RECOVERY_ALPHABET[b % RECOVERY_ALPHABET.length]).join("");
-  return `${chars.slice(0, 5)}-${chars.slice(5)}`;
+  const chars = Array.from({ length: RECOVERY_LENGTH }, () => RECOVERY_ALPHABET[randomInt(RECOVERY_ALPHABET.length)]).join("");
+  return chars.match(/.{4}/g)!.join("-");
 }
 
 function userRow(db: Db, userId: number) {
@@ -51,7 +61,7 @@ function replaceRecoveryCodes(db: Db, userId: number): string[] {
   const codes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode);
   db.transaction((tx) => {
     tx.delete(recoveryCode).where(eq(recoveryCode.userId, userId)).run();
-    for (const code of codes) tx.insert(recoveryCode).values({ userId, codeHash: digest(normalizeRecovery(code)) }).run();
+    for (const code of codes) tx.insert(recoveryCode).values({ userId, codeHash: recoveryHash(userId, normalizeRecovery(code)) }).run();
   });
   return codes;
 }
@@ -118,11 +128,11 @@ export function verifySecondFactor(db: Db, userId: number, code: string, nowMs: 
     return true;
   }
   const normalized = normalizeRecovery(code);
-  if (normalized.length !== 10) return false;
+  if (normalized.length !== RECOVERY_LENGTH && normalized.length !== LEGACY_RECOVERY_LENGTH) return false;
   const used = db
     .update(recoveryCode)
     .set({ usedAt: nowIso })
-    .where(and(eq(recoveryCode.userId, userId), eq(recoveryCode.codeHash, digest(normalized)), isNull(recoveryCode.usedAt)))
+    .where(and(eq(recoveryCode.userId, userId), eq(recoveryCode.codeHash, recoveryHash(userId, normalized)), isNull(recoveryCode.usedAt)))
     .run();
   if (used.changes !== 1) return false;
   audit(db, userId, "RECOVERY_USED", { nowIso });

@@ -29,16 +29,25 @@ interface StoredPassword {
   cost: number;
 }
 
-const COST = 2 ** 15;
+/**
+ * Coût scrypt (N). Chaque hachage demande 128 × N × r octets de mémoire : 64 Mo à 2^16. Plus haut,
+ * quelques connexions simultanées satureraient le conteneur (768 Mo). Les anciennes empreintes
+ * (2^15) sont refaites au coût actuel à la connexion suivante.
+ */
+const COST = 2 ** 16;
 
 function hashPassword(password: string, salt: Buffer, cost: number): Buffer {
-  return scryptSync(password.normalize("NFKC"), salt, 32, { N: cost, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+  return scryptSync(password.normalize("NFKC"), salt, 32, { N: cost, r: 8, p: 1, maxmem: 80 * 1024 * 1024 });
+}
+
+function hashed(password: string): StoredPassword {
+  const salt = randomBytes(16);
+  return { salt: salt.toString("base64"), hash: hashPassword(password, salt, COST).toString("base64"), cost: COST };
 }
 
 export function storedPassword(password: string): StoredPassword {
   validatePassword(password);
-  const salt = randomBytes(16);
-  return { salt: salt.toString("base64"), hash: hashPassword(password, salt, COST).toString("base64"), cost: COST };
+  return hashed(password);
 }
 
 /** Vérification d'un mot de passe dans les fuites connues (null : service muet, on n'empêche rien). */
@@ -154,7 +163,10 @@ export function attemptLogin(db: Db, userId: number, password: string, nowIso: s
   const locked = lockSeconds(db, userId, nowIso);
   if (locked > 0) return { ok: false, lockedSeconds: locked };
   if (verifyPassword(db, userId, password)) {
-    db.update(appUser).set({ failedLogins: 0, lockedUntil: null }).where(eq(appUser.id, userId)).run();
+    const stored = db.select({ password: appUser.password }).from(appUser).where(eq(appUser.id, userId)).get()?.password;
+    // Empreinte d'un ancien coût : refaite maintenant que le mot de passe est connu (sans revalider ses règles).
+    const upgrade = stored && stored.cost < COST ? { password: hashed(password) } : {};
+    db.update(appUser).set({ failedLogins: 0, lockedUntil: null, ...upgrade }).where(eq(appUser.id, userId)).run();
     return { ok: true };
   }
   const user = db.select({ failedLogins: appUser.failedLogins }).from(appUser).where(eq(appUser.id, userId)).get();

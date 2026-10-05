@@ -6,7 +6,7 @@ import { requestPasswordReset, resendVerification, resetPassword } from "@/appli
 import { checkNewPassword, createFirstAdmin, hasStrongFactor, login, normalizeEmail, passwordToDefine, primaryUserId, setPassword } from "@/application/auth";
 import { finishMfaLogin, startMfaLogin } from "@/application/mfa";
 import { finishPasskeyLogin, passkeyLoginOptions } from "@/application/passkeys";
-import { accountDeps, clientIp, deleteCookie, mailDeps, rateLimit, readCookie, relyingParty, setupCodeMatches, writeCookie } from "@/server/accounts";
+import { accountDeps, clientIp, DIRECT_CLIENT, deleteCookie, mailDeps, rateLimit, readCookie, relyingParty, setupCodeMatches, writeCookie } from "@/server/accounts";
 import type { ActionState } from "@/server/action";
 import { toActionError } from "@/server/action";
 import { completeLogin, endSession, landingAfterLogin, safeNext } from "@/server/auth";
@@ -108,7 +108,10 @@ export async function mfaAction(_: ActionState, form: FormData): Promise<ActionS
 /** Connexion par passkey, étape 1 : le défi à signer par l'appareil. */
 export async function passkeyLoginOptionsAction(): Promise<{ options?: PublicKeyCredentialRequestOptionsJSON; error?: string }> {
   try {
-    rateLimit([`passkey-ip:${await clientIp()}`], 30, 15);
+    // Sans mandataire, toutes les requêtes partagent la même « IP » : limiter ici bloquerait les
+    // passkeys de tout le monde. Une passkey ne se devine pas ; la limite ne sert qu'à freiner.
+    const ip = await clientIp();
+    if (ip !== DIRECT_CLIENT) rateLimit([`passkey-ip:${ip}`], 30, 15);
     const { options, token } = await passkeyLoginOptions(db(), await relyingParty(), nowIso());
     await writeCookie(COOKIE.webauthn, token, 5 * 60);
     return { options };

@@ -103,6 +103,8 @@ mkdir -p "$APP_DIR/data/prod" "$APP_DIR/data/staging" "$APP_DIR/secrets"
 chown -R 1000:1000 "$APP_DIR/data"
 chown "$ADMIN_USER":"$ADMIN_USER" "$APP_DIR" "$APP_DIR/secrets"
 chmod 700 "$APP_DIR/secrets"
+# Données de santé : les autres comptes du serveur ne lisent pas la base.
+chmod 700 "$APP_DIR/data" "$APP_DIR/data/prod" "$APP_DIR/data/staging"
 
 echo
 echo "Terminé. Déconnectez-vous puis reconnectez-vous (groupe docker), puis suivez docs/mise-en-ligne.md."

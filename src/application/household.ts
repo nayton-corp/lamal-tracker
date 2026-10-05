@@ -30,12 +30,17 @@ export function setHouseholdMode(db: Db, scope: Scope, mode: HouseholdMode) {
     .run();
 }
 
+/** Longueurs maximales des champs saisis : un texte de plusieurs Mo alourdirait chaque page et chaque PDF. */
+const SHORT_TEXT = 200;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const text = () => z.string().trim().max(SHORT_TEXT, `${SHORT_TEXT} caractères au plus`);
+
 export const householdInput = z.object({
-  name: z.string().trim().default(""),
-  street: z.string().trim().default(""),
-  postalCode: z.string().trim().default(""),
-  city: z.string().trim().default(""),
-  commune: z.string().trim().default(""),
+  name: text().default(""),
+  street: text().default(""),
+  postalCode: text().default(""),
+  city: text().default(""),
+  commune: text().default(""),
   bfsNumber: z.coerce.number().int().positive().optional().nullable(),
   canton: z.enum(CANTONS),
   region: z.coerce.number().int().min(0).max(3),
@@ -43,15 +48,15 @@ export const householdInput = z.object({
 
 export const personInput = z.object({
   id: z.coerce.number().int().positive().optional(),
-  firstName: z.string().trim().min(1, "Prénom requis"),
-  lastName: z.string().trim().min(1, "Nom requis"),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date au format AAAA-MM-JJ"),
-  kidSubgroup: z.string().trim().toUpperCase().default(DEFAULT_KID_SUBGROUP),
+  firstName: text().min(1, "Prénom requis"),
+  lastName: text().min(1, "Nom requis"),
+  birthDate: z.string().regex(ISO_DATE, "Date au format AAAA-MM-JJ"),
+  kidSubgroup: text().toUpperCase().default(DEFAULT_KID_SUBGROUP),
   employedAccidentCover: z.coerce.boolean().default(false),
   healthCostsRp: z.coerce.number().int().min(0).default(DEFAULT_HEALTH_COSTS_RP),
-  allowedModels: z.array(z.enum(MODEL_TYPES as [string, ...string[]])).default([]),
-  excludedInsurerIds: z.array(z.coerce.number().int()).default([]),
-  doctorName: z.string().trim().optional().nullable(),
+  allowedModels: z.array(z.enum(MODEL_TYPES as [string, ...string[]])).max(MODEL_TYPES.length).default([]),
+  excludedInsurerIds: z.array(z.coerce.number().int()).max(100).default([]),
+  doctorName: text().optional().nullable(),
 });
 
 export const policyInput = z.object({
@@ -59,9 +64,9 @@ export const policyInput = z.object({
   personId: z.coerce.number().int().positive(),
   coverageYear: z.coerce.number().int().min(2000).max(2100),
   insurerId: z.coerce.number().int().positive(),
-  policyNumber: z.string().trim().optional().nullable(),
-  tariffCode: z.string().trim().optional().nullable(),
-  tariffLabel: z.string().trim().optional().nullable(),
+  policyNumber: text().optional().nullable(),
+  tariffCode: text().optional().nullable(),
+  tariffLabel: text().optional().nullable(),
   modelType: z.enum(MODEL_TYPES as [string, ...string[]]),
   franchiseChf: z.coerce.number().int().min(0).max(5000),
   accident: z.coerce.boolean(),
@@ -71,14 +76,14 @@ export const policyInput = z.object({
 export const lcaInput = z.object({
   id: z.coerce.number().int().positive().optional(),
   personId: z.coerce.number().int().positive(),
-  insurerName: z.string().trim().min(1, "Assureur requis"),
+  insurerName: text().min(1, "Assureur requis"),
   linkedInsurerId: z.coerce.number().int().positive().optional().nullable(),
   guarantee: z.enum(LCA_GUARANTEE_KEYS, { message: "Garantie requise" }),
   /** Nom commercial du produit ; à défaut, le libellé de la garantie. */
-  productName: z.string().trim().optional().nullable(),
-  policyNumber: z.string().trim().optional().nullable(),
+  productName: text().optional().nullable(),
+  policyNumber: text().optional().nullable(),
   monthlyRp: z.coerce.number().int().min(0).optional().nullable(),
-  minTermEnd: z.string().optional().nullable(),
+  minTermEnd: z.string().regex(ISO_DATE, "Date au format AAAA-MM-JJ").optional().nullable(),
   noticeMonths: z.coerce.number().int().min(0).max(24).optional().nullable(),
   active: z.coerce.boolean().default(true),
 });

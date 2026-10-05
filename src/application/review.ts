@@ -271,6 +271,7 @@ export function setLineFlags(
   flags: { doctorCheck?: "YES" | "NO" | "UNKNOWN"; affiliationRequestedAt?: string | null; affiliationConfirmedAt?: string | null },
 ) {
   loadLine(db, scope, lineId);
+  if (flags.doctorCheck !== undefined && !["YES", "NO", "UNKNOWN"].includes(flags.doctorCheck)) throw new UserError("Réponse inconnue.");
   db.update(reviewLine).set(flags).where(eq(reviewLine.id, lineId)).run();
 }
 
@@ -538,6 +539,8 @@ export function deleteLetter(db: Db, scope: Scope, letterId: number) {
 
 export function markLetterSent(db: Db, scope: Scope, letterId: number, sentAt: string, trackingNumber: string | null) {
   const row = ownedLetter(db, scope, letterId);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sentAt)) throw new UserError("Date d'envoi au format AAAA-MM-JJ.");
+  if (trackingNumber && trackingNumber.length > 60) throw new UserError("Numéro de suivi trop long.");
   db.transaction((tx) => {
     tx.update(letter).set({ sentAt, trackingNumber }).where(eq(letter.id, letterId)).run();
     if (!row.sentAt) bumpUsage(tx, "letters.sent");

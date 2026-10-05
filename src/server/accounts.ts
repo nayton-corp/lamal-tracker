@@ -75,8 +75,11 @@ export function accountDeps(): AccountDeps {
  * reçu) ajoute une entrée à droite : on prend celle du plus éloigné d'entre eux. Une adresse IPv6
  * est ramenée à son préfixe /64, que le client contrôle en entier.
  */
+/** Valeur de `clientIp()` sans mandataire de confiance (TRUSTED_PROXY_HOPS=0) : tous les clients la partagent. */
+export const DIRECT_CLIENT = "directe";
+
 export function clientIpFrom(forwarded: string, hops: number): string {
-  if (hops <= 0) return "directe";
+  if (hops <= 0) return DIRECT_CLIENT;
   const parts = forwarded.split(",").map((p) => p.trim()).filter(Boolean);
   const ip = parts[parts.length - hops];
   if (!ip) return "inconnue";

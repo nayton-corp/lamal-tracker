@@ -4,6 +4,8 @@
 # production dessus sans réseau et vérifie que la clé maître ouvre bien les données. Résultat
 # envoyé à RESTORE_PING_URL : une sauvegarde en retard ou illisible déclenche une alerte.
 set -uo pipefail
+# La copie restaurée est déchiffrée : lisible par ce seul utilisateur.
+umask 077
 cd "$(dirname "$0")"
 PING="$(grep '^RESTORE_PING_URL=' .env | cut -d= -f2- || true)"
 TAG="$(grep '^APP_TAG=' .env | cut -d= -f2-)"
@@ -17,6 +19,9 @@ fail() {
   cleanup; exit 1
 }
 cleanup() { docker rm -f "$NAME" >/dev/null 2>&1; rm -rf "$work"; }
+# Même interrompu (délai systemd, redémarrage), le script ne laisse aucune copie en clair.
+trap cleanup EXIT INT TERM
+[ -n "$TAG" ] || fail "APP_TAG manquant dans .env"
 
 # 1. Dernière copie depuis le stockage objet (déchiffrée avec la clé age).
 docker compose run --rm --no-deps -v "$work:/restore" litestream restore -config /etc/litestream.yml -o /restore/lamal.db /data/lamal.db \

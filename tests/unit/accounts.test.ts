@@ -29,6 +29,9 @@ import { confirmTotpSetup, disableTotp, finishMfaLogin, recoveryCodesLeft, start
 import { createHouseholdFor, scopeForUser, type Scope } from "@/application/scope";
 import { base32Encode, totpCode, totpStep, verifyTotp } from "@/application/totp";
 import { openDb, type Db } from "@/infrastructure/db/client";
+import { appUser } from "@/infrastructure/db/schema";
+import { eq } from "drizzle-orm";
+import { scryptSync } from "node:crypto";
 import { pwnedCount } from "@/infrastructure/hibp";
 import { fileMailer } from "@/infrastructure/mail/mailer";
 import { consume, resetRateLimits } from "@/infrastructure/rate-limit";
@@ -162,6 +165,16 @@ describe("inscription sur invitation", () => {
     expect(login(db, { email: "alex@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: true })).toEqual({ kind: "ok", userId });
     // Le nouveau compte n'a pas de foyer et n'est pas administrateur.
     expect(scopeForUser(db, userId)).toEqual({ userId, householdId: null, householdRole: null, admin: false });
+  });
+
+  it("refait au coût actuel une empreinte ancienne, à la connexion", () => {
+    const a = admin();
+    const salt = Buffer.alloc(16, 1);
+    const old = { salt: salt.toString("base64"), hash: scryptSync(PW, salt, 32, { N: 2 ** 14, r: 8, p: 1 }).toString("base64"), cost: 2 ** 14 };
+    db.update(appUser).set({ password: old }).where(eq(appUser.id, a.userId)).run();
+    expect(login(db, { email: "admin@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: false }).kind).toBe("ok");
+    expect(db.select().from(appUser).where(eq(appUser.id, a.userId)).get()!.password.cost).toBe(2 ** 16);
+    expect(login(db, { email: "admin@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: false }).kind).toBe("ok");
   });
 
   it("un lien de confirmation ancien n'ouvre pas de session", async () => {

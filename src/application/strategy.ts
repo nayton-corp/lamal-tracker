@@ -153,7 +153,8 @@ export function saveNeeds(db: Db, scope: Scope, reviewId: number, needs: NeedsIn
       const line = tx.select().from(reviewLine).where(eq(reviewLine.id, n.lineId)).get();
       if (!line || line.reviewId !== r.id) throw new NotFoundError("Personne");
       const models = n.models.filter((m): m is ModelType => (MODEL_TYPES as readonly string[]).includes(m));
-      if (n.healthCostsRp < 0) throw new UserError("Frais de santé invalides.");
+      if (!Number.isInteger(n.healthCostsRp) || n.healthCostsRp < 0) throw new UserError("Frais de santé invalides.");
+      if ((n.doctorName?.length ?? 0) > 200) throw new UserError("Nom du médecin trop long (200 caractères au plus).");
       tx.update(reviewLine).set({ wishFranchiseChf: n.franchiseChf, wishModels: models }).where(eq(reviewLine.id, line.id)).run();
       tx.update(person).set({ healthCostsRp: n.healthCostsRp, doctorName: n.doctorName }).where(eq(person.id, line.personId)).run();
     }
