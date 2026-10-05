@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { compareForLine } from "@/application/compare";
 import { listSignatures, saveSignature, signaturesByName } from "@/application/signatures";
-import { saveNeeds, setStrategy, strategyOverview } from "@/application/strategy";
+import { savePreferences, strategyOverview } from "@/application/strategy";
 import { householdHistory } from "@/application/history";
 import { listInsurers, saveHousehold, saveInsurer, saveLca, savePerson, savePolicy } from "@/application/household";
 import { generateLetters, getLetter, markLetterSent } from "@/application/letters";
@@ -114,12 +114,12 @@ describe("rituel annuel", () => {
     expect(view.lines[0]!.line.renewalStatus).toBe("MATCHED");
   });
 
-  it("compare les trois stratégies, puis applique la stratégie et les besoins", () => {
+  it("compare les deux stratégies, puis enregistre les préférences", () => {
     const overview = strategyOverview(db, scope, 1);
-    expect(overview.map((o) => o.strategy)).toEqual(["ECONOMY", "KEEP", "BALANCE"]);
+    expect(overview.map((o) => o.strategy)).toEqual(["ECONOMY", "KEEP"]);
     const economy = overview.find((o) => o.strategy === "ECONOMY")!;
     const keep = overview.find((o) => o.strategy === "KEEP")!;
-    // Économie max explore tout : jamais moins d'économie que le maintien.
+    // « Payer le moins possible » explore tout : jamais moins d'économie que le maintien.
     expect(economy.annualSavingsRp!).toBeGreaterThanOrEqual(keep.annualSavingsRp!);
     const keepAdult = keep.persons.find((p) => p.lineId === lines.adult)!.offer!;
     expect(keepAdult.modelType).toBe("TELMED");
@@ -127,20 +127,25 @@ describe("rituel annuel", () => {
 
     let view = getReviewView(db, scope, 1, TODAY);
     expect(view.steps.map((s) => [s.key, s.done])).toEqual([
-      ["renewal", true], ["strategy", false], ["needs", false], ["decide", false], ["procedures", false],
+      ["renewal", true], ["preferences", false], ["decide", false], ["procedures", false],
     ]);
 
-    setStrategy(db, scope, 1, "KEEP");
+    savePreferences(db, scope, 1, "KEEP", [{ lineId: lines.adult, franchiseChf: 2500, models: ["TELMED"], healthCostsRp: 50_000, doctorName: null }], NOW);
     const kept = compareForLine(db, scope, lines.adult);
-    expect(kept.sort).toBe("strategy");
     expect(kept.appliedFilters).toEqual({ models: ["TELMED"], franchiseChf: 2500 });
     expect(kept.offers.every((o) => o.modelType === "TELMED" && o.franchiseChf === 2500)).toBe(true);
-    expect(kept.picks).toHaveLength(3);
-    // Un filtre explicite (URL) l'emporte sur les besoins ; [] = tous.
+    // Toujours classé par coût réel.
+    const totals = kept.offers.map((o) => o.cost.totalRp);
+    expect(totals).toEqual([...totals].sort((a, b) => a - b));
+    // Un filtre explicite (URL) l'emporte sur les préférences ; [] = tous.
     expect(compareForLine(db, scope, lines.adult, { franchises: [], models: [], everyOffer: true }).offers.some((o) => o.franchiseChf !== 2500)).toBe(true);
+    // « Toutes les offres » ignore les préférences.
+    const all = compareForLine(db, scope, lines.adult, { allOffers: true });
+    expect(all.appliedFilters).toEqual({ models: [], franchiseChf: null });
+    expect(all.matchingOffers).toBeGreaterThan(kept.matchingOffers);
+    expect(() => savePreferences(db, scope, 1, "BALANCE" as never, [], NOW)).toThrow(UserError);
 
-    setStrategy(db, scope, 1, "ECONOMY");
-    saveNeeds(db, scope, 1, [
+    savePreferences(db, scope, 1, "ECONOMY", [
       { lineId: lines.adult, franchiseChf: null, models: ["TELMED", "STANDARD", "BOGUS"], healthCostsRp: 120_000, doctorName: "Dr Martin" },
     ], NOW);
     const cmp = compareForLine(db, scope, lines.adult);
@@ -148,9 +153,9 @@ describe("rituel annuel", () => {
     expect(cmp.healthCostsRp).toBe(120_000);
     view = getReviewView(db, scope, 1, TODAY);
     expect(view.review.strategy).toBe("ECONOMY");
-    expect(view.steps.slice(0, 4).map((s) => s.done)).toEqual([true, true, true, false]);
+    expect(view.steps.slice(0, 3).map((s) => s.done)).toEqual([true, true, false]);
     // On rend les modèles de départ pour la suite du scénario.
-    saveNeeds(db, scope, 1, [{ lineId: lines.adult, franchiseChf: null, models: [], healthCostsRp: 50_000, doctorName: null }], NOW);
+    savePreferences(db, scope, 1, "ECONOMY", [{ lineId: lines.adult, franchiseChf: null, models: [], healthCostsRp: 50_000, doctorName: null }], NOW);
   });
 
   it("enregistre une signature dessinée et la retrouve par nom", () => {
@@ -161,7 +166,7 @@ describe("rituel annuel", () => {
   });
 
   it("compare et décide", () => {
-    const cmp = compareForLine(db, scope, lines.adult, { sort: "total" });
+    const cmp = compareForLine(db, scope, lines.adult);
     expect(cmp.offers.length).toBeGreaterThan(3);
     expect(new Set(cmp.offers.map((o) => o.insurerId)).size).toBe(cmp.offers.length);
     expect(cmp.matchingOffers).toBeGreaterThan(cmp.offers.length);
@@ -170,7 +175,7 @@ describe("rituel annuel", () => {
     const best = cmp.offers[0]!;
     expect(decide(db, scope, lines.adult, { tariffId: best.tariffId, franchiseChf: best.franchiseChf }, NOW)).toBe("SWITCH");
 
-    const teenCmp = compareForLine(db, scope, lines.teen, { ignorePersonPreferences: true, everyOffer: true });
+    const teenCmp = compareForLine(db, scope, lines.teen, { allOffers: true, everyOffer: true });
     const sameInsurerOther = teenCmp.offers.find((o) => o.insurerId === insurerId(8) && o.tariffCode === "CSS-TEL")!;
     expect(decide(db, scope, lines.teen, { tariffId: sameInsurerOther.tariffId, franchiseChf: sameInsurerOther.franchiseChf }, NOW)).toBe("ADJUST");
   });
@@ -238,7 +243,7 @@ describe("rituel annuel", () => {
     expect(letters[0]!.kind).toBe("TERMINATION");
     expect(letters[0]!.sentAt).toBe(TODAY);
     // On rétablit la décision du scénario (changement de modèle chez CSS).
-    const teenCmp = compareForLine(db, scope, lines.teen, { ignorePersonPreferences: true, everyOffer: true });
+    const teenCmp = compareForLine(db, scope, lines.teen, { allOffers: true, everyOffer: true });
     const other = teenCmp.offers.find((o) => o.insurerId === insurerId(8) && o.tariffCode === "CSS-TEL")!;
     expect(decide(db, scope, lines.teen, { tariffId: other.tariffId, franchiseChf: other.franchiseChf }, NOW)).toBe("ADJUST");
     expect(generateLetters(db, scope, 1, TODAY).created).toHaveLength(1);

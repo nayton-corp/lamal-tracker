@@ -262,7 +262,7 @@ export const review = sqliteTable(
     /** Seuls OPEN et CLOSED sont écrits ; DECIDED et LETTERS_SENT sont des valeurs historiques. */
     status: text("status", { enum: ["OPEN", "DECIDED", "LETTERS_SENT", "CLOSED"] }).notNull(),
     /** Stratégie choisie pour comparer (économie max, maintien, équilibre) ; null = pas encore choisie. */
-    strategy: text("strategy", { enum: ["ECONOMY", "KEEP", "BALANCE"] }),
+    strategy: text("strategy", { enum: ["ECONOMY", "KEEP"] }),
     /** Besoins confirmés (franchise, modèles, consommation) : le comparateur peut s'ouvrir. */
     needsConfirmedAt: text("needs_confirmed_at"),
     createdAt: createdAt(),

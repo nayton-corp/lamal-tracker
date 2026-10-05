@@ -48,7 +48,7 @@ export function ProfileCard({ person, needs, needsHref, year, ageLabel }: { pers
         </dl>
         {needsHref && (
           <p>
-            <Link href={needsHref} className="text-primary underline">Ajuster les besoins</Link>
+            <Link href={needsHref} className="text-primary underline">Ajuster les préférences</Link>
           </p>
         )}
       </div>

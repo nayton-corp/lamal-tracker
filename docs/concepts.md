@@ -326,8 +326,8 @@ ligne = une caisse × canton × région × classe d'âge × sous-groupe × accid
   identifié par son empreinte SHA-256 et validé avant d'être activé. Un nouveau fichier pour la
   même année remplace l'actif ; l'ancien passe `SUPERSEDED`.
 - **Autres référentiels officiels** : annuaire des assureurs (adresses), données de
-  surveillance (réserves, frais administratifs, utilisés pour le portrait des caisses et la
-  stratégie Équilibre) et montants CO2.
+  surveillance (réserves, frais administratifs, utilisés pour le portrait des caisses et le
+  badge « Caisse solide ») et montants CO2.
 
 Ce que l'open data ne contient pas : les listes de médecins des modèles et les tarifs LCA.
 
@@ -367,29 +367,34 @@ stateDiagram-v2
 Seuls `OPEN` et `CLOSED` sont écrits. `DECIDED` et `LETTERS_SENT` existent encore dans le type
 `ReviewStatus` et dans le schéma, mais ce sont des valeurs historiques que le code n'écrit plus.
 
-### Stratégies
+### Préférences : stratégie et besoins
 
-Avant de comparer, le foyer choisit une stratégie (`review.strategy`). Elle règle les filtres
-par défaut et l'ordre de classement.
+Avant de comparer, le foyer règle ses **préférences** sur une seule page
+(`/rituel/[year]/preferences`). La première question choisit la stratégie (`review.strategy`),
+qui ne fait que pré-remplir les filtres de chaque personne :
 
-| Code | Interface | Filtres par défaut | Classement |
-|---|---|---|---|
-| `ECONOMY` | Économie max | Tous les modèles, meilleure franchise | Coût total attendu |
-| `KEEP` | Maintien | Même modèle, même franchise | Coût total attendu |
-| `BALANCE` | Équilibre | Modèles acceptés par la personne, meilleure franchise | Coût corrigé de la solidité de la caisse |
+| Code | Interface | Filtres proposés |
+|---|---|---|
+| `ECONOMY` | Payer le moins possible | Tous les modèles, franchise la plus avantageuse |
+| `KEEP` | Ne rien changer au quotidien | Même modèle, même franchise |
 
-Pour `BALANCE`, chaque caisse reçoit de −3 à +3 points de solidité (réserves, frais
-administratifs, hausses passées). Chaque point vaut un bonus ou malus de 3 % du coût
-(`QUALITY_WEIGHT_PERMILLE` = 30).
+Les offres sont **toujours classées par coût total attendu**, quelle que soit la stratégie.
+L'ancienne stratégie « Équilibre » (`BALANCE`) a disparu (migration `0010` : elle devient
+`ECONOMY`) ; la solidité d'une caisse (−3 à +3 points : réserves, frais administratifs, hausses
+passées) ne sert plus qu'au badge « Caisse solide » (2 points ou plus).
 
-Code : `strategyDefaults()`, `qualityPoints()`, `rankForStrategy()` dans `src/domain/strategy.ts`.
+Ensuite, par personne : les frais de santé attendus (`person.health_costs_rp`, par la fréquence
+des consultations) et, repliés sous « Affiner », la franchise souhaitée
+(`review_line.wish_franchise_chf`, null = l'app cherche la meilleure), les modèles acceptés
+(`review_line.wish_models`) et le médecin. Changer de stratégie remet franchise et modèles aux
+valeurs qu'elle propose. L'enregistrement remplit `review.needs_confirmed_at` et ouvre le
+comparateur.
 
-### Besoins
+Dans le comparateur, un sélecteur « Selon mes préférences / Toutes les offres » applique ces
+filtres ou les lève tous (caisses exclues comprises) ; les filtres fins restent repliés.
 
-Le questionnaire des besoins fixe, par personne, les frais de santé attendus
-(`person.health_costs_rp`), la franchise souhaitée (`review_line.wish_franchise_chf`, null =
-l'app cherche la meilleure) et les modèles acceptés (`review_line.wish_models`). Sa validation
-remplit `review.needs_confirmed_at`.
+Code : `strategyDefaults()`, `qualityPoints()` dans `src/domain/strategy.ts` ;
+`savePreferences()`, `strategyOverview()` dans `src/application/strategy.ts`.
 
 ### Décision d'une ligne
 
@@ -410,13 +415,12 @@ Code : `src/application/review/decisions.ts`, `DECISION_LABEL` dans `src/domain/
 
 ### Étapes affichées
 
-La page du rituel montre une frise de cinq étapes, calculée à partir de l'état des lignes :
+La page du rituel montre une frise de quatre étapes, calculée à partir de l'état des lignes :
 
 | Clé | Libellé | Cochée quand |
 |---|---|---|
 | `renewal` | Hausse | La nouvelle prime de chaque personne est connue |
-| `strategy` | Stratégie | Une stratégie est choisie (ou tout est déjà décidé) |
-| `needs` | Besoins | Les besoins sont confirmés (ou tout est déjà décidé) |
+| `preferences` | Préférences | Les préférences sont enregistrées (ou tout est déjà décidé) |
 | `decide` | Choix | Plus aucune ligne `UNDECIDED` |
 | `procedures` | Envoi | Pour chaque `SWITCH`, affiliation demandée ; chaque lettre nécessaire envoyée |
 

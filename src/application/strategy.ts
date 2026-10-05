@@ -1,10 +1,10 @@
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { bestPerInsurer, filterOffers, rankOffers, type Offer, type RankedOffer } from "@/domain/comparison";
 import { costOf } from "@/domain/comparison";
 import type { InsurerProfile } from "@/domain/insurer-profile";
 import { MODEL_TYPES, type ModelType } from "@/domain/lamal";
 import { franchisesFor } from "@/domain/parameters";
-import { qualityPoints, rankForStrategy, STRATEGIES, strategyDefaults, type Strategy } from "@/domain/strategy";
+import { qualityPoints, STRATEGIES, strategyDefaults, type Strategy } from "@/domain/strategy";
 import type { Db } from "@/infrastructure/db/client";
 import { offersFor, parametersFor } from "@/infrastructure/db/queries";
 import { household, lamalPolicy, person, review, reviewLine } from "@/infrastructure/db/schema";
@@ -13,7 +13,7 @@ import { insurerProfiles } from "./insurers";
 import { NotFoundError, UserError } from "./errors";
 
 /*
- * Stratégie du rituel et questionnaire des besoins. `lineContext` rassemble ce qu'il faut pour
+ * Préférences du rituel : stratégie du foyer et besoins de chaque personne. `lineContext` rassemble ce qu'il faut pour
  * classer les offres d'une personne ; le comparateur (compare.ts) s'en sert aussi.
  */
 
@@ -69,8 +69,8 @@ export function effectiveNeeds(c: Pick<LineContext, "line" | "person">): { model
   return { models: (c.line.wishModels ?? c.person.allowedModels) as ModelType[], franchiseChf: c.line.wishFranchiseChf };
 }
 
-/** Offres classées pour une stratégie, une par caisse, avec les filtres de la ligne. */
-export function rankedForStrategy(c: LineContext, strategy: Strategy, overrides: { models?: ModelType[]; franchiseChf?: number | null } = {}): RankedOffer[] {
+/** Offres classées par coût réel de l'année, une par caisse, avec les filtres de la ligne. */
+export function rankedFor(c: LineContext, overrides: { models?: ModelType[]; franchiseChf?: number | null } = {}): RankedOffer[] {
   const needs = effectiveNeeds(c);
   const models = overrides.models ?? needs.models;
   const franchise = overrides.franchiseChf !== undefined ? overrides.franchiseChf : needs.franchiseChf;
@@ -79,22 +79,12 @@ export function rankedForStrategy(c: LineContext, strategy: Strategy, overrides:
     franchises: franchise === null ? undefined : [franchise],
     excludedInsurerIds: c.person.excludedInsurerIds,
   });
-  const ranked = rankOffers(filtered, { ...c.costContext, referenceTotalRp: c.renewalTotalRp });
-  return bestPerInsurer(rankForStrategy(ranked, strategy, c.quality));
+  return bestPerInsurer(rankOffers(filtered, { ...c.costContext, referenceTotalRp: c.renewalTotalRp }));
 }
 
-export interface StrategyPick {
-  strategy: Strategy;
-  offer: RankedOffer | null;
-}
-
-/** Meilleure offre de chaque stratégie pour une personne (réglages par défaut de la stratégie). */
-export function picksFor(c: LineContext): StrategyPick[] {
-  return STRATEGIES.map((strategy) => {
-    const d = strategyDefaults(strategy, { modelType: c.policy.modelType as ModelType, franchiseChf: c.line.renewalFranchiseChf });
-    const offer = rankedForStrategy(c, strategy, { models: d.models ?? (c.person.allowedModels as ModelType[]), franchiseChf: d.franchiseChf })[0] ?? null;
-    return { strategy, offer };
-  });
+/** Réglages par défaut d'une stratégie pour une personne. */
+export function defaultsFor(c: Pick<LineContext, "line" | "policy">, strategy: Strategy) {
+  return strategyDefaults(strategy, { modelType: c.policy.modelType as ModelType, franchiseChf: c.line.renewalFranchiseChf });
 }
 
 export interface StrategyOverview {
@@ -104,14 +94,13 @@ export interface StrategyOverview {
   persons: { lineId: number; firstName: string; offer: RankedOffer | null }[];
 }
 
-/** Aperçu des trois stratégies pour le foyer : ce que chacune ferait économiser. */
+/** Aperçu des stratégies pour le foyer : ce que chacune ferait économiser avec ses réglages par défaut. */
 export function strategyOverview(db: Db, scope: Scope, reviewId: number): StrategyOverview[] {
   ownedReview(db, scope, reviewId);
   const lines = db.select().from(reviewLine).where(eq(reviewLine.reviewId, reviewId)).orderBy(asc(reviewLine.id)).all();
   const contexts = lines.map((l) => lineContext(db, scope, l.id));
-  const picks = contexts.map((c) => ({ c, picks: picksFor(c) }));
   return STRATEGIES.map((strategy) => {
-    const persons = picks.map(({ c, picks: ps }) => ({ lineId: c.line.id, firstName: c.person.firstName, offer: ps.find((p) => p.strategy === strategy)!.offer }));
+    const persons = contexts.map((c) => ({ lineId: c.line.id, firstName: c.person.firstName, offer: rankedFor(c, defaultsFor(c, strategy))[0] ?? null }));
     const savings = persons.map((p) => p.offer?.savingsRp ?? null);
     return {
       strategy,
@@ -127,23 +116,6 @@ function openReviewRow(db: Db, scope: Scope, reviewId: number) {
   return reviewRow;
 }
 
-/**
- * Choisit la stratégie du foyer. Les besoins des personnes encore sans décision repartent des
- * réglages de la stratégie (ils restent modifiables à l'étape suivante).
- */
-export function setStrategy(db: Db, scope: Scope, reviewId: number, strategy: Strategy) {
-  const reviewRow = openReviewRow(db, scope, reviewId);
-  db.transaction((tx) => {
-    tx.update(review).set({ strategy, needsConfirmedAt: null }).where(eq(review.id, reviewRow.id)).run();
-    const lines = tx.select().from(reviewLine).where(and(eq(reviewLine.reviewId, reviewRow.id), eq(reviewLine.decision, "UNDECIDED"))).all();
-    for (const l of lines) {
-      const policy = tx.select().from(lamalPolicy).where(eq(lamalPolicy.id, l.currentPolicyId)).get()!;
-      const d = strategyDefaults(strategy, { modelType: policy.modelType as ModelType, franchiseChf: l.renewalFranchiseChf });
-      tx.update(reviewLine).set({ wishFranchiseChf: d.franchiseChf, wishModels: d.models }).where(eq(reviewLine.id, l.id)).run();
-    }
-  });
-}
-
 export interface NeedsInput {
   lineId: number;
   /** null = l'app choisit la franchise la plus avantageuse. */
@@ -154,9 +126,13 @@ export interface NeedsInput {
   doctorName: string | null;
 }
 
-/** Enregistre le questionnaire des besoins de chaque personne et ouvre le comparateur. */
-export function saveNeeds(db: Db, scope: Scope, reviewId: number, needs: NeedsInput[], nowIso: string) {
+/**
+ * Enregistre les préférences du rituel : la stratégie du foyer et les besoins de chaque personne
+ * (pré-remplis par la stratégie, éventuellement affinés). Ouvre ensuite le comparateur.
+ */
+export function savePreferences(db: Db, scope: Scope, reviewId: number, strategy: Strategy, needs: NeedsInput[], nowIso: string) {
   const reviewRow = openReviewRow(db, scope, reviewId);
+  if (!STRATEGIES.includes(strategy)) throw new UserError("Stratégie inconnue.");
   db.transaction((tx) => {
     for (const n of needs) {
       const line = tx.select().from(reviewLine).where(eq(reviewLine.id, n.lineId)).get();
@@ -167,6 +143,6 @@ export function saveNeeds(db: Db, scope: Scope, reviewId: number, needs: NeedsIn
       tx.update(reviewLine).set({ wishFranchiseChf: n.franchiseChf, wishModels: models }).where(eq(reviewLine.id, line.id)).run();
       tx.update(person).set({ healthCostsRp: n.healthCostsRp, doctorName: n.doctorName }).where(eq(person.id, line.personId)).run();
     }
-    tx.update(review).set({ needsConfirmedAt: nowIso }).where(eq(review.id, reviewRow.id)).run();
+    tx.update(review).set({ strategy, needsConfirmedAt: nowIso }).where(eq(review.id, reviewRow.id)).run();
   });
 }

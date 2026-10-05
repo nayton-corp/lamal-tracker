@@ -1,7 +1,7 @@
 import type { ReviewView } from "@/application/review";
 import { isStepDone, needsLetter } from "@/domain/ritual-steps";
 
-export type NextStepKind = "strategy" | "needs" | "compare" | "procedures" | "none";
+export type NextStepKind = "preferences" | "compare" | "procedures" | "none";
 
 export interface NextStep {
   kind: NextStepKind;
@@ -10,7 +10,7 @@ export interface NextStep {
 }
 
 /**
- * Prochaine étape du parcours du rituel, dans l'ordre : stratégie, besoins, choix, envoi. Une fois
+ * Prochaine étape du parcours du rituel, dans l'ordre : préférences, choix, envoi. Une fois
  * tout envoyé, le rituel se clôt de lui-même (application/review/close.ts) : « none ».
  */
 export function nextStep(view: ReviewView): NextStep {
@@ -18,11 +18,8 @@ export function nextStep(view: ReviewView): NextStep {
   const base = `/rituel/${year}`;
   const undecided = view.lines.filter((p) => p.line.decision === "UNDECIDED");
   if (view.review.status === "CLOSED") return { kind: "none", href: base, label: "Voir le rituel" };
-  if (undecided.length > 0 && !view.review.strategy && undecided.length === view.lines.length) {
-    return { kind: "strategy", href: `${base}/strategie`, label: "Choisir ma stratégie" };
-  }
   if (undecided.length > 0 && !view.review.needsConfirmedAt && undecided.length === view.lines.length) {
-    return { kind: "needs", href: `${base}/besoins`, label: "Préciser mes besoins" };
+    return { kind: "preferences", href: `${base}/preferences`, label: "Régler mes préférences" };
   }
   if (undecided.length > 0) return { kind: "compare", href: `${base}/comparer`, label: undecided.length === view.lines.length ? "Comparer les offres" : `Comparer pour ${undecided[0]!.person.firstName}` };
   const needsLetters = view.lines.some((p) => needsLetter(p.line.decision));

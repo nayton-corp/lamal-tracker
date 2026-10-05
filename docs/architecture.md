@@ -36,7 +36,7 @@ src/
     reminders.ts       règles des rappels d'envoi et des relances
     comparison.ts      filtres, classement déterministe, statistiques de marché
     renewal.ts         tarif de renouvellement d'un contrat (MATCHED, PROBABLE, AMBIGUOUS, MISSING)
-    strategy.ts        stratégies du rituel, profils de consommation, solidité d'une caisse
+    strategy.ts        deux stratégies du rituel, profils de consommation, solidité d'une caisse
     ritual-steps.ts    étapes du rituel, leur ordre et quand chacune est faite
     review.ts          garde-fous des décisions, des lettres et du contrôle LCA
     letter.ts          contenu des lettres et des demandes d'offre (indépendant du rendu PDF)
@@ -404,8 +404,8 @@ tarifs officiels par `application/policy-import.ts`. Le fichier n'est jamais enr
 
 Le rituel d'automne s'appelle `review` dans le code. Ses étapes sont typées dans
 `domain/ritual-steps.ts` ; les routes sont sous `/rituel/[year]` : page d'accueil (reconduction
-tacite), `strategie`, `besoins`, `comparer` et `personne/[lineId]`, `lettres` (Démarches ; `lca` n'est
-plus qu'une redirection vers elle). Le rituel se clôt seul quand tout est envoyé
+tacite), `preferences`, `comparer` et `personne/[lineId]`, `lettres` (Démarches). `lca` mène aux
+Démarches, `strategie` et `besoins` aux préférences. Le rituel se clôt seul quand tout est envoyé
 (`syncReviewClosure`).
 L'année visée est toujours l'année prochaine (`reviewTargetYear()`). Pendant la fenêtre de
 changement (`isReviewWindowOpen` : primes publiées et échéance du 30 novembre pas encore passée),

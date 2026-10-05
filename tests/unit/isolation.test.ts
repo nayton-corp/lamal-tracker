@@ -47,7 +47,7 @@ import {
 } from "@/application/review";
 import { withHousehold, type Scope } from "@/application/scope";
 import { deleteSignature, listSignatures, saveSignature, signaturesByName } from "@/application/signatures";
-import { lineContext, saveNeeds, setStrategy, strategyOverview } from "@/application/strategy";
+import { lineContext, savePreferences, strategyOverview } from "@/application/strategy";
 import { tariffOptions } from "@/application/tariffs";
 import { openDb, type Db } from "@/infrastructure/db/client";
 import { household, lamalPolicy, lcaPolicy, letter, offerRequest, person, review, reviewLine, signature, tariffLineage } from "@/infrastructure/db/schema";
@@ -181,9 +181,8 @@ describe("cloisonnement des foyers", () => {
       ["keepAsIs", () => keepAsIs(db, s, b.lineId, NOW)],
       ["undoDecision", () => undoDecision(db, s, b.lineId)],
       ["setLcaWishes", () => setLcaWishes(db, s, b.lineId, ["DENTAL"])],
-      ["setStrategy", () => setStrategy(db, s, b.reviewId, "ECONOMY")],
-      ["saveNeeds (rituel)", () => saveNeeds(db, s, b.reviewId, [], NOW)],
-      ["saveNeeds (ligne)", () => saveNeeds(db, s, a.reviewId, [{ lineId: b.lineId, franchiseChf: 300, models: [], healthCostsRp: 0, doctorName: null }], NOW)],
+      ["savePreferences (rituel)", () => savePreferences(db, s, b.reviewId, "ECONOMY", [], NOW)],
+      ["savePreferences (ligne)", () => savePreferences(db, s, a.reviewId, "ECONOMY", [{ lineId: b.lineId, franchiseChf: 300, models: [], healthCostsRp: 0, doctorName: null }], NOW)],
       ["generateLetters", () => generateLetters(db, s, b.reviewId, TODAY)],
       ["generateOfferRequests", () => generateOfferRequests(db, s, b.reviewId, TODAY)],
       ["markLetterSent", () => markLetterSent(db, s, b.letterId, TODAY, "X")],

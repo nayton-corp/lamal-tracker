@@ -71,6 +71,13 @@
       "when": 1791142681274,
       "tag": "0009_feedback_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791226266839,
+      "tag": "0010_strategy_two_choices",
+      "breakpoints": true
     }
   ]
 }

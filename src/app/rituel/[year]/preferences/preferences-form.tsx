@@ -1,17 +1,24 @@
 "use client";
 
-import { Stethoscope, UserRound } from "lucide-react";
+import { ChevronDown, PiggyBank, Repeat, Stethoscope, UserRound } from "lucide-react";
 import { useActionState, useState } from "react";
-import { saveNeedsAction } from "@/app/actions/journey";
+import { savePreferencesAction } from "@/app/actions/journey";
 import { MODEL_HINT, MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import { formatChf, rpToInput } from "@/domain/money";
-import { USAGE_INFO, USAGE_PROFILES, usageFor, type UsageProfile } from "@/domain/strategy";
+import { STRATEGY_INFO, USAGE_INFO, USAGE_PROFILES, usageFor, type Strategy, type UsageProfile } from "@/domain/strategy";
 import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
 import { FormError, Input } from "@/ui/form";
 import { SubmitButton } from "@/ui/submit";
 
-export interface NeedsPerson {
+export interface StrategyChoice {
+  strategy: Strategy;
+  /** Économie annuelle du foyer avec les réglages par défaut (null si un renouvellement manque). */
+  annualSavingsRp: number | null;
+  persons: { lineId: number; firstName: string; offer: { summary: string; monthlyRp: number } | null }[];
+}
+
+export interface PreferencesPerson {
   lineId: number;
   firstName: string;
   /** Contrat actuel, en une ligne. */
@@ -21,6 +28,8 @@ export interface NeedsPerson {
   franchises: number[];
   franchise: number | null;
   models: ModelType[];
+  /** Réglages proposés par chaque stratégie, appliqués quand on en change. */
+  defaults: Record<Strategy, { franchiseChf: number | null; models: ModelType[] }>;
   healthCostsRp: number;
   doctorName: string | null;
   accident: boolean;
@@ -35,16 +44,38 @@ const chip = (active: boolean) =>
     active ? "border-primary bg-primary text-on-primary" : "border-border bg-surface hover:bg-surface-2",
   );
 
-/** Questionnaire des besoins, pré-rempli par la stratégie et ce que l'app sait déjà. */
-export function NeedsForm({ year, reviewId, persons, strategyLabel }: { year: number; reviewId: number; persons: NeedsPerson[]; strategyLabel: string | null }) {
-  const [state, action] = useActionState(saveNeedsAction, null);
+const ICONS: Record<Strategy, typeof PiggyBank> = { ECONOMY: PiggyBank, KEEP: Repeat };
+
+/**
+ * Préférences du rituel : la stratégie du foyer en tête, puis par personne la fréquence des soins
+ * (pour le coût réel) et, repliés, la franchise, les modèles et le médecin. Changer de stratégie
+ * remet franchise et modèles aux réglages qu'elle propose.
+ */
+export function PreferencesForm({ year, reviewId, strategy: initial, choices, persons }: {
+  year: number;
+  reviewId: number;
+  strategy: Strategy;
+  choices: StrategyChoice[];
+  persons: PreferencesPerson[];
+}) {
+  const [state, action] = useActionState(savePreferencesAction, null);
+  const [strategy, setStrategy] = useState<Strategy>(initial);
+  const several = persons.length > 1;
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-6">
       <input type="hidden" name="year" value={year} />
       <input type="hidden" name="reviewId" value={reviewId} />
-      {persons.map((p) => (
-        <PersonNeeds key={p.lineId} p={p} several={persons.length > 1} strategyLabel={strategyLabel} />
-      ))}
+      <fieldset className="space-y-3">
+        <legend className="mb-1 text-lg font-semibold">Qu&apos;est-ce qui compte le plus{several ? " pour le foyer" : ""} ?</legend>
+        {choices.map((c) => (
+          <StrategyCard key={c.strategy} choice={c} active={strategy === c.strategy} several={several} onPick={() => setStrategy(c.strategy)} />
+        ))}
+      </fieldset>
+      <section className="space-y-4" aria-label="Besoins">
+        {persons.map((p) => (
+          <PersonNeeds key={p.lineId} p={p} several={several} strategy={strategy} />
+        ))}
+      </section>
       <FormError message={state?.error} />
       <div className="sticky bottom-20 z-30 lg:bottom-6">
         <SubmitButton block size="lg" className="shadow-lg" pendingLabel="Recherche des offres…">
@@ -55,9 +86,54 @@ export function NeedsForm({ year, reviewId, persons, strategyLabel }: { year: nu
   );
 }
 
-function PersonNeeds({ p, several, strategyLabel }: { p: NeedsPerson; several: boolean; strategyLabel: string | null }) {
+function StrategyCard({ choice: c, active, several, onPick }: { choice: StrategyChoice; active: boolean; several: boolean; onPick: () => void }) {
+  const info = STRATEGY_INFO[c.strategy];
+  const Icon = ICONS[c.strategy];
+  return (
+    <label className={cn("block cursor-pointer space-y-3 rounded-2xl border-2 bg-surface p-4 shadow-card has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring", active ? "border-primary" : "border-border")}>
+      <span className="flex items-start gap-3">
+        <input type="radio" name="strategy" value={c.strategy} checked={active} onChange={onPick} className="sr-only" />
+        <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-full", active ? "bg-primary text-on-primary" : "bg-primary-soft text-primary")}>
+          <Icon aria-hidden className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-lg font-semibold">{info.label}</span>
+          <span className="block text-sm text-muted">{info.tagline}</span>
+        </span>
+        <span className="shrink-0 text-right">
+          <span className="block text-xs text-muted">Économie</span>
+          <span className={cn("block text-lg font-bold tabular", (c.annualSavingsRp ?? 0) > 0 ? "text-saving" : "text-muted")}>
+            {c.annualSavingsRp === null ? "—" : c.annualSavingsRp > 0 ? `${formatChf(c.annualSavingsRp, { whole: true })}/an` : "aucune"}
+          </span>
+        </span>
+      </span>
+      {active && (
+        <ul className="space-y-1 rounded-xl bg-surface-2 p-3 text-sm">
+          {c.persons.map((p) => (
+            <li key={p.lineId} className="flex justify-between gap-2">
+              <span className="min-w-0">
+                {several && <strong>{p.firstName} : </strong>}
+                {p.offer ? p.offer.summary : "aucune offre"}
+              </span>
+              {p.offer && <span className="shrink-0 tabular">{formatChf(p.offer.monthlyRp)}/mois</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </label>
+  );
+}
+
+function PersonNeeds({ p, several, strategy }: { p: PreferencesPerson; several: boolean; strategy: Strategy }) {
   const [franchise, setFranchise] = useState<number | null>(p.franchise);
   const [models, setModels] = useState<Set<ModelType>>(new Set(p.models));
+  // Changer de stratégie remet franchise et modèles à ses réglages (mise à jour pendant le rendu).
+  const [appliedStrategy, setAppliedStrategy] = useState(strategy);
+  if (appliedStrategy !== strategy) {
+    setAppliedStrategy(strategy);
+    setFranchise(p.defaults[strategy].franchiseChf);
+    setModels(new Set(p.defaults[strategy].models));
+  }
   const [usage, setUsage] = useState<UsageProfile | "CUSTOM">(usageFor(p.healthCostsRp) ?? "CUSTOM");
   const [custom, setCustom] = useState(rpToInput(p.healthCostsRp, 0));
   const healthChf = usage === "CUSTOM" ? custom : rpToInput(USAGE_INFO[usage].healthCostsRp, 0);
@@ -85,7 +161,7 @@ function PersonNeeds({ p, several, strategyLabel }: { p: NeedsPerson; several: b
           <UserRound aria-hidden className="size-5" />
         </span>
         <div>
-          <h2 className="text-lg font-semibold">{several ? p.firstName : "Vos besoins"}</h2>
+          <h2 className="text-lg font-semibold">{several ? p.firstName : "Votre suivi médical"}</h2>
           <p className="text-sm text-muted">Aujourd&apos;hui : {p.current}</p>
           {p.transition && <p className="text-sm text-info">{p.transition}</p>}
         </div>
@@ -114,6 +190,18 @@ function PersonNeeds({ p, several, strategyLabel }: { p: NeedsPerson; several: b
         </div>
       </fieldset>
 
+      <details className="group rounded-xl border border-border">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-3 [&::-webkit-details-marker]:hidden">
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">Affiner</span>
+            <span className="block text-sm text-muted">
+              {franchise === null ? "Franchise la plus avantageuse" : `Franchise ${franchise}`} ·{" "}
+              {models.size === 0 ? "tous les modèles" : [...models].map((m) => MODEL_LABEL[m]).join(", ")}
+            </span>
+          </span>
+          <ChevronDown aria-hidden className="size-4 shrink-0 text-muted transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="space-y-5 border-t border-border p-3">
       <fieldset className="space-y-2">
         <legend className="font-medium">Franchise souhaitée</legend>
         <div className="flex flex-wrap gap-2">
@@ -162,12 +250,12 @@ function PersonNeeds({ p, several, strategyLabel }: { p: NeedsPerson; several: b
           <span className="block text-sm text-muted">Avec un modèle médecin de famille, vérifiez qu&apos;il figure sur la liste de la nouvelle caisse : l&apos;app vous le rappellera.</span>
         </label>
       )}
-      {!needsDoctor && p.doctorName && <input type="hidden" name={`doctor-${id}`} value={p.doctorName} />}
-
       <p className="text-xs text-muted">
         Couverture accidents : {p.accident ? "comprise" : "exclue (couverte par l'employeur)"}, comme aujourd&apos;hui.
-        {strategyLabel && ` Réglages proposés par la stratégie « ${strategyLabel} ».`}
       </p>
+        </div>
+      </details>
+      {!needsDoctor && p.doctorName && <input type="hidden" name={`doctor-${id}`} value={p.doctorName} />}
     </Card>
   );
 }
