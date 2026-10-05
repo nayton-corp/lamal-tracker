@@ -113,10 +113,11 @@ export function PasswordPanel() {
 // ───────────────────────── Passkeys ─────────────────────────
 
 /** Ajout d'une passkey : mot de passe redemandé si la connexion date de plus de dix minutes. */
-export function AddPasskey({ onDone, label = "Ajouter une passkey", block }: { onDone?: () => void; label?: string; block?: boolean }) {
+/** `askPassword` : la session n'est pas confirmée, le champ du mot de passe est montré d'emblée. */
+export function AddPasskey({ onDone, label = "Ajouter une passkey", block, askPassword = false }: { onDone?: () => void; label?: string; block?: boolean; askPassword?: boolean }) {
   const supported = usePasskeySupport();
   const [pending, setPending] = useState(false);
-  const [needPassword, setNeedPassword] = useState(false);
+  const [needPassword, setNeedPassword] = useState(askPassword);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);

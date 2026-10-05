@@ -1,7 +1,8 @@
 import { Fingerprint } from "lucide-react";
 import { accountOverview } from "@/application/account";
+import { isFreshSession } from "@/application/auth";
 import { accountPageScope } from "@/server/auth";
-import { db } from "@/server/context";
+import { db, nowIso } from "@/server/context";
 import { AuthShell } from "@/ui/auth-shell";
 import { PasskeyOffer } from "./passkey-offer";
 
@@ -16,7 +17,7 @@ export default async function PasskeyOfferPage() {
   return (
     <AuthShell icon={Fingerprint} title="Connexion en un geste" subtitle="Votre compte est prêt.">
       <p>Avec une passkey, vous vous connectez avec Face ID, Touch ID ou l&apos;empreinte de ce téléphone, sans mot de passe. C&apos;est aussi plus sûr.</p>
-      <PasskeyOffer next={next} already={has} />
+      <PasskeyOffer next={next} already={has} askPassword={!isFreshSession(db(), scope.sessionId, nowIso())} />
     </AuthShell>
   );
 }

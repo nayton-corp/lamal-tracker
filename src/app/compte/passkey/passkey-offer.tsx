@@ -7,7 +7,7 @@ import { Button } from "@/ui/button";
 import { usePasskeySupport } from "@/ui/media";
 import { AddPasskey } from "../panels";
 
-export function PasskeyOffer({ next, already }: { next: string; already: boolean }) {
+export function PasskeyOffer({ next, already, askPassword }: { next: string; already: boolean; askPassword: boolean }) {
   const router = useRouter();
   const supported = usePasskeySupport();
   // Appareil sans passkey possible (ou déjà équipé) : on passe directement à la suite.
@@ -16,7 +16,7 @@ export function PasskeyOffer({ next, already }: { next: string; already: boolean
   }, [supported, already, next, router]);
   return (
     <div className="space-y-3">
-      <AddPasskey block label="Activer la passkey" onDone={() => setTimeout(() => router.replace(next), 1200)} />
+      <AddPasskey block askPassword={askPassword} label="Activer la passkey" onDone={() => setTimeout(() => router.replace(next), 1200)} />
       <Button asChild variant="ghost" block>
         <Link href={next}>Plus tard</Link>
       </Button>

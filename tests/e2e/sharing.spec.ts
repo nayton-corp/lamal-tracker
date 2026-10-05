@@ -60,6 +60,8 @@ test("un invité crée son compte sur mobile avec une passkey et ne voit rien de
   await addVirtualAuthenticator(context, page);
   await signUpWith(page, link, "invite@e2e.test");
   await page.screenshot({ path: path.join(shots, "a02-passkey-proposee.png"), fullPage: true });
+  // Session ouverte par le lien du courriel : le mot de passe est redemandé avant d'ajouter un facteur.
+  await page.getByLabel("Votre mot de passe, pour confirmer").fill(NEW_PASSWORD);
   await page.getByRole("button", { name: "Activer la passkey" }).click();
   // Passkey créée, nouveau compte sans foyer : l'accueil guidé suit.
   await expect(page).toHaveURL(/\/bienvenue/);
@@ -141,9 +143,11 @@ test("un invité télécharge ses données, puis supprime son compte", async ({ 
   await signUpWith(page, link, "depart@e2e.test");
   await page.getByRole("link", { name: "Plus tard" }).click();
 
-  // Mon compte › Mes données : la session vient d'être ouverte, l'identité est confirmée.
+  // Mon compte › Mes données : la session vient du lien du courriel, le mot de passe est redemandé.
   await page.goto("/compte");
   await page.getByRole("link", { name: /Mes données/ }).click();
+  await page.getByLabel("Votre mot de passe").fill(NEW_PASSWORD);
+  await page.getByRole("button", { name: "Confirmer" }).click();
   await expect(page.getByText("Identité confirmée")).toBeVisible();
   await page.screenshot({ path: path.join(shots, "a05-mes-donnees.png"), fullPage: true });
 
