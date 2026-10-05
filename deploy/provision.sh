@@ -107,4 +107,4 @@ chmod 700 "$APP_DIR/secrets"
 chmod 700 "$APP_DIR/data" "$APP_DIR/data/prod" "$APP_DIR/data/staging"
 
 echo
-echo "Terminé. Déconnectez-vous puis reconnectez-vous (groupe docker), puis suivez docs/mise-en-ligne.md."
+echo "Terminé. Déconnectez-vous puis reconnectez-vous (groupe docker), puis suivez docs/exploitation/serveur-public.md."

@@ -1,6 +1,6 @@
 # Réplication continue de la base de production (WAL) vers un stockage objet compatible S3.
 # Les copies sont chiffrées par age avant de quitter le serveur ; seule la clé privée (gardée hors
-# du serveur, voir docs/mise-en-ligne.md) permet de les relire.
+# du serveur, voir docs/exploitation/serveur-public.md) permet de les relire.
 dbs:
   - path: /data/lamal.db
     replicas:

@@ -106,53 +106,54 @@ function ensureBaseDatasets(): boolean {
   return false;
 }
 
-/** Une passe du planificateur : en saison, contrôle quotidien ; sinon hebdomadaire. */
-export async function schedulerTick(): Promise<void> {
+/** Une passe du planificateur (contrôle OFSP quotidien en saison, hebdomadaire sinon) ; renvoie les tâches en échec. */
+export async function schedulerTick(): Promise<string[]> {
   if (ensureBaseDatasets()) {
     console.log("[watch] import initial des primes lancé");
-    return;
+    return [];
   }
+  // Chaque tâche est isolée : une erreur est journalisée, n'empêche pas les suivantes, et fait
+  // envoyer un signal d'échec au service de surveillance (voir pingHeartbeat).
+  const failed: string[] = [];
+  const task = async (name: string, run: () => Promise<unknown> | unknown) => {
+    try {
+      await run();
+    } catch (error) {
+      failed.push(name);
+      console.error(`[watch] ${name} :`, error instanceof Error ? error.message : error);
+    }
+  };
+
   const last = getSetting<{ at: string }>(db(), SETTING_KEYS.ofspLastCheck);
   const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
   const every = inPublicationSeason(today()) ? 20 : 24 * 7;
   if (process.env.OFSP_AUTO_CHECK !== "false" && ageH >= every) {
-    try {
-      console.log("[watch]", await checkForNewPremiums());
-    } catch (error) {
-      console.error("[watch] contrôle OFSP impossible :", error instanceof Error ? error.message : error);
-      setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), ok: false });
-    }
+    await task("contrôle OFSP", async () => {
+      try {
+        console.log("[watch]", await checkForNewPremiums());
+      } catch (error) {
+        setSetting(db(), SETTING_KEYS.ofspLastCheck, { at: new Date().toISOString(), ok: false });
+        throw error;
+      }
+    });
   }
-  try {
-    await referenceTick();
-  } catch (error) {
-    console.error("[watch] référentiels", error);
-  }
-  try {
-    await sendDeadlineReminders();
-  } catch (error) {
-    console.error("[watch] rappels", error);
-  }
-  try {
-    await pingenTick();
-  } catch (error) {
-    console.error("[watch] suivi Pingen", error);
-  }
-  try {
+  await task("référentiels", referenceTick);
+  await task("rappels", sendDeadlineReminders);
+  await task("suivi Pingen", pingenTick);
+  await task("comptes inactifs", async () => {
     const { notified, deleted } = await inactivityTick(db(), mailDeps(), nowIso());
     if (notified || deleted) console.log(`[watch] comptes inactifs : ${notified} rappel(s), ${deleted} suppression(s)`);
-  } catch (error) {
-    console.error("[watch] comptes inactifs", error instanceof Error ? error.message : error);
-  }
-  try {
+  });
+  await task("alertes", async () => {
     const sent = await opsTick(db(), { mail: mailDeps(), disk: dataDisk }, nowIso());
     if (sent.length) console.warn(`[watch] alertes d'exploitation envoyées : ${sent.join(", ")}`);
-  } catch (error) {
-    console.error("[watch] alertes", error instanceof Error ? error.message : error);
-  }
+  });
   // Ménage : jetons expirés, journal de sécurité de plus de 12 mois.
-  purgeExpiredTokens(db(), nowIso());
-  purgeAudit(db(), nowIso());
+  await task("ménage", () => {
+    purgeExpiredTokens(db(), nowIso());
+    purgeAudit(db(), nowIso());
+  });
+  return failed;
 }
 
 /** Espace libre du volume qui contient la base. */
