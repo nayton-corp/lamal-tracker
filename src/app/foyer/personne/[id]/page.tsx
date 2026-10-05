@@ -6,7 +6,7 @@ import { getPerson, listInsurers, listLca, listPolicies } from "@/application/ho
 import { activeReview } from "@/application/review";
 import { ageClassForYear } from "@/domain/age";
 import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType, selectableYears } from "@/domain/lamal";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { currentYear, db } from "@/server/context";
 import { Badge } from "@/ui/badge";
 import { ConfirmButton } from "@/ui/confirm-button";

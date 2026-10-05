@@ -3,7 +3,7 @@ import Link from "next/link";
 import { chooseModeAction } from "@/app/actions/journey";
 import { getHousehold, listInsurers, listPersons, listPolicies } from "@/application/household";
 import { formatDateShort } from "@/domain/dates";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { currentYear, db } from "@/server/context";
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";

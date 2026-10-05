@@ -6,7 +6,7 @@ import { MODEL_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal"
 import { buildOfferRequest, letterPlainText, type LetterContent } from "@/domain/letter";
 import { formatChf } from "@/domain/money";
 import type { Db } from "@/infrastructure/db/client";
-import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
+import { insurerLabel, insurerRecipient } from "@/domain/insurer";
 import { household, insurer, lcaPolicy, offerRequest, review, reviewLine } from "@/infrastructure/db/schema";
 import { UserError } from "./errors";
 import { getReviewView } from "./review";

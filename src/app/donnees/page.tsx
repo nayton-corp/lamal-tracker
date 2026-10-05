@@ -2,8 +2,7 @@ import { CheckCircle2, ChevronRight, Download, FolderLock, Landmark, MessageSqua
 import Link from "next/link";
 import { listInsurers } from "@/application/household";
 import type { ValidationReport } from "@/domain/ofsp/report";
-import { listDatasets, listParameters } from "@/application/reference-data";
-import { getSetting, SETTING_KEYS } from "@/infrastructure/db/settings";
+import { lastDataChecks, listDatasets, listParameters } from "@/application/reference-data";
 import { subscriptionCount } from "@/infrastructure/push/push";
 import { currentYear, db } from "@/server/context";
 import { importJob } from "@/server/jobs";
@@ -15,7 +14,6 @@ import { Co2Form } from "./co2-form";
 import { refreshReferenceAction } from "@/app/actions/data";
 import { formatDateLong, formatTimestamp } from "@/domain/dates";
 import { officialCo2 } from "@/infrastructure/reference/apply";
-import type { ReferenceCheck } from "@/server/reference";
 import { ActionForm } from "@/ui/action-form";
 import { SubmitButton } from "@/ui/submit";
 import { ImportPanel } from "./import-panel";
@@ -46,8 +44,7 @@ export default async function DataPage() {
   const insurers = listInsurers(db());
   const customAddresses = insurers.filter((i) => i.terminationAddress?.trim()).length;
   const directoryDate = insurers.map((i) => i.directoryDate).filter(Boolean).sort().at(-1);
-  const reference = getSetting<ReferenceCheck>(db(), SETTING_KEYS.referenceLastCheck);
-  const lastCheck = getSetting<{ at: string; ok: boolean }>(db(), SETTING_KEYS.ofspLastCheck);
+  const { reference, premiums: lastCheck } = lastDataChecks(db());
 
   return (
     <Page wide>

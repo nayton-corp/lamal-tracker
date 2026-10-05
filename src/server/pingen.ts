@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { pingenAllowed } from "@/application/admin";
 import { syncPingenLetters, type PingenDeps } from "@/application/pingen";
 import type { Scope } from "@/application/scope";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { insurer, letter, review } from "@/infrastructure/db/schema";
 import { createPingenClient, pingenConfig, type PingenClient } from "@/infrastructure/pingen/client";
 import { renderLetterPdf } from "@/infrastructure/pdf/letter-pdf";

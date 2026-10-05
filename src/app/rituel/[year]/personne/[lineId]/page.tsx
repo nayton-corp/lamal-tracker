@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { confirmLineageAction, decideAction, keepAction } from "@/app/actions/review";
 import { compareForLine, offerKey, type CompareView, type DetailedOffer } from "@/application/compare";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { lineOverview, listReviewLineTabs } from "@/application/review";
 import { STRATEGY_INFO } from "@/domain/strategy";
 import { AGE_CLASS_LABEL, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";

@@ -5,7 +5,7 @@ import { effectiveNeeds } from "@/application/strategy";
 import { displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { franchisesFor } from "@/domain/parameters";
 import { STRATEGY_INFO } from "@/domain/strategy";
-import { parametersFor } from "@/infrastructure/db/queries";
+import { legalParameters } from "@/application/reference-data";
 import { db, today } from "@/server/context";
 import { Page, PageHeader } from "@/ui/page";
 import { NeedsForm, type NeedsPerson } from "./needs-form";
@@ -20,7 +20,7 @@ export default async function NeedsPage({ params }: { params: Promise<{ year: st
   const reviewRow = getReviewByYear(db(), scope, year);
   if (!reviewRow || reviewRow.status === "CLOSED") redirect(`/rituel/${year}`);
   const view = getReviewView(db(), scope, reviewRow.id, today());
-  const params_ = parametersFor(db(), year);
+  const params_ = legalParameters(db(), year);
   const open = view.lines.filter((p) => p.line.decision === "UNDECIDED");
   const persons: NeedsPerson[] = (open.length ? open : view.lines).map((p) => {
     const needs = effectiveNeeds({ line: p.line, person: p.person });

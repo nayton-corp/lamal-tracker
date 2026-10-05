@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
 import type { LetterContent } from "@/domain/letter";
 import type { Db } from "@/infrastructure/db/client";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import {
   appUser,
   auditEvent,

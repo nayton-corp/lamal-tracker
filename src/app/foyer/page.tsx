@@ -5,7 +5,7 @@ import { getHousehold, getHouseholdMode, listLca, listPersons, listPolicies } fr
 import { ageClassForYear } from "@/domain/age";
 import { AGE_CLASS_LABEL } from "@/domain/lamal";
 import { formatDateShort } from "@/domain/dates";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { currentYear, db } from "@/server/context";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";

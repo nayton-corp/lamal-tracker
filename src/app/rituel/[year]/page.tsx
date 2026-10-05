@@ -11,7 +11,7 @@ import { Awareness } from "../_parts/awareness";
 import { nextStep } from "../_parts/next-step";
 import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType, FIRST_PREMIUM_YEAR } from "@/domain/lamal";
 import { DECISION_LABEL } from "@/domain/review";
-import { activeDataset } from "@/infrastructure/db/queries";
+import { premiumsAvailable } from "@/application/reference-data";
 import { currentYear, db, today } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
 import { Alert } from "@/ui/alert";
@@ -59,9 +59,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
     );
   }
 
-  const dataset = activeDataset(db(), year);
+  const published = premiumsAvailable(db(), year);
   // Les primes sont publiées : l'analyse s'ouvre d'elle-même (rien n'est décidé à la place de l'utilisateur).
-  const windowOpen = isReviewWindowOpen(today(), year, Boolean(dataset));
+  const windowOpen = isReviewWindowOpen(today(), year, published);
   if (windowOpen && !getReviewByYear(db(), scope, year)) openReviewIfPossible(db(), scope, year);
   const reviewRow = getReviewByYear(db(), scope, year);
   const hasContracts = persons.some((p) => listPolicies(db(), p.id).some((x) => x.policy.coverageYear === year - 1));
@@ -70,15 +70,15 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
     return (
       <Page>
         <PageHeader title={`Rituel ${year}`} subtitle="Hausse et meilleure caisse pour l'année suivante." />
-        {dataset && !windowOpen ? (
+        {published && !windowOpen ? (
           <EmptyState icon={<CalendarClock aria-hidden />} title="Délai passé">
             Les résiliations pour {year} devaient arriver avant le {formatDateLong(reviewDeadlines(year).receiptDeadline)}. Le prochain rituel s&apos;ouvrira à la publication des primes {year + 1}.
           </EmptyState>
-        ) : dataset && !hasContracts ? (
+        ) : published && !hasContracts ? (
           <EmptyState icon={<CircleAlert aria-hidden />} title={`Contrat${persons.length > 1 ? "s" : ""} ${year - 1} à indiquer`} action={<Button asChild><Link href="/bienvenue?etape=contrats">Indiquer {persons.length > 1 ? "les contrats" : "mon contrat"}</Link></Button>}>
             La hausse se mesure par rapport à {year - 1}.
           </EmptyState>
-        ) : dataset ? (
+        ) : published ? (
           <Card className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">

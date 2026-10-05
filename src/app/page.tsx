@@ -6,7 +6,8 @@ import { getHousehold, getHouseholdMode, listPersons, listPolicies } from "@/app
 import { openReviewIfPossible, getReviewView } from "@/application/review";
 import { daysBetween, formatDateLong } from "@/domain/dates";
 import { reviewDeadlines, isReviewWindowOpen } from "@/domain/deadlines";
-import { activeDataset, insurerLabel, parametersFor } from "@/infrastructure/db/queries";
+import { legalParameters, premiumsAvailable } from "@/application/reference-data";
+import { insurerLabel } from "@/domain/insurer";
 import { db, reviewTargetYear, today } from "@/server/context";
 import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
@@ -28,7 +29,7 @@ export default async function Home() {
   const solo = getHouseholdMode(db(), scope) === "SOLO";
 
   const persons = listPersons(db(), householdRow.id);
-  const params = parametersFor(db(), year);
+  const params = legalParameters(db(), year);
   const co2Monthly = params.co2AnnualRp === null ? 0 : Math.round(params.co2AnnualRp / 12);
   const rows = persons.map((p) => {
     const policies = listPolicies(db(), p.id);
@@ -42,9 +43,9 @@ export default async function Home() {
 
   if (persons.length === 0) redirect("/bienvenue?etape=membres");
 
-  const dataset = activeDataset(db(), target);
+  const published = premiumsAvailable(db(), target);
   const deadlines = reviewDeadlines(target);
-  const windowOpen = isReviewWindowOpen(t, target, Boolean(dataset));
+  const windowOpen = isReviewWindowOpen(t, target, published);
   // Pendant la fenêtre du rituel, l'analyse s'ouvre d'elle-même : l'accueil montre tout de suite
   // ce que coûtera l'année prochaine sans rien faire.
   const reviewId = windowOpen ? openReviewIfPossible(db(), scope, target) : null;
@@ -71,7 +72,7 @@ export default async function Home() {
             </div>
           </Card>
         </Link>
-      ) : dataset && windowOpen ? (
+      ) : published && windowOpen ? (
         <Card className="space-y-3 border-primary/30">
           <p className="flex items-center gap-2 font-semibold text-primary">
             <Sparkles aria-hidden className="size-5" /> Les primes {target} sont publiées

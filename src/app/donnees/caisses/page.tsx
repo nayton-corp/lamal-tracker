@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { BadgeCheck, Globe, Mail, Phone } from "lucide-react";
 import { getHousehold, listInsurers, listPersons, listPolicies } from "@/application/household";
 import { formatDateLong } from "@/domain/dates";
-import { insurerAddressLines, insurerLabel } from "@/infrastructure/db/queries";
+import { insurerAddressLines, insurerLabel } from "@/domain/insurer";
 import { db } from "@/server/context";
 import { Section } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";

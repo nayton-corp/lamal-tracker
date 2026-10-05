@@ -3,7 +3,7 @@ import { reviewDeadlines } from "@/domain/deadlines";
 import { pingenFailed } from "@/domain/pingen";
 import { letterReminders, type LetterProgress, type Reminder } from "@/domain/reminders";
 import type { Db } from "@/infrastructure/db/client";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { appUser, household, householdMember, insurer, letter, notificationLog, offerRequest, person, review, reviewLine } from "@/infrastructure/db/schema";
 import type { MailDeps } from "./account-mail";
 import { logMailError } from "@/infrastructure/mail/mailer";

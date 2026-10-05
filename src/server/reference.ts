@@ -8,13 +8,8 @@ import { parseSupervisoryData, pickSupervisoryLink, SUPERVISORY_PAGE_URL } from 
 import { readWorkbook } from "@/infrastructure/reference/workbook";
 import { db } from "./context";
 
-export interface ReferenceCheck {
-  at: string;
-  /** Date de l'annuaire des caisses appliqué. */
-  directory: string | null;
-  results: string[];
-  ok: boolean;
-}
+import type { ReferenceCheck } from "@/application/reference-data";
+export type { ReferenceCheck };
 
 /**
  * Rafraîchit les référentiels officiels depuis admin.ch : annuaire des caisses (adresses),

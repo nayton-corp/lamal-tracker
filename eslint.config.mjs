@@ -28,7 +28,7 @@ const config = [
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [{ group: ["drizzle-orm", "drizzle-orm/*", "@/infrastructure/db/schema", "@/infrastructure/db/client"], message: "Passez par src/application (cloisonnement des foyers)." }] },
+        { patterns: [{ group: ["drizzle-orm", "drizzle-orm/*", "@/infrastructure/db/*"], message: "Passez par src/application (cloisonnement des foyers)." }] },
       ],
     },
   },

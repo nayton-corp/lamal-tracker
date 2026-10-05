@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getHousehold, listInsurers, listPersons } from "@/application/household";
-import { insurerLabel } from "@/infrastructure/db/queries";
+import { insurerLabel } from "@/domain/insurer";
 import { currentYear, db } from "@/server/context";
 import { Page, PageHeader } from "@/ui/page";
 import { ImportFlow } from "./import-flow";
