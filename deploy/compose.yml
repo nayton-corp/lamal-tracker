@@ -67,7 +67,7 @@ services:
 
   # Réplique la base de production en continu, chiffrée (age), vers un stockage objet suisse.
   litestream:
-    image: litestream/litestream:0.3.13
+    image: litestream/litestream:0.5.17
     restart: unless-stopped
     command: ["replicate"]
     env_file: backup.env
