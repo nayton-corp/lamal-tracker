@@ -54,3 +54,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Étape finale toujours reconstruite : les correctifs Debian du jour (apt-get upgrade) ne
+          # doivent pas venir d'un cache figé.
+          no-cache-filters: runtime

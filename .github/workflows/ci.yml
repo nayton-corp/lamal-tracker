@@ -86,6 +86,9 @@ jobs:
           tags: lamal-tracker:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Étape finale toujours reconstruite : les correctifs Debian du jour (apt-get upgrade) ne
+          # doivent pas venir d'un cache figé.
+          no-cache-filters: runtime
       # Deux sources pour la base de failles : si le miroir est incomplet, la seconde prend le relais.
       - name: Scan Trivy
         run: |
