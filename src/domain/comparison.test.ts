@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cheapestPerFranchise, filterOffers, marketStats, rankOffers, type Offer } from "./comparison";
+import { filterOffers, marketStats, rankOffers, type Offer } from "./comparison";
 import { defaultParameters } from "./parameters";
 
 function offer(p: Partial<Offer> & Pick<Offer, "tariffId" | "monthlyPremiumRp">): Offer {
@@ -44,13 +44,6 @@ describe("comparaison", () => {
     expect(filterOffers(offers, { models: ["TELMED"] }).map((o) => o.tariffId)).toEqual([2]);
     expect(filterOffers(offers, { franchises: [300] }).map((o) => o.tariffId)).toEqual([3]);
     expect(filterOffers(offers, { excludedInsurerIds: [1, 2] }).map((o) => o.tariffId)).toEqual([3, 4]);
-  });
-
-  it("donne la meilleure prime par franchise", () => {
-    expect(cheapestPerFranchise(offers).map((o) => [o.franchiseChf, o.monthlyPremiumRp])).toEqual([
-      [300, 45000],
-      [2500, 30000],
-    ]);
   });
 
   it("statistiques de marché", () => {

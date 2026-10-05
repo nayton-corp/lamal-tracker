@@ -120,7 +120,7 @@ export function getOfferRequest(db: Db, scope: Scope, id: number) {
   return row ? { ...row, content: row.content as LetterContent } : null;
 }
 
-/** Envoi de la demande : vaut demande d'affiliation pour les personnes concernées. */
+/** Envoi de la demande (null : envoi annulé) : vaut demande d'affiliation pour les personnes concernées. */
 export function markOfferRequestSent(db: Db, scope: Scope, id: number, at: IsoDate | null) {
   const row = ownedOfferRequest(db, scope, id);
   db.transaction((tx) => {
@@ -130,16 +130,9 @@ export function markOfferRequestSent(db: Db, scope: Scope, id: number, at: IsoDa
       const line = tx.select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
       if (!line) continue;
       if (at && !line.affiliationRequestedAt) tx.update(reviewLine).set({ affiliationRequestedAt: at }).where(eq(reviewLine.id, lineId)).run();
+      // Envoi annulé : la demande n'est plus faite (le rituel, s'il était clôturé, se rouvre).
+      if (!at && line.affiliationRequestedAt) tx.update(reviewLine).set({ affiliationRequestedAt: null }).where(eq(reviewLine.id, lineId)).run();
     }
-  });
-}
-
-/** Réponse de la caisse (confirmation d'affiliation) : l'ancienne caisse pourra libérer la personne. */
-export function markOfferRequestAnswered(db: Db, scope: Scope, id: number, at: IsoDate | null) {
-  const row = ownedOfferRequest(db, scope, id);
-  db.transaction((tx) => {
-    tx.update(offerRequest).set({ answeredAt: at }).where(eq(offerRequest.id, id)).run();
-    for (const lineId of row.lineIds) tx.update(reviewLine).set({ affiliationConfirmedAt: at }).where(eq(reviewLine.id, lineId)).run();
   });
 }
 

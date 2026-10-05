@@ -67,7 +67,7 @@ export default async function PersonPage({ params, searchParams }: { params: Pro
             <p className="text-muted">
               Indiquez le contrat {year} : choisissez la caisse et la franchise, la prime est retrouvée toute seule. Les années précédentes sont facultatives (elles alimentent l&apos;historique).
             </p>
-            <Link href="/foyer/importer" className="mt-2 inline-flex min-h-11 items-center text-primary underline">
+            <Link href={`/foyer/importer?personne=${p.id}`} className="mt-2 inline-flex min-h-11 items-center text-primary underline">
               Ou importer le PDF de la police
             </Link>
           </Card>

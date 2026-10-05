@@ -112,8 +112,7 @@ La prime la plus basse n'est pas la moins chère ici. L'app montre aussi deux au
 (`costScenarios()`) : « sans frais » (prime nette seule : 4'743.00 et 3'903.00) et « année
 chargée » (franchise et quote-part maximales : 5'743.00 et 7'103.00).
 
-Code : `annualCost()`, `costScenarios()`, `franchiseCurve()` (simulateur de franchise) et
-`breakEvenRp()` (point de bascule entre franchises) dans `src/domain/cost.ts`.
+Code : `annualCost()` et `costScenarios()` dans `src/domain/cost.ts`.
 
 ### Classe d'âge
 
@@ -202,17 +201,18 @@ douces…) relèvent d'une autre loi, la LCA. Ce sont des **contrats privés** :
 - elles ont leurs propres durées et délais de résiliation ;
 - résilier la LAMal ne résilie **pas** la LCA, même chez le même groupe.
 
-D'où le **garde-fou LCA** : avant qu'une lettre de résiliation LAMal puisse être générée, la
-personne doit confirmer explicitement qu'elle a vérifié ses complémentaires. Le message
-principal : « ne résiliez jamais une LCA avant d'avoir l'acceptation écrite d'une nouvelle ».
-Dans l'interface, la couleur ambre (jeton CSS `--lca` de `src/app/globals.css`) est réservée à
-ces alertes.
+D'où le **rappel LCA** : la lettre de résiliation de l'app ne vise que l'assurance de base et
+le dit (`lcaClause`). Sous chaque résiliation, l'écran des démarches rappelle en une ligne que
+les complémentaires continuent et les liste. Il n'y a plus de case à cocher bloquante : le
+risque (résilier une LCA par erreur) ne vient pas des lettres de l'app. Dans l'interface, la
+couleur ambre (jeton CSS `--lca` de `src/app/globals.css`) est réservée à ces rappels.
 
 L'OFSP ne publie pas les tarifs LCA : l'app ne les compare pas. Elle aide seulement à les
 demander à la nouvelle caisse (demande d'offre).
 
-Code : garanties `LCA_GUARANTEES` dans `src/domain/lca.ts` ; `lcaWarnings()` et `checkLetter()`
-dans `src/domain/review.ts` ; table `lca_policy` ; confirmation `review_line.lca_ack_at`.
+Code : garanties `LCA_GUARANTEES` dans `src/domain/lca.ts` ; `checkLetter()` dans
+`src/domain/review.ts` ; table `lca_policy`. La colonne `review_line.lca_ack_at` (ancienne
+confirmation) n'est plus écrite.
 
 ## 3. Changer de caisse
 
@@ -275,9 +275,8 @@ Code : `reviewDeadlines()`, `urgency()`, `isReviewWindowOpen()` dans `src/domain
 Avant la date d'envoi conseillée, l'app envoie des rappels à J-30, J-14, J-7, J-3 et J-1
 (`REMINDER_OFFSETS`), seulement aux foyers qui ont encore un courrier à poster (ou rien
 préparé). Un dernier rappel part deux jours après la date conseillée s'il reste des courriers.
-Enfin, une relance part quand une caisse n'a pas confirmé **21 jours** après l'envoi
-(`CONFIRMATION_FOLLOW_UP_DAYS`). Les rappels sont des notifications ; J-7, J-1, le dernier
-rappel et les relances partent aussi par courriel, sans nom de caisse.
+Un rituel clôturé (tout est envoyé) ne reçoit plus de rappel. Les rappels sont des
+notifications ; J-7, J-1 et le dernier rappel partent aussi par courriel, sans nom de caisse.
 
 Code : `letterReminders()` dans `src/domain/reminders.ts`, `src/application/reminders.ts`.
 
@@ -288,8 +287,10 @@ l'affiliation (formulaire ou courrier). L'ancienne caisse ne libère l'assuré q
 la confirmation de la nouvelle. L'app produit cette demande (PDF et courriel prérempli) avec les
 complémentaires souhaitées : c'est la **demande d'offre**.
 
-Code : table `offer_request`, `src/application/offers.ts`, colonnes
-`review_line.affiliation_requested_at` et `affiliation_confirmed_at`.
+Code : table `offer_request`, `src/application/offers.ts`, colonne
+`review_line.affiliation_requested_at` (remplie à l'envoi de la demande, vidée si l'envoi est
+annulé). Les colonnes de réception des confirmations (`affiliation_confirmed_at`,
+`offer_request.answered_at`, `letter.acknowledged_at`) ne sont plus écrites.
 
 ### Lettres
 
@@ -357,8 +358,8 @@ Code : `src/application/review/open.ts`.
 ```mermaid
 stateDiagram-v2
     [*] --> OPEN: openReview()
-    OPEN --> CLOSED: closeReview()
-    CLOSED --> OPEN: reopenReview()
+    OPEN --> CLOSED: tout est envoyé (syncReviewClosure)
+    CLOSED --> OPEN: envoi annulé, refus Pingen, « Modifier mes choix »
     OPEN --> [*]: deleteReview()
     CLOSED --> [*]: deleteReview()
 ```
@@ -409,7 +410,7 @@ Code : `src/application/review/decisions.ts`, `DECISION_LABEL` dans `src/domain/
 
 ### Étapes affichées
 
-La page du rituel montre une frise de six étapes, calculée à partir de l'état des lignes :
+La page du rituel montre une frise de cinq étapes, calculée à partir de l'état des lignes :
 
 | Clé | Libellé | Cochée quand |
 |---|---|---|
@@ -417,24 +418,30 @@ La page du rituel montre une frise de six étapes, calculée à partir de l'éta
 | `strategy` | Stratégie | Une stratégie est choisie (ou tout est déjà décidé) |
 | `needs` | Besoins | Les besoins sont confirmés (ou tout est déjà décidé) |
 | `decide` | Choix | Plus aucune ligne `UNDECIDED` |
-| `procedures` | Démarches | Pour chaque `SWITCH`, contrôle LCA confirmé et affiliation demandée ; chaque lettre nécessaire envoyée |
-| `confirmed` | Confirmé | Affiliations confirmées par les nouvelles caisses et résiliations confirmées par les anciennes |
+| `procedures` | Envoi | Pour chaque `SWITCH`, affiliation demandée ; chaque lettre nécessaire envoyée |
 
 « Hausse » est indépendante. Les suivantes sont **chaînées** : une étape n'est cochée que si
 toutes les précédentes (sauf « Hausse ») le sont.
 
-Code : `ritualSteps()` dans `src/domain/ritual-steps.ts`.
+Quand « Envoi » est cochée, le rituel est terminé (`isRitualComplete()`) : il se clôt seul.
+
+Code : `ritualSteps()` et `isRitualComplete()` dans `src/domain/ritual-steps.ts`.
 
 ### Clôture, réouverture, suppression
 
+- **Clôture automatique** (`syncReviewClosure()`) : appelée après chaque action qui change
+  l'avancement (dernier choix, courrier ou demande marqué envoyé, envoi annulé, envoi Pingen).
+  Elle clôt le rituel quand il est terminé et le rouvre s'il ne l'est plus. Une lettre refusée
+  par Pingen rouvre aussi son rituel (`reopenReviewOfFailedLetter()`).
 - **Clôturer** (`closeReview()`) : exige une décision pour chaque ligne. Crée, pour chaque
   personne, le contrat LAMal de l'année cible à partir du choix figé (`lamal_policy.source` =
-  `REVIEW`), puis passe le rituel en `CLOSED`. Un contrat de l'année cible saisi à la main
-  (`MANUAL`) bloque la clôture.
-- **Rouvrir** (`reopenReview()`) : retire les contrats créés par la clôture et repasse en
-  `OPEN`. Les décisions restent. Refusé si le rituel de l'année suivante s'appuie sur ces
-  contrats.
-- **Supprimer** (`deleteReview()`) : rouvre si besoin, puis supprime le rituel, ses lignes, ses
-  lettres et ses demandes d'offre (cascade). On revient à l'état d'avant.
+  `REVIEW`), puis passe le rituel en `CLOSED`. Un contrat de l'année cible saisi à la main ou
+  importé d'un PDF (`MANUAL`) est gardé tel quel.
+- **Rouvrir** (`reopenReview()`, bouton « Modifier mes choix ») : retire les contrats créés par
+  la clôture et repasse en `OPEN`. Les décisions restent. Refusé si le rituel de l'année
+  suivante s'appuie sur ces contrats.
+- **Supprimer** (`deleteReview()`, bouton « Recommencer à zéro ») : rouvre si besoin, puis
+  supprime le rituel, ses lignes, ses lettres et ses demandes d'offre (cascade). On revient à
+  l'état d'avant.
 
 Code : `src/application/review/close.ts`.

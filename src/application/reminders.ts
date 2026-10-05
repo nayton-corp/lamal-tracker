@@ -1,10 +1,9 @@
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { reviewDeadlines } from "@/domain/deadlines";
 import { pingenFailed } from "@/domain/pingen";
 import { letterReminders, type LetterProgress, type Reminder } from "@/domain/reminders";
 import type { Db } from "@/infrastructure/db/client";
-import { insurerLabel } from "@/domain/insurer";
-import { appUser, household, householdMember, insurer, letter, notificationLog, offerRequest, person, review, reviewLine } from "@/infrastructure/db/schema";
+import { appUser, household, householdMember, letter, notificationLog, person, review, reviewLine } from "@/infrastructure/db/schema";
 import type { MailDeps } from "./account-mail";
 import { logMailError } from "@/infrastructure/mail/mailer";
 import { householdNotificationKey } from "@/infrastructure/push/push";
@@ -20,14 +19,9 @@ const SIGNATURE = "\n\n— Primes LAMal\nCe message est automatique : n'y répon
 export function paperProgress(db: Db, householdId: number, targetYear: number): LetterProgress {
   const persons = db.select({ id: person.id }).from(person).where(eq(person.householdId, householdId)).all().length;
   const r = db.select().from(review).where(and(eq(review.householdId, householdId), eq(review.targetYear, targetYear))).get();
-  if (!r) return { closed: false, persons, keeping: 0, letters: 0, lettersSent: 0, awaiting: [] };
+  if (!r) return { closed: false, persons, keeping: 0, letters: 0, lettersSent: 0 };
   const lines = db.select({ decision: reviewLine.decision }).from(reviewLine).where(eq(reviewLine.reviewId, r.id)).all();
   const letters = db.select().from(letter).where(eq(letter.reviewId, r.id)).all();
-  const offers = db.select().from(offerRequest).where(eq(offerRequest.reviewId, r.id)).all();
-  const insurerIds = [...new Set([...letters, ...offers].map((x) => x.insurerId))];
-  const names = new Map(
-    (insurerIds.length ? db.select().from(insurer).where(inArray(insurer.id, insurerIds)).all() : []).map((i) => [i.id, insurerLabel(i)]),
-  );
   // Une lettre refusée par Pingen est à reprendre : elle compte comme non envoyée.
   const sent = (l: typeof letter.$inferSelect) => Boolean(l.sentAt) && !pingenFailed(l.pingenStatus);
   return {
@@ -36,14 +30,6 @@ export function paperProgress(db: Db, householdId: number, targetYear: number): 
     keeping: lines.filter((l) => l.decision === "KEEP").length,
     letters: letters.length,
     lettersSent: letters.filter(sent).length,
-    awaiting: [
-      ...offers
-        .filter((o) => o.sentAt && !o.answeredAt)
-        .map((o) => ({ key: `offre-${o.id}`, insurer: names.get(o.insurerId) ?? "la caisse", what: "affiliation" as const, sentAt: o.sentAt!.slice(0, 10) })),
-      ...letters
-        .filter((l) => l.kind === "TERMINATION" && sent(l) && !l.acknowledgedAt)
-        .map((l) => ({ key: `lettre-${l.id}`, insurer: names.get(l.insurerId) ?? "la caisse", what: "fin du contrat" as const, sentAt: l.sentAt!.slice(0, 10) })),
-    ],
   };
 }
 
@@ -54,7 +40,7 @@ export interface ReminderDeps {
 }
 
 /**
- * Passe quotidienne : rappels d'envoi et relances de confirmation, foyer par foyer. Le push part
+ * Passe quotidienne : rappels d'envoi, foyer par foyer. Le push part
  * vers les appareils abonnés ; les rappels importants partent aussi par courriel aux membres dont
  * l'adresse est confirmée, une seule fois par foyer et par rappel.
  */

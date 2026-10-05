@@ -172,10 +172,6 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText("Selon chaque stratégie")).toBeVisible();
   await shot(page, "06-comparateur");
   await expectAccessible(page);
-  await page.getByRole("button", { name: "Simulateur de franchise" }).click();
-  await expect(page.getByText("Quelle franchise ?")).toBeVisible();
-  await shot(page, "07-simulateur");
-  await page.getByRole("button", { name: "Fermer" }).click();
 
   // Deux offres côte à côte
   const offerCards = page.locator("ol > li > details");
@@ -197,20 +193,14 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   const first = page.locator("ol > li > details").first();
   if (!(await first.getAttribute("open"))) await first.locator(":scope > summary").click();
   await first.getByRole("button", { name: /^Choisir/ }).click();
-  // Dernier choix fait : l'app enchaîne sur l'étape suivante, le garde-fou LCA (case à cocher puis confirmation).
-  await expect(page).toHaveURL(/\/rituel\/2027\/lca/);
-  await expect(page.getByText("Ne résiliez jamais votre LCA par erreur")).toBeVisible();
-  await expect(page.getByText("Hospitalisation demi-privée", { exact: true }).first()).toBeVisible();
-  await shot(page, "08-lca");
-  await expectAccessible(page);
-  const confirm = page.getByRole("button", { name: "J'ai compris, confirmer" });
-  await expect(confirm).toBeDisabled();
-  await page.getByText(/Seule l'assurance de base de Alex/).click();
-  await confirm.click();
-  await expect(page.getByText(/Confirmé le/)).toBeVisible();
+  // Dernier choix fait : l'app enchaîne directement sur les démarches (plus d'étape LCA séparée).
+  await expect(page).toHaveURL(/\/rituel\/2027\/lettres/);
   await page.goto("/rituel/2027");
   await expect(page.getByText("Je change de caisse")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Faire les démarches" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Envoyer les courriers" })).toBeVisible();
+  // L'ancienne adresse de l'étape LCA mène aux démarches.
+  await page.goto("/rituel/2027/lca");
+  await expect(page).toHaveURL(/\/rituel\/2027\/lettres/);
 
   // Adresse officielle de l'annuaire OFSP, modifiable au besoin
   await page.goto("/donnees/caisses");
@@ -248,6 +238,9 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText(/Signez à la main/)).toBeVisible();
   await expectAccessible(page);
   await expect(page.getByText(/avec offre de complémentaires/)).toBeVisible();
+  // Rappel sous la résiliation : les complémentaires continuent.
+  await expect(page.getByText(/Cette lettre ne résilie que l'assurance de base chez Helsana/)).toBeVisible();
+  await expect(page.getByText(/^Hospitalisation demi-privée, /)).toBeVisible();
   const offerHref = await page.getByRole("link", { name: "Ouvrir le PDF" }).first().getAttribute("href");
   expect(offerHref).toMatch(/\/api\/offers\/\d+\/pdf/);
   const offerPdf = await page.request.get(offerHref!);
@@ -275,8 +268,12 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
     await page.getByRole("button", { name: "Envoyer (test)" }).click();
     await expect(page.getByText(/En préparation chez Pingen/)).toBeVisible();
     await expect(page.getByText(/Confiée à Pingen le/)).toBeVisible();
+    // Tout est parti : le rituel se clôt tout seul…
+    await expect(page.getByText("Tout est envoyé", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Actualiser le suivi" }).click();
     await expect(page.getByText("Pingen n'a pas envoyé cette lettre")).toBeVisible();
+    // … et se rouvre quand Pingen refuse la lettre.
+    await expect(page.getByText("Tout est envoyé", { exact: true })).toHaveCount(0);
     await expect(page.getByText("À reprendre")).toBeVisible();
     await shot(page, "09a-pingen-refus");
     await page.getByRole("button", { name: "Reprendre la lettre" }).click();
@@ -288,17 +285,15 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByLabel("N° de suivi").fill("98.00.123456.12345678");
   await page.getByRole("button", { name: "Marquer comme envoyée" }).click();
   await expect(page.getByText("Suivi : 98.00.123456.12345678")).toBeVisible();
-  for (let i = 0; i < 2; i++) {
-    await page.getByRole("button", { name: "Reçue", exact: true }).first().click();
-    await expect(page.getByRole("button", { name: "Reçue", exact: true })).toHaveCount(1 - i);
-  }
-  await expect(page.getByRole("link", { name: /Clôturer le rituel/ })).toBeVisible();
+  // Dernier courrier envoyé : le rituel se clôt tout seul, sans étape de confirmations.
+  await expect(page.getByText("Tout est envoyé", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reçue", exact: true })).toHaveCount(0);
   await shot(page, "09-demarches");
 
-  // Clôture et historique
+  // Clôture automatique et historique
   await page.goto("/rituel/2027");
-  await page.getByRole("button", { name: "Clôturer le rituel 2027" }).click();
   await expect(page.getByText("Clôturé · contrats 2027 créés.")).toBeVisible();
+  await expect(page.getByText("C'est terminé")).toBeVisible();
   await page.getByRole("link", { name: "Historique" }).click();
   await expect(page.getByRole("heading", { name: "Historique" })).toBeVisible();
   await expect(page.getByRole("table")).toContainText("2027");
@@ -325,36 +320,41 @@ test.describe("sur ordinateur", () => {
       await shot(page, file);
     }
     await page.goto("/foyer");
-    await page.getByRole("link", { name: "Importer une police" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Importer une police" })).toBeVisible();
-    await shot(page, "d04b-import-police");
-    await page.goto("/foyer");
+    await expect(page.getByRole("link", { name: "Importer une police" })).toHaveCount(0);
     await page.getByRole("link", { name: /Alex Test/ }).click();
     await shot(page, "d05-personne");
+    // Ajouter un contrat : importer la police ou saisir à la main.
     await page.getByRole("button", { name: "Ajouter un contrat LAMal" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.waitForTimeout(300);
     await shot(page, "d06-dialogue");
+    await page.getByRole("dialog").getByRole("button", { name: /Saisir à la main/ }).click();
+    await expect(page.getByRole("dialog").getByLabel("Caisse-maladie")).toBeVisible();
     await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Ajouter un contrat LAMal" }).click();
+    await page.getByRole("dialog").getByRole("link", { name: /Importer le PDF de la police/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Importer une police" })).toBeVisible();
+    await shot(page, "d04b-import-police");
 
     // Rituel clôturé : on peut le rouvrir…
     await nav.getByRole("link", { name: /Rituel/ }).click();
     await expect(page.getByText("Clôturé · contrats 2027 créés.")).toBeVisible();
     await shot(page, "d07-rituel-cloture");
-    await page.getByRole("button", { name: "Rouvrir le rituel" }).click();
+    await page.getByRole("button", { name: "Modifier mes choix" }).click();
     await page.waitForTimeout(300);
     await shot(page, "d08-confirmation");
-    await page.getByRole("dialog").getByRole("button", { name: "Rouvrir" }).click();
-    await expect(page.getByRole("button", { name: "Clôturer le rituel 2027" })).toBeVisible();
+    await page.getByRole("dialog").getByRole("button", { name: "Modifier mes choix" }).click();
+    await expect(page.getByText("C'est terminé")).toHaveCount(0);
     await expect(page.getByText("Je change de caisse")).toBeVisible();
     await page.getByRole("link", { name: "Revoir" }).click();
     await expect(page.getByText("Sans rien faire en 2027")).toBeVisible();
     await shot(page, "d09-comparateur");
     await page.goto("/rituel/2027");
 
-    // … ou le supprimer complètement.
-    await page.getByRole("button", { name: "Supprimer ce rituel" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Supprimer le rituel" }).click();
+    // … ou recommencer à zéro.
+    await page.getByRole("button", { name: "Recommencer à zéro" }).click();
+    await expect(page.getByRole("dialog")).toContainText("Les courriers déjà postés ne sont pas annulés.");
+    await page.getByRole("dialog").getByRole("button", { name: "Recommencer", exact: true }).click();
     // Les primes sont publiées : une analyse vierge s'ouvre, sans aucun choix.
     await expect(page.getByRole("link", { name: "Choisir ma stratégie" }).first()).toBeVisible();
     await expect(page.getByText("Je change de caisse")).toHaveCount(0);

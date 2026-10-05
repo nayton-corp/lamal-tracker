@@ -15,7 +15,7 @@ import { scopeForUser, type Scope } from "@/application/scope";
 import { usageSummary } from "@/application/usage";
 import type { Reminder } from "@/domain/reminders";
 import { openDb, type Db } from "@/infrastructure/db/client";
-import { appUser, feedback, insurer, letter, offerRequest, person, review, tariffDataset } from "@/infrastructure/db/schema";
+import { appUser, feedback, insurer, letter, person, review, tariffDataset } from "@/infrastructure/db/schema";
 import { fileMailer } from "@/infrastructure/mail/mailer";
 import { testAccount, testHousehold } from "../accounts";
 
@@ -79,20 +79,8 @@ describe("rappels d'envoi et relances", () => {
     markLetterSent(db, owner, a, "2026-11-03", "98.00.1");
     const p = paperProgress(db, owner.householdId!, 2027);
     expect(p).toMatchObject({ letters: 2, lettersSent: 1 });
-    expect(p.awaiting).toEqual([expect.objectContaining({ key: `lettre-${a}`, what: "fin du contrat", sentAt: "2026-11-03" })]);
   });
 
-  it("relance la demande d'affiliation restée sans réponse trois semaines", async () => {
-    const { owner, reviewId } = household();
-    const insurerId = db.select().from(insurer).get()!.id;
-    db.insert(offerRequest).values({ reviewId: reviewId!, insurerId, lineIds: [], content: {}, sentAt: "2026-10-20" }).run();
-    addLetter(reviewId!, { sentAt: "2026-10-21", acknowledgedAt: "2026-10-28" });
-    const pushed: Reminder[] = [];
-    await reminderTick(db, { push: async (_, r) => void pushed.push(r), mail }, "2026-11-10", 2027);
-    expect(pushed.map((r) => r.key)).toEqual(["relance-offre-1"]);
-    expect(sent()[0]!.subject).toBe("Une confirmation de caisse-maladie se fait attendre");
-    expect(owner.householdId).not.toBeNull();
-  });
 });
 
 describe("avis envoyés depuis l'app", () => {

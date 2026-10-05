@@ -1,13 +1,12 @@
 import {
   bestPerInsurer,
-  cheapestPerFranchise,
   filterOffers,
   marketStats,
   rankOffers,
   type RankedOffer,
   type SortKey,
 } from "@/domain/comparison";
-import { breakEvenRp, costScenarios, franchiseCurve, type CostScenarios, type CurvePoint } from "@/domain/cost";
+import { costScenarios, type CostScenarios } from "@/domain/cost";
 import type { InsurerProfile } from "@/domain/insurer-profile";
 import type { ModelType } from "@/domain/lamal";
 import { coinsuranceMaxFor } from "@/domain/parameters";
@@ -49,13 +48,6 @@ export interface DetailedOffer extends RankedOffer {
   standardMonthlyRp: number | null;
 }
 
-/**
- * Courbe « coût total selon les frais de santé » : jusqu'à CHF 4'000 de frais pour un enfant,
- * CHF 10'000 pour un adulte, en `CURVE_POINTS` pas égaux.
- */
-const CURVE_MAX_HEALTH_COSTS_RP = { KID: 400_000, OTHER: 1_000_000 } as const;
-const CURVE_POINTS = 40;
-
 /** Identifiant d'une offre dans l'interface : un tarif a une prime par franchise. */
 export const offerKey = (o: { tariffId: number; franchiseChf: number }) => `${o.tariffId}-${o.franchiseChf}`;
 
@@ -70,7 +62,6 @@ export interface CompareView {
   renewal: { monthlyRp: number; totalRp: number; label: string | null; franchiseChf: number } | null;
   chosen: { tariffCode: string | null; franchiseChf: number | null; insurerId: number | null };
   currentInsurerId: number;
-  curve: { franchises: number[]; points: CurvePoint[]; breakEvenRp: number | null };
   /** Tarifs de l'assureur actuel (franchise de renouvellement), pour confirmer un renouvellement incertain. */
   renewalCandidates: { code: string; label: string; modelType: ModelType; monthlyRp: number }[];
   renewalStatus: string;
@@ -151,13 +142,6 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     standardMonthlyRp: standard.get(`${o.insurerId}-${o.franchiseChf}`) ?? null,
   }));
 
-  const cheapest = cheapestPerFranchise(filterOffers(all, { models: opts.models }));
-  const base = {
-    coinsuranceRateBp: params.coinsuranceRateBp,
-    coinsuranceMaxRp,
-    co2AnnualRp: params.co2AnnualRp,
-  };
-  const curveMaxRp = line.targetAgeClass === "KID" ? CURVE_MAX_HEALTH_COSTS_RP.KID : CURVE_MAX_HEALTH_COSTS_RP.OTHER;
   return {
     lineId,
     targetYear: r.targetYear,
@@ -172,11 +156,6 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     renewal,
     chosen: { tariffCode: line.chosenTariffCode, franchiseChf: line.chosenFranchiseChf, insurerId: line.chosenInsurerId },
     currentInsurerId: policy.insurerId,
-    curve: {
-      franchises: cheapest.map((o) => o.franchiseChf),
-      points: franchiseCurve(cheapest, base, curveMaxRp, curveMaxRp / CURVE_POINTS),
-      breakEvenRp: breakEvenRp(cheapest, base, curveMaxRp * 2),
-    },
     renewalCandidates: [...new Map(
       all
         .filter((o) => o.insurerId === policy.insurerId && o.franchiseChf === line.renewalFranchiseChf)

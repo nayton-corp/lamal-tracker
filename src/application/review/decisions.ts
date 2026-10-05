@@ -3,9 +3,9 @@ import { eq } from "drizzle-orm";
 import { costOf } from "@/domain/comparison";
 import type { Db } from "@/infrastructure/db/client";
 import { offersFor, parametersFor } from "@/infrastructure/db/queries";
-import { person, reviewLine, tariffLineage } from "@/infrastructure/db/schema";
+import { reviewLine, tariffLineage } from "@/infrastructure/db/schema";
 import { UserError } from "../errors";
-import { ownedLine, type Scope } from "../scope";
+import { type Scope } from "../scope";
 import { premiumProfileFor, renewalFor, loadLine, linesWithSentLetter } from "./lines";
 
 /** Confirme à quel tarif de l'année cible correspond le tarif actuel, puis recalcule la ligne. */
@@ -99,30 +99,3 @@ export function undoDecision(db: Db, scope: Scope, lineId: number) {
     .run();
 }
 
-/** Contrôle des complémentaires LCA confirmé : condition pour préparer une résiliation (domain/review.ts). */
-export function acknowledgeLca(db: Db, scope: Scope, lineId: number, nowIso: string) {
-  loadLine(db, scope, lineId);
-  db.update(reviewLine).set({ lcaAckAt: nowIso }).where(eq(reviewLine.id, lineId)).run();
-}
-
-/**
- * Cases à cocher d'une ligne : médecin vérifié dans la liste du modèle (`doctorCheck`), affiliation
- * demandée ou confirmée par la nouvelle caisse (dates ; null annule).
- */
-export function setLineFlags(
-  db: Db,
-  scope: Scope,
-  lineId: number,
-  flags: { doctorCheck?: "YES" | "NO" | "UNKNOWN"; affiliationRequestedAt?: string | null; affiliationConfirmedAt?: string | null },
-) {
-  loadLine(db, scope, lineId);
-  if (flags.doctorCheck !== undefined && !["YES", "NO", "UNKNOWN"].includes(flags.doctorCheck)) throw new UserError("Réponse inconnue.");
-  db.update(reviewLine).set(flags).where(eq(reviewLine.id, lineId)).run();
-}
-
-/** Frais de santé attendus de la personne d'une ligne (comparateur). */
-export function setHealthCosts(db: Db, scope: Scope, lineId: number, amountRp: number) {
-  if (!Number.isInteger(amountRp) || amountRp < 0) throw new UserError("Montant invalide.");
-  const line = ownedLine(db, scope, lineId);
-  db.update(person).set({ healthCostsRp: amountRp }).where(eq(person.id, line.personId)).run();
-}

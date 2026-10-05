@@ -9,7 +9,6 @@ import { listInsurers, saveHousehold, saveInsurer, saveLca, savePerson, savePoli
 import { generateLetters, getLetter, markLetterSent } from "@/application/letters";
 import { generateOfferRequests, lcaWishesFor, listOfferRequests, markOfferRequestSent, setLcaWishes } from "@/application/offers";
 import {
-  acknowledgeLca,
   closeReview,
   deleteReview,
   getReviewByYear,
@@ -19,6 +18,7 @@ import {
   keepAsIs,
   openReview,
   reopenReview,
+  syncReviewClosure,
   undoDecision,
 } from "@/application/review";
 import { UserError } from "@/application/errors";
@@ -105,7 +105,7 @@ describe("rituel annuel", () => {
     expect(view.deadlines.receiptDeadline).toBe("2026-11-30");
     expect(adult!.bestOffer?.insurerName).toBe("Assura");
     expect(view.totals.potentialAnnualSavingsRp).toBeGreaterThan(0);
-    expect(adult!.lcaWarnings[0]!.level).toBe("danger");
+    expect(adult!.lcaProducts).toEqual(["Hospitalisation mi-privée, Helsana Assurances complémentaires SA"]);
   });
 
   it("confirme une lignée", () => {
@@ -127,7 +127,7 @@ describe("rituel annuel", () => {
 
     let view = getReviewView(db, scope, 1, TODAY);
     expect(view.steps.map((s) => [s.key, s.done])).toEqual([
-      ["renewal", true], ["strategy", false], ["needs", false], ["decide", false], ["procedures", false], ["confirmed", false],
+      ["renewal", true], ["strategy", false], ["needs", false], ["decide", false], ["procedures", false],
     ]);
 
     setStrategy(db, scope, 1, "KEEP");
@@ -167,7 +167,6 @@ describe("rituel annuel", () => {
     expect(cmp.matchingOffers).toBeGreaterThan(cmp.offers.length);
     expect(cmp.offers[0]!.rank).toBe(1);
     expect(cmp.renewal?.franchiseChf).toBe(2500);
-    expect(cmp.curve.points.length).toBeGreaterThan(10);
     const best = cmp.offers[0]!;
     expect(decide(db, scope, lines.adult, { tariffId: best.tariffId, franchiseChf: best.franchiseChf }, NOW)).toBe("SWITCH");
 
@@ -199,17 +198,16 @@ describe("rituel annuel", () => {
     expect(generateOfferRequests(db, scope, 1, TODAY)).toEqual([]);
   });
 
-  it("refuse la résiliation sans contrôle LCA ; l'adresse officielle suffit", () => {
+  it("prépare les lettres sans étape LCA ; l'adresse officielle suffit", () => {
     const res = generateLetters(db, scope, 1, TODAY);
+    expect(res.blocked).toEqual([]);
+    expect(res.created).toHaveLength(2);
     // Noa change seulement de modèle chez CSS : l'adresse de l'annuaire officiel suffit.
-    expect(res.created).toHaveLength(1);
-    expect(getLetter(db, scope, res.created[0]!)!.content.insurerLines).toEqual(["CSS Assurance-maladie SA", "Tribschenstrasse 21", "Postfach 2568", "6002 Luzern"]);
-    expect(res.blocked.map((b) => b.person)).toEqual(["Alex Test"]);
-    expect(res.blocked[0]!.reasons.join(" ")).toMatch(/LCA/);
+    const change = res.created.map((id) => getLetter(db, scope, id)!).find((l) => l.kind === "CHANGE")!;
+    expect(change.content.insurerLines).toEqual(["CSS Assurance-maladie SA", "Tribschenstrasse 21", "Postfach 2568", "6002 Luzern"]);
   });
 
-  it("génère les lettres une fois les garde-fous levés", () => {
-    acknowledgeLca(db, scope, lines.adult, NOW);
+  it("génère les lettres avec les adresses de résiliation saisies", () => {
     saveInsurer(db, scope, { id: insurerId(1562), terminationAddress: "Case postale\n8081 Zurich" }, NOW);
     saveInsurer(db, scope, { id: insurerId(8), terminationAddress: "Case postale 2568\n6002 Lucerne" }, NOW);
     const res = generateLetters(db, scope, 1, TODAY);
@@ -245,6 +243,23 @@ describe("rituel annuel", () => {
     expect(decide(db, scope, lines.teen, { tariffId: other.tariffId, franchiseChf: other.franchiseChf }, NOW)).toBe("ADJUST");
     expect(generateLetters(db, scope, 1, TODAY).created).toHaveLength(1);
     expect(getReviewView(db, scope, 1, TODAY).letters).toHaveLength(2);
+  });
+
+  it("se clôt toute seule quand le dernier courrier est envoyé, et se rouvre si un envoi est annulé", () => {
+    expect(syncReviewClosure(db, scope, 1, TODAY, NOW)).toBeNull();
+    const unsent = getReviewView(db, scope, 1, TODAY).letters.find((l) => !l.sentAt)!;
+    markLetterSent(db, scope, unsent.id, TODAY, null);
+    expect(syncReviewClosure(db, scope, 1, TODAY, NOW)).toBe("closed");
+    expect(getReviewByYear(db, scope, 2027)?.status).toBe("CLOSED");
+    expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(2);
+
+    const offer = listOfferRequests(db, scope, 1).find((o) => o.sentAt)!;
+    markOfferRequestSent(db, scope, offer.id, null);
+    expect(syncReviewClosure(db, scope, 1, TODAY, NOW)).toBe("reopened");
+    expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(0);
+    markOfferRequestSent(db, scope, offer.id, TODAY);
+    expect(syncReviewClosure(db, scope, 1, TODAY, NOW)).toBe("closed");
+    reopenReview(db, scope, 1);
   });
 
   it("clôt la revue et crée les contrats de l'année suivante", () => {
@@ -287,9 +302,12 @@ describe("rituel annuel", () => {
       personId: adult.person.id, coverageYear: 2027, insurerId: insurerId(1562), policyNumber: "HEL-2027",
       tariffCode: null, tariffLabel: null, modelType: "STANDARD", franchiseChf: 300, accident: false, billedMonthlyRp: 45000,
     });
-    expect(() => closeReview(db, scope, 1, NOW)).toThrow(/2027 saisi à la main existe déjà pour Alex/);
-    expect(getReviewByYear(db, scope, 2027)?.status).toBe("OPEN");
-    expect(db.select().from(lamalPolicy).where(byPerson).get()?.insurerId).toBe(insurerId(1562));
+    // Saisi à la main (ou importé d'un PDF) : c'est le vrai contrat, la clôture le garde, la réouverture aussi.
+    closeReview(db, scope, 1, NOW);
+    expect(getReviewByYear(db, scope, 2027)?.status).toBe("CLOSED");
+    expect(db.select().from(lamalPolicy).where(byPerson).get()).toMatchObject({ id: manualId, source: "MANUAL", billedMonthlyRp: 45000 });
+    reopenReview(db, scope, 1);
+    expect(db.select().from(lamalPolicy).where(byPerson).get()?.id).toBe(manualId);
 
     // Importé (OFSP) : la décision l'emporte et le contrat est repris par la clôture.
     db.update(lamalPolicy).set({ source: "OFSP" }).where(eq(lamalPolicy.id, manualId)).run();

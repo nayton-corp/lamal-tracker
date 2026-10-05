@@ -25,13 +25,19 @@ const toRp = (s: string) => {
  * Import d'une police PDF : le texte est lu sur le serveur, les contrats proposés sont
  * vérifiés puis enregistrés. `initial` : analyse déjà faite (accueil depuis la police).
  */
-export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
+export function ImportFlow({ insurers, years, hasPersons, initial, onSaved, focus, backHref = "/foyer" }: {
   insurers: { id: number; name: string }[];
   years: number[];
   hasPersons: boolean;
   initial?: PolicyImport | null;
-  /** Appelé après l'enregistrement (accueil guidé) ; sinon un lien ramène au foyer. */
+  /** Appelé après l'enregistrement (accueil guidé) ; sinon un lien ramène à `backHref`. */
   onSaved?: () => void;
+  /**
+   * Import lancé depuis la fiche d'une personne : elle seule est cochée d'office ; les autres
+   * personnes d'une police familiale sont proposées, décochées.
+   */
+  focus?: { personId: number; firstName: string };
+  backHref?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -64,7 +70,8 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
     setResult(res.result);
     setInsurerId(res.result.insurerId ? String(res.result.insurerId) : "");
     setYear(res.result.year);
-    setRows(res.result.persons.map((p) => ({ ...p, include: true, premium: rpToInput(p.billedMonthlyRp), lcaKeep: p.lca.map(() => true) })));
+    const persons = focus ? [...res.result.persons].sort((a, b) => Number(b.personId === focus.personId) - Number(a.personId === focus.personId)) : res.result.persons;
+    setRows(persons.map((p) => ({ ...p, include: !focus || p.personId === focus.personId, premium: rpToInput(p.billedMonthlyRp), lcaKeep: p.lca.map(() => true) })));
   }
 
   function analyze(file: File | undefined) {
@@ -130,7 +137,7 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
           <FormError message={error} />
           {done && (
             <Alert tone="success" title={done}>
-              {!onSaved && <Link href="/foyer" className="text-primary underline">Retour au foyer</Link>}
+              {!onSaved && <Link href={backHref} className="text-primary underline">{focus ? `Retour à ${focus.firstName}` : "Retour au foyer"}</Link>}
             </Alert>
           )}
         </Card>
@@ -145,6 +152,11 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
                   <li key={w}>{w}</li>
                 ))}
               </ul>
+            </Alert>
+          )}
+          {focus && !rows.some((r) => r.personId === focus.personId) && (
+            <Alert tone="info" title={`${focus.firstName} n'apparaît pas dans cette police`}>
+              La personne est retrouvée par sa date de naissance : vérifiez celle de la fiche, ou saisissez le contrat à la main.
             </Alert>
           )}
           <Card className="grid grid-cols-2 gap-3">
@@ -171,6 +183,9 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
 
           {rows.map((r, i) => (
             <Card key={r.personId} className="space-y-3">
+              {focus && r.personId !== focus.personId && rows.findIndex((x) => x.personId !== focus.personId) === i && (
+                <p className="text-sm font-medium text-muted">Aussi dans cette police</p>
+              )}
               <div className="flex items-start justify-between gap-2">
                 <Checkbox checked={r.include} onChange={(e) => update(i, { include: e.target.checked })} label={<span className="font-semibold">{r.name}</span>} />
                 {r.matched ? (

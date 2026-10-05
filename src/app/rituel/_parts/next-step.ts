@@ -1,7 +1,7 @@
 import type { ReviewView } from "@/application/review";
 import { isStepDone, needsLetter } from "@/domain/ritual-steps";
 
-export type NextStepKind = "strategy" | "needs" | "compare" | "lca" | "procedures" | "confirm" | "close" | "none";
+export type NextStepKind = "strategy" | "needs" | "compare" | "procedures" | "none";
 
 export interface NextStep {
   kind: NextStepKind;
@@ -9,7 +9,10 @@ export interface NextStep {
   label: string;
 }
 
-/** Prochaine étape du parcours du rituel, dans l'ordre : stratégie, besoins, choix, LCA, démarches. */
+/**
+ * Prochaine étape du parcours du rituel, dans l'ordre : stratégie, besoins, choix, envoi. Une fois
+ * tout envoyé, le rituel se clôt de lui-même (application/review/close.ts) : « none ».
+ */
 export function nextStep(view: ReviewView): NextStep {
   const year = view.review.targetYear;
   const base = `/rituel/${year}`;
@@ -22,11 +25,7 @@ export function nextStep(view: ReviewView): NextStep {
     return { kind: "needs", href: `${base}/besoins`, label: "Préciser mes besoins" };
   }
   if (undecided.length > 0) return { kind: "compare", href: `${base}/comparer`, label: undecided.length === view.lines.length ? "Comparer les offres" : `Comparer pour ${undecided[0]!.person.firstName}` };
-  if (view.lines.some((p) => p.line.decision === "SWITCH" && !p.line.lcaAckAt)) return { kind: "lca", href: `${base}/lca`, label: "Vérifier les complémentaires" };
   const needsLetters = view.lines.some((p) => needsLetter(p.line.decision));
-  const proceduresDone = isStepDone(view.steps, "procedures");
-  if (needsLetters && !proceduresDone) return { kind: "procedures", href: `${base}/lettres`, label: "Faire les démarches" };
-  // Courriers envoyés : il reste à cocher les confirmations reçues (décembre, janvier) avant de clôturer.
-  if (needsLetters && !isStepDone(view.steps, "confirmed")) return { kind: "confirm", href: `${base}/lettres`, label: "Cocher les confirmations reçues" };
-  return { kind: "close", href: base, label: "Clôturer le rituel" };
+  if (needsLetters && !isStepDone(view.steps, "procedures")) return { kind: "procedures", href: `${base}/lettres`, label: "Envoyer les courriers" };
+  return { kind: "none", href: base, label: "Voir le rituel" };
 }

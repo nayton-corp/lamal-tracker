@@ -114,7 +114,7 @@ export function Awareness({ view, detailed, cta = true }: { view: ReviewView; de
         </p>
       )}
 
-      {cta && !closed && step.kind !== "close" && (
+      {cta && !closed && step.kind !== "none" && (
         <Button asChild block size="lg" variant="secondary" className="border-0 text-primary">
           <Link href={step.href}>
             {step.label} <ArrowRight aria-hidden className="size-5" />
