@@ -39,7 +39,7 @@ export async function opsTick(db: Db, deps: OpsDeps, nowIso: string): Promise<st
   const failures =
     db.select({ n: count() }).from(auditEvent).where(and(inArray(auditEvent.kind, ["LOGIN_FAILED", "MFA_FAILED", "LOCKED"]), gte(auditEvent.createdAt, hourAgo))).get()?.n ?? 0;
   if (failures >= LOGIN_FAILURES_PER_HOUR) {
-    alerts.push({ key: `ops:echecs:${day}`, subject: "Vague d'échecs de connexion", text: `${failures} échecs de connexion ou de double facteur dans la dernière heure. Les comptes visés sont verrouillés progressivement ; Vérifiez dans l'administration qu'aucun compte n'a changé sans raison.` });
+    alerts.push({ key: `ops:echecs:${day}`, subject: "Vague d'échecs de connexion", text: `${failures} échecs de connexion ou de double facteur dans la dernière heure. Les comptes visés sont verrouillés progressivement ; vérifiez dans l'administration qu'aucun compte n'a changé sans raison.` });
   }
 
   if (!deps.mail || alerts.length === 0) return [];

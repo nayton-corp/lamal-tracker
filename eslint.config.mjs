@@ -11,7 +11,7 @@ const config = [
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [{ group: ["@/infrastructure/*", "@/application/*", "@/app/*", "@/server/*", "@/ui/*", "next", "next/*", "react", "drizzle-orm", "drizzle-orm/*", "node:*"], message: "Le domaine doit rester pur." }] },
+        { patterns: [{ group: ["@/infrastructure/*", "@/application/*", "@/app/*", "@/server/*", "@/ui/*", "next", "next/*", "react", "drizzle-orm", "drizzle-orm/*", "node:*", "**/infrastructure/**", "**/application/**", "**/server/**", "**/ui/**", "fs", "path", "crypto", "os", "child_process"], message: "Le domaine doit rester pur." }] },
       ],
     },
   },

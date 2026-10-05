@@ -112,7 +112,7 @@ export const USAGE_INFO: Record<UsageProfile, { label: string; example: string; 
   HEAVY: { label: "Traitement lourd", example: "Opération prévue, maladie chronique, grossesse.", healthCostsRp: 1_000_000 },
 };
 
-/** Profil le plus proche d'un montant de frais (pour pré-cocher le questionnaire). */
+/** Profil dont le montant de frais est exactement celui-ci (pour pré-cocher le questionnaire) ; null sinon. */
 export function usageFor(healthCostsRp: Rappen): UsageProfile | null {
   return USAGE_PROFILES.find((u) => USAGE_INFO[u].healthCostsRp === healthCostsRp) ?? null;
 }

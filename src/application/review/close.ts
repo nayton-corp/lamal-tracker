@@ -40,7 +40,7 @@ export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: stri
         billedMonthlyRp: l.chosenMonthlyRp!,
         source: "REVIEW" as const,
       };
-      // Un contrat importé (OFSP) ou issu d'une clôture précédente est remplacé par la décision.
+      // Un contrat non saisi à la main (clôture précédente de ce rituel) est remplacé par la décision.
       if (existing) tx.update(lamalPolicy).set(values).where(eq(lamalPolicy.id, existing.id)).run();
       else tx.insert(lamalPolicy).values(values).run();
     }

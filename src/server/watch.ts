@@ -4,7 +4,7 @@ import path from "node:path";
 import { opsTick } from "@/application/ops";
 import { reminderTick } from "@/application/reminders";
 import { getSetting, setSetting, SETTING_KEYS } from "@/infrastructure/db/settings";
-import { householdKey, notify } from "@/infrastructure/push/push";
+import { householdNotificationKey, notify } from "@/infrastructure/push/push";
 import { remoteSignature, resolvePremiumsUrl, type RemoteSignature } from "@/infrastructure/ofsp/source";
 import { yearAttemptKey, yearRetryDue } from "@/infrastructure/ofsp/retry";
 import { activeDataset } from "@/infrastructure/db/queries";
@@ -71,7 +71,7 @@ export async function sendDeadlineReminders(): Promise<void> {
   await reminderTick(
     db(),
     {
-      push: (householdId, r) => notify(db(), { householdId }, { title: r.title, body: r.body, url: r.url }, householdKey(householdId, r.key)),
+      push: (householdId, r) => notify(db(), { householdId }, { title: r.title, body: r.body, url: r.url }, householdNotificationKey(householdId, r.key)),
       mail: mailDeps(),
     },
     today(),

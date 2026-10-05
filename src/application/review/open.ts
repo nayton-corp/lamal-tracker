@@ -15,7 +15,7 @@ import { renewalFor, currentPolicy } from "./lines";
 export function openReview(db: Db, scope: Scope, targetYear: number): { reviewId: number; skipped: string[] } {
   const householdRow = { id: householdIdOf(scope) };
   const dataset = activeDataset(db, targetYear);
-  if (!dataset) throw new UserError(`Les primes ${targetYear} ne sont pas encore importées (page Données).`);
+  if (!dataset) throw new UserError(`Les primes ${targetYear} ne sont pas encore importées (Réglages).`);
 
   let row = db.select().from(review).where(and(eq(review.householdId, householdRow.id), eq(review.targetYear, targetYear))).get();
   if (!row) {

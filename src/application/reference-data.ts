@@ -31,7 +31,7 @@ export function legalParameters(db: Db, year: number): LamalParameters {
   return parametersFor(db, year);
 }
 
-/** Derniers contrôles automatiques : primes OFSP et référentiel (page Données). */
+/** Derniers contrôles automatiques : primes OFSP et référentiel (Réglages). */
 export function lastDataChecks(db: Db) {
   return {
     premiums: getSetting<{ at: string; ok: boolean }>(db, SETTING_KEYS.ofspLastCheck),
@@ -49,7 +49,10 @@ export function listParameters(db: Db) {
   return db.select().from(lamalParameters).orderBy(desc(lamalParameters.year)).all();
 }
 
-/** Montant annuel de la redistribution CO2 saisi à la main ; null efface la saisie. */
+/**
+ * Montant annuel de la redistribution CO2 saisi à la main (null : montant inconnu). La saisie reste
+ * prioritaire sur le montant officiel jusqu'à `resetCo2`.
+ */
 export function saveCo2(db: Db, scope: Scope, year: number, amountRp: number | null) {
   requireAdmin(scope);
   db.update(lamalParameters).set({ co2AnnualRp: amountRp, co2Source: "USER", sourceNote: "Saisi manuellement" }).where(eq(lamalParameters.year, year)).run();

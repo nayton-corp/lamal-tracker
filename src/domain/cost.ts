@@ -74,12 +74,12 @@ export function franchiseCurve(
 ): CurvePoint[] {
   if (options.length === 0) return [];
   const points: CurvePoint[] = [];
-  for (let householdRow = 0; householdRow <= maxHealthCostsRp; householdRow += stepRp) {
+  for (let costRp = 0; costRp <= maxHealthCostsRp; costRp += stepRp) {
     const totals = options.map(
-      (o) => annualCost({ ...base, ...o, healthCostsRp: householdRow }).totalRp,
+      (o) => annualCost({ ...base, ...o, healthCostsRp: costRp }).totalRp,
     );
     const bestIdx = totals.indexOf(Math.min(...totals));
-    points.push({ healthCostsRp: householdRow, totals, bestFranchiseChf: options[bestIdx]!.franchiseChf });
+    points.push({ healthCostsRp: costRp, totals, bestFranchiseChf: options[bestIdx]!.franchiseChf });
   }
   return points;
 }

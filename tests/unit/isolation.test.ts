@@ -84,7 +84,7 @@ function insurerId(bag: number) {
 }
 
 /** Un foyer complet : personne, contrat, complémentaire, signature, rituel décidé, lettre et demande d'offre. */
-function household_(name: string): Fixture {
+function makeHousehold(name: string): Fixture {
   let scope = testAccount(db);
   scope = withHousehold(scope, saveHousehold(db, scope, { name, street: "Rue du Lac 1", postalCode: "1003", city: "Lausanne", canton: "VD", region: 1 }));
   setHouseholdMode(db, scope, "SOLO");
@@ -128,8 +128,8 @@ beforeAll(async () => {
   db = openDb(":memory:");
   await importPremiumFile(db, path.join(FIXTURES_DIR, "primes-2026.xlsx"), "test");
   await importPremiumFile(db, path.join(FIXTURES_DIR, "primes-2027.xlsx"), "test");
-  a = household_("Alex");
-  b = household_("Bea");
+  a = makeHousehold("Alex");
+  b = makeHousehold("Bea");
 });
 
 describe("cloisonnement des foyers", () => {

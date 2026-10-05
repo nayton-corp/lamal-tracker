@@ -83,7 +83,7 @@ async function main() {
     console.log(`Téléchargement : ${source}`);
     file = await download(source, path.join(os.tmpdir(), "lamal-downloads"));
   } else {
-    console.error("Usage : cli import <fichier> | download | url | archives | download-archives");
+    console.error("Usage : cli import <fichier> | inspect <fichier> | download | url | archives | download-archives");
     process.exit(2);
   }
   const started = Date.now();

@@ -7,7 +7,7 @@ import { insurerLabel } from "@/domain/insurer";
 import { insurer, letter, review } from "@/infrastructure/db/schema";
 import { createPingenClient, pingenConfig, type PingenClient } from "@/infrastructure/pingen/client";
 import { renderLetterPdf } from "@/infrastructure/pdf/letter-pdf";
-import { householdKey, notify } from "@/infrastructure/push/push";
+import { householdNotificationKey, notify } from "@/infrastructure/push/push";
 import { db, nowIso } from "./context";
 
 /*
@@ -54,7 +54,7 @@ export async function pingenTick(): Promise<void> {
       db(),
       { householdId: row.householdId },
       { title: "Lettre non envoyée par Pingen", body: `Le courrier à ${insurerLabel(row.insurer)} doit être repris : ouvrez les démarches.`, url: `/rituel/${row.year}/lettres` },
-      householdKey(row.householdId, `pingen-echec-${id}`),
+      householdNotificationKey(row.householdId, `pingen-echec-${id}`),
     );
   }
   if (result.errors.length) console.error("[pingen]", result.errors.join(" ; "));

@@ -19,8 +19,8 @@ export const metadata = { title: "Historique" };
 
 export default async function HistoryPage() {
   const scope = await pageScope();
-  const householdRow = householdHistory(db(), scope);
-  if (householdRow.years.length === 0) {
+  const history = householdHistory(db(), scope);
+  if (history.years.length === 0) {
     return (
       <Page>
         <PageHeader title="Historique" />
@@ -30,14 +30,14 @@ export default async function HistoryPage() {
       </Page>
     );
   }
-  const s = householdRow.stats;
+  const s = history.stats;
   const saved = s.reviewSavings.reduce((a, x) => a + Math.max(x.annualRp, 0), 0);
-  const last = householdRow.totals.at(-1)!;
+  const last = history.totals.at(-1)!;
   return (
     <Page wide>
-      <PageHeader title="Historique" subtitle={`${householdRow.years[0]}–${householdRow.years.at(-1)} · primes réellement payées, comparées au marché`} />
+      <PageHeader title="Historique" subtitle={`${history.years[0]}–${history.years.at(-1)} · primes réellement payées, comparées au marché`} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label={`Payé depuis ${householdRow.years[0]}`} value={<Chf rp={s.totalPaidRp} whole />} hint="Primes LAMal du foyer, avant redistribution CO2." />
+        <Stat label={`Payé depuis ${history.years[0]}`} value={<Chf rp={s.totalPaidRp} whole />} hint="Primes LAMal du foyer, avant redistribution CO2." />
         <Stat
           label="Économisé grâce aux rituels"
           value={<Chf rp={saved} whole />}
@@ -60,22 +60,22 @@ export default async function HistoryPage() {
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:space-y-0">
         <Section title="Votre foyer et le marché">
           <Card>
-            <MarketChart totals={householdRow.totals} />
+            <MarketChart totals={history.totals} />
           </Card>
         </Section>
         <Section title="Foyer, prime mensuelle">
           <Card>
-            <TotalsChart totals={householdRow.totals} />
+            <TotalsChart totals={history.totals} />
           </Card>
         </Section>
         <Section title="Par personne, après redistribution CO2">
           <Card>
-            <PersonChart persons={householdRow.persons} years={householdRow.years} />
+            <PersonChart persons={history.persons} years={history.years} />
           </Card>
         </Section>
         <Section title="Parcours de chaque personne">
           <Card className="space-y-4">
-            {householdRow.persons.map((p) => (
+            {history.persons.map((p) => (
               <div key={p.personId} className="space-y-1">
                 <p className="font-medium">{p.name}</p>
                 <ol className="space-y-1 text-sm">
@@ -111,17 +111,17 @@ export default async function HistoryPage() {
             <thead className="bg-surface-2 text-left">
               <tr>
                 <th scope="col" className="p-3">Année</th>
-                {householdRow.persons.map((p) => (
+                {history.persons.map((p) => (
                   <th key={p.personId} scope="col" className="p-3 text-right">{p.name}</th>
                 ))}
                 <th scope="col" className="p-3 text-right">Foyer</th>
               </tr>
             </thead>
             <tbody>
-              {[...householdRow.totals].reverse().map((t) => (
+              {[...history.totals].reverse().map((t) => (
                 <tr key={t.year} className="border-t border-border">
                   <th scope="row" className="p-3 text-left tabular">{t.year}</th>
-                  {householdRow.persons.map((p) => {
+                  {history.persons.map((p) => {
                     const pt = p.points.find((x) => x.year === t.year);
                     return (
                       <td key={p.personId} className="p-3 text-right align-top">

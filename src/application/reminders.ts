@@ -7,6 +7,7 @@ import { insurerLabel } from "@/domain/insurer";
 import { appUser, household, householdMember, insurer, letter, notificationLog, offerRequest, person, review, reviewLine } from "@/infrastructure/db/schema";
 import type { MailDeps } from "./account-mail";
 import { logMailError } from "@/infrastructure/mail/mailer";
+import { householdNotificationKey } from "@/infrastructure/push/push";
 
 /*
  * Rappels du rituel, envoyés par le planificateur (server/watch.ts) : avancement des courriers de
@@ -52,8 +53,6 @@ export interface ReminderDeps {
   mail: MailDeps | null;
 }
 
-const householdLogKey = (householdId: number, key: string) => `h${householdId}:${key}`;
-
 /**
  * Passe quotidienne : rappels d'envoi et relances de confirmation, foyer par foyer. Le push part
  * vers les appareils abonnés ; les rappels importants partent aussi par courriel aux membres dont
@@ -66,7 +65,7 @@ export async function reminderTick(db: Db, deps: ReminderDeps, today: string, ta
     for (const r of reminders) {
       await deps.push(householdRow.id, r);
       if (!r.mail || !deps.mail) continue;
-      const logKey = householdLogKey(householdRow.id, `courriel:${r.key}`);
+      const logKey = householdNotificationKey(householdRow.id, `courriel:${r.key}`);
       if (db.select().from(notificationLog).where(eq(notificationLog.key, logKey)).get()) continue;
       const recipients = db
         .select({ email: appUser.email })

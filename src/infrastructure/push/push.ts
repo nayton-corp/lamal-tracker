@@ -129,7 +129,7 @@ export async function notify(db: Db, audience: Audience, msg: PushMessage, dedup
   return sent;
 }
 
-/** Clé de dédoublonnage propre à un foyer. */
-export function householdKey(householdId: number, key: string): string {
+/** Clé de dédoublonnage (journal des notifications) propre à un foyer : « h<id>:<clé> ». */
+export function householdNotificationKey(householdId: number, key: string): string {
   return `h${householdId}:${key}`;
 }

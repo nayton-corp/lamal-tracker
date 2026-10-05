@@ -20,8 +20,6 @@ import { COOKIE } from "./cookie-names";
  * serveur le refont elles-mêmes (`pageScope`, `requireScope`), pour ne pas dépendre du seul proxy.
  * Le foyer de chaque requête vient de la session, jamais d'un paramètre du navigateur.
  */
-/** Jeton d'appareil de longue durée : reconnaît un appareil déjà utilisé (alerte sinon). */
-
 /** Session du cookie, prolongée au passage ; null si absente ou expirée. */
 export async function currentSession(): Promise<SessionInfo | null> {
   return touchSession(db(), await readCookie(COOKIE.session), nowIso());
@@ -68,8 +66,8 @@ export async function accountPageScope(): Promise<Scope & { sessionId: string }>
 }
 
 async function startSession(userId: number, confirmed: boolean): Promise<string> {
-  const householdRow = await headers();
-  const device = describeDevice(householdRow.get("user-agent"));
+  const requestHeaders = await headers();
+  const device = describeDevice(requestHeaders.get("user-agent"));
   const { token } = openSession(db(), userId, device, nowIso(), confirmed);
   await writeCookie(COOKIE.session, token, SESSION_MAX_DAYS * 86_400);
   return device;

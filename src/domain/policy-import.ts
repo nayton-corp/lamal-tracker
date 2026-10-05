@@ -363,7 +363,7 @@ export function readYear(text: string, minYear: number, maxYear: number): number
 }
 
 /**
- * Caisse la plus citée. Le nom de groupe (`groupName`, partagé par plusieurs caisses) pèse peu ;
+ * Caisse la plus citée. Le nom de groupe (`group`, partagé par plusieurs caisses) pèse peu ;
  * une égalité parfaite entre deux caisses ne tranche pas (la prime exacte le fera).
  */
 export function findInsurer(text: string, insurers: readonly ImportInsurer[]): number | null {
