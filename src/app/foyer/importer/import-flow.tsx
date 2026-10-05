@@ -12,10 +12,10 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
+import { rpToInput } from "@/domain/money";
 
 type Row = ImportedPerson & { include: boolean; premium: string; lcaKeep: boolean[] };
 
-const toChf = (rp: number | null) => (rp === null ? "" : (rp / 100).toFixed(2));
 const toRp = (s: string) => {
   const n = Number(s.replace(/[\s'’]/g, "").replace(",", "."));
   return s.trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
@@ -64,7 +64,7 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
     setResult(res.result);
     setInsurerId(res.result.insurerId ? String(res.result.insurerId) : "");
     setYear(res.result.year);
-    setRows(res.result.persons.map((p) => ({ ...p, include: true, premium: toChf(p.billedMonthlyRp), lcaKeep: p.lca.map(() => true) })));
+    setRows(res.result.persons.map((p) => ({ ...p, include: true, premium: rpToInput(p.billedMonthlyRp), lcaKeep: p.lca.map(() => true) })));
   }
 
   function analyze(file: File | undefined) {
@@ -213,7 +213,7 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved }: {
                           key={l.guarantee}
                           checked={r.lcaKeep[k]}
                           onChange={(e) => update(i, { lcaKeep: r.lcaKeep.map((v, x) => (x === k ? e.target.checked : v)) })}
-                          label={`${l.label}${l.monthlyRp ? ` · CHF ${toChf(l.monthlyRp)}/mois` : ""}`}
+                          label={`${l.label}${l.monthlyRp ? ` · CHF ${rpToInput(l.monthlyRp)}/mois` : ""}`}
                         />
                       ))}
                     </div>

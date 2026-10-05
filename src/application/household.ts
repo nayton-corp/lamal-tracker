@@ -1,6 +1,6 @@
 import { and, asc, eq, like } from "drizzle-orm";
 import { z } from "zod";
-import { MODEL_TYPES, CANTONS } from "@/domain/lamal";
+import { CANTONS, DEFAULT_HEALTH_COSTS_RP, DEFAULT_KID_SUBGROUP, MODEL_TYPES } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
 import { household, householdMember, householdSetting, insurer, lamalPolicy, lcaPolicy, notificationLog, person } from "@/infrastructure/db/schema";
 import { audit } from "./audit";
@@ -46,9 +46,9 @@ export const personInput = z.object({
   firstName: z.string().trim().min(1, "Prénom requis"),
   lastName: z.string().trim().min(1, "Nom requis"),
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date au format AAAA-MM-JJ"),
-  kidSubgroup: z.string().trim().toUpperCase().default("K1"),
+  kidSubgroup: z.string().trim().toUpperCase().default(DEFAULT_KID_SUBGROUP),
   employedAccidentCover: z.coerce.boolean().default(false),
-  healthCostsRp: z.coerce.number().int().min(0).default(50000),
+  healthCostsRp: z.coerce.number().int().min(0).default(DEFAULT_HEALTH_COSTS_RP),
   allowedModels: z.array(z.enum(MODEL_TYPES as [string, ...string[]])).default([]),
   excludedInsurerIds: z.array(z.coerce.number().int()).default([]),
   doctorName: z.string().trim().optional().nullable(),

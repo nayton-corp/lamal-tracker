@@ -10,12 +10,11 @@ import { Button } from "@/ui/button";
 import { Card, Section } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
 import { ConfirmIdentity, DeleteAccount, DeleteHousehold } from "./panels";
+import { formatTimestamp } from "@/domain/dates";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Mes données" };
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString("fr-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" });
-const stamp = (iso: string) => new Date(iso).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" });
 
 export default async function MyDataPage() {
   const scope = await accountPageScope();
@@ -31,7 +30,7 @@ export default async function MyDataPage() {
 
       {until ? (
         <Alert tone="success" title="Identité confirmée">
-          Export et suppression sont ouverts jusqu&apos;à {time(until)}.
+          Export et suppression sont ouverts jusqu&apos;à {formatTimestamp(until, "time")}.
         </Alert>
       ) : (
         <Section title="Confirmez votre identité">
@@ -97,7 +96,7 @@ export default async function MyDataPage() {
                     <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-muted" />
                     <span className="flex-1">{e.label}</span>
                     <time dateTime={e.createdAt} className="text-muted tabular">
-                      {stamp(e.createdAt)}
+                      {formatTimestamp(e.createdAt, "dateTime")}
                     </time>
                   </li>
                 ))}

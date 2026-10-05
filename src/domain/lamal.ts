@@ -123,7 +123,28 @@ export function isCanton(value: string): value is Canton {
 
 /** Échelon de rabais enfant (K1 = tarif normal). Non documenté par l'OFSP, lu sur la police. */
 export const KID_SUBGROUPS = ["K1", "K3", "K4", "K5"] as const;
+export const DEFAULT_KID_SUBGROUP = "K1";
 
+/** Sous-groupe d'âge par défaut de l'OFSP : K1 (enfant), J1 (jeune adulte), E1 (adulte). */
 export function defaultSubgroup(ageClass: AgeClass): string {
-  return ageClass === "KID" ? "K1" : ageClass === "YOUNG" ? "J1" : "E1";
+  return ageClass === "KID" ? DEFAULT_KID_SUBGROUP : ageClass === "YOUNG" ? "J1" : "E1";
 }
+
+/** Sous-groupe tarifaire d'une personne : son échelon enfant si elle est enfant, sinon le défaut. */
+export function subgroupFor(ageClass: AgeClass, kidSubgroup: string | null | undefined): string {
+  return ageClass === "KID" ? kidSubgroup || DEFAULT_KID_SUBGROUP : defaultSubgroup(ageClass);
+}
+
+/** Première année de primes publiées par l'OFSP que l'app accepte (saisie, import, rituel). */
+export const FIRST_PREMIUM_YEAR = 2010;
+
+/** Années proposées dans les listes : de l'année prochaine à `FIRST_PREMIUM_YEAR`, la plus récente d'abord. */
+export function selectableYears(currentYear: number): number[] {
+  return Array.from({ length: currentYear + 2 - FIRST_PREMIUM_YEAR }, (_, i) => currentYear + 1 - i);
+}
+
+/**
+ * Frais de santé annuels supposés tant que le foyer n'a pas répondu au questionnaire
+ * des besoins (CHF 500). Ils servent au calcul du coût total d'une franchise.
+ */
+export const DEFAULT_HEALTH_COSTS_RP = 50_000;

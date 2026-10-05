@@ -3,6 +3,7 @@ import type { DetailedOffer, InsurerCard } from "@/application/compare";
 import { MODEL_DETAILS, MODEL_LABEL } from "@/domain/lamal";
 import { Badge } from "@/ui/badge";
 import { Chf } from "@/ui/money";
+import { formatPermille } from "@/domain/money";
 
 const LEVEL_WORD = { LOW: "bas", MID: "moyen", HIGH: "élevé" } as const;
 
@@ -11,7 +12,7 @@ export function InsurerFacts({ name, card }: { name: string; card: InsurerCard |
   const p = card?.profile;
   if (!p && !card?.website && !card?.phone) return null;
   const trendText = p?.trend
-    ? `${p.trend.insurerPermille >= 0 ? "+" : ""}${(p.trend.insurerPermille / 10).toFixed(1)} % par an de ${p.trend.fromYear} à ${p.trend.toYear} (marché ${p.trend.marketPermille >= 0 ? "+" : ""}${(p.trend.marketPermille / 10).toFixed(1)} %)`
+    ? `${formatPermille(p.trend.insurerPermille)} par an de ${p.trend.fromYear} à ${p.trend.toYear} (marché ${formatPermille(p.trend.marketPermille)})`
     : null;
   return (
     <div className="space-y-2 rounded-xl bg-surface-2 p-3">

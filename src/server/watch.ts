@@ -12,7 +12,7 @@ import { purgeAudit } from "@/application/audit";
 import { purgeExpiredTokens } from "@/application/tokens";
 import { inactivityTick } from "@/application/data-rights";
 import { mailDeps } from "./accounts";
-import { db, nowIso, ritualYear, today } from "./context";
+import { currentYear, db, nowIso, ritualYear, today } from "./context";
 import { pingenTick } from "./pingen";
 import { referenceTick } from "./reference";
 import { importJob, startBootstrapImport, startImport, startYearImport } from "./jobs";
@@ -85,7 +85,7 @@ function inPublicationSeason(iso: string): boolean {
  */
 function ensureBaseDatasets(): boolean {
   if (process.env.OFSP_AUTO_CHECK === "false" || importJob().running) return false;
-  const year = Number(today().slice(0, 4));
+  const year = currentYear();
   if (latestActiveYear(db()) === null) {
     return startBootstrapImport(year, async (outcome) => {
       if (outcome.status === "IMPORTED") setSetting(db(), "ofsp.lastCheck", { at: new Date().toISOString(), ok: true });

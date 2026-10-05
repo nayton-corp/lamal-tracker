@@ -12,8 +12,8 @@ import { toActionError, type ActionState } from "@/server/action";
 import { endSession, requireScope } from "@/server/auth";
 import { db, nowIso } from "@/server/context";
 import { forgetMode } from "@/server/onboarding";
+import { COOKIE } from "@/server/cookie-names";
 
-const WEBAUTHN_COOKIE = "lamal_wa";
 
 async function guard(name: string) {
   const scope = await requireScope();
@@ -37,7 +37,7 @@ export async function confirmPasskeyOptionsAction(): Promise<{ options?: PublicK
   try {
     const scope = await guard("confirm");
     const { options, token } = await passkeyConfirmOptions(db(), scope.userId, await relyingParty(), nowIso());
-    await writeCookie(WEBAUTHN_COOKIE, token, 5 * 60);
+    await writeCookie(COOKIE.webauthn, token, 5 * 60);
     return { options };
   } catch (e) {
     return { error: toActionError(e)?.error };
@@ -47,8 +47,8 @@ export async function confirmPasskeyOptionsAction(): Promise<{ options?: PublicK
 export async function confirmPasskeyAction(response: AuthenticationResponseJSON): Promise<{ error?: string }> {
   try {
     const scope = await guard("confirm");
-    const token = await readCookie(WEBAUTHN_COOKIE);
-    await deleteCookie(WEBAUTHN_COOKIE);
+    const token = await readCookie(COOKIE.webauthn);
+    await deleteCookie(COOKIE.webauthn);
     if (!(await finishPasskeyConfirm(db(), scope.userId, token, response, await relyingParty(), nowIso()))) return { error: "Passkey non reconnue : réessayez, ou confirmez avec votre mot de passe." };
     markConfirmed(db(), scope.sessionId, nowIso());
   } catch (e) {

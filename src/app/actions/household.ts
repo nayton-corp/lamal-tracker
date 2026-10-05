@@ -20,8 +20,9 @@ import { analyzePolicyText, applyPolicyImport, createHouseholdFromPolicy, previe
 import { readPdfText } from "@/infrastructure/pdf/read-text";
 import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/postal";
 import { UserError } from "@/application/errors";
+import { DEFAULT_HEALTH_COSTS_RP, DEFAULT_KID_SUBGROUP } from "@/domain/lamal";
 import { chfField, rethrowForeignKey, toActionError, type ActionState } from "@/server/action";
-import { db, today } from "@/server/context";
+import { currentYear, db } from "@/server/context";
 import { requireScope } from "@/server/auth";
 import { chosenMode } from "@/server/onboarding";
 import { withHousehold, type Scope } from "@/application/scope";
@@ -73,9 +74,9 @@ export async function savePersonAction(_: ActionState, form: FormData): Promise<
       firstName: str(form, "firstName") ?? "",
       lastName: str(form, "lastName") ?? "",
       birthDate: str(form, "birthDate") ?? "",
-      kidSubgroup: str(form, "kidSubgroup") ?? "K1",
+      kidSubgroup: str(form, "kidSubgroup") ?? DEFAULT_KID_SUBGROUP,
       employedAccidentCover: form.has("employedAccidentCover") ? form.get("employedAccidentCover") === "on" : (existing?.employedAccidentCover ?? false),
-      healthCostsRp: existing?.healthCostsRp ?? 50000,
+      healthCostsRp: existing?.healthCostsRp ?? DEFAULT_HEALTH_COSTS_RP,
       allowedModels: (existing?.allowedModels ?? []) as never,
       excludedInsurerIds: existing?.excludedInsurerIds ?? [],
       doctorName: existing?.doctorName ?? null,
@@ -126,9 +127,9 @@ export async function saveSoloAction(_: ActionState, form: FormData): Promise<Ac
       firstName,
       lastName,
       birthDate: str(form, "birthDate") ?? "",
-      kidSubgroup: existing?.kidSubgroup ?? "K1",
+      kidSubgroup: existing?.kidSubgroup ?? DEFAULT_KID_SUBGROUP,
       employedAccidentCover: existing?.employedAccidentCover ?? false,
-      healthCostsRp: existing?.healthCostsRp ?? 50000,
+      healthCostsRp: existing?.healthCostsRp ?? DEFAULT_HEALTH_COSTS_RP,
       allowedModels: (existing?.allowedModels ?? []) as never,
       excludedInsurerIds: existing?.excludedInsurerIds ?? [],
       doctorName: existing?.doctorName ?? null,
@@ -253,7 +254,7 @@ export async function analyzePolicyAction(form: FormData): Promise<{ result?: Po
   const read = await pdfText(form);
   if ("error" in read) return read;
   try {
-    return { result: analyzePolicyText(db(), scope, read.text, Number(today().slice(0, 4))) };
+    return { result: analyzePolicyText(db(), scope, read.text, currentYear()) };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     return { error: "Lecture impossible." };
@@ -266,7 +267,7 @@ export async function analyzePolicyStartAction(form: FormData): Promise<{ previe
   const read = await pdfText(form);
   if ("error" in read) return read;
   try {
-    return { preview: previewPolicyHolder(db(), read.text, Number(today().slice(0, 4))), text: read.text.slice(0, 200_000) };
+    return { preview: previewPolicyHolder(db(), read.text, currentYear()), text: read.text.slice(0, 200_000) };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     return { error: "Lecture impossible." };
@@ -285,7 +286,7 @@ export async function createFromPolicyAction(input: HouseholdFromPolicy, text: s
   }
   // Pas de revalidation ici : l'écran reste monté pour vérifier les contrats ; l'enregistrement final rafraîchit.
   try {
-    return { result: analyzePolicyText(db(), mine, String(text).slice(0, 200_000), Number(today().slice(0, 4))) };
+    return { result: analyzePolicyText(db(), mine, String(text).slice(0, 200_000), currentYear()) };
   } catch (e) {
     return { error: e instanceof UserError ? e.message : "Lecture impossible." };
   }

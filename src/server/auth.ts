@@ -9,7 +9,9 @@ import { UserError } from "@/application/errors";
 import { requireAdmin as assertAdmin, scopeForUser, type Scope } from "@/application/scope";
 import { randomToken } from "@/application/tokens";
 import { deleteCookie, mailDeps, readCookie, writeCookie } from "./accounts";
-import { db, nowIso, TIME_ZONE } from "./context";
+import { db, nowIso } from "./context";
+import { formatTimestamp } from "@/domain/dates";
+import { COOKIE } from "./cookie-names";
 
 /*
  * La connexion est obligatoire : sans compte, tout mène à la création du premier ; sans session
@@ -17,12 +19,10 @@ import { db, nowIso, TIME_ZONE } from "./context";
  * serveur le refont elles-mêmes (`pageScope`, `requireScope`), pour ne pas dépendre du seul proxy.
  * Le foyer de chaque requête vient de la session, jamais d'un paramètre du navigateur.
  */
-export const SESSION_COOKIE = "lamal_session";
 /** Jeton d'appareil de longue durée : reconnaît un appareil déjà utilisé (alerte sinon). */
-const DEVICE_COOKIE = "lamal_device";
 
 export async function currentSession(): Promise<SessionInfo | null> {
-  return touchSession(db(), await readCookie(SESSION_COOKIE), nowIso());
+  return touchSession(db(), await readCookie(COOKIE.session), nowIso());
 }
 
 /** Compte et foyer de la requête en cours (une seule lecture par requête). */
@@ -69,7 +69,7 @@ async function startSession(userId: number): Promise<string> {
   const h = await headers();
   const device = describeDevice(h.get("user-agent"));
   const { token } = openSession(db(), userId, device, nowIso());
-  await writeCookie(SESSION_COOKIE, token, SESSION_MAX_DAYS * 86_400);
+  await writeCookie(COOKIE.session, token, SESSION_MAX_DAYS * 86_400);
   return device;
 }
 
@@ -79,16 +79,16 @@ async function startSession(userId: number): Promise<string> {
  */
 export async function completeLogin(userId: number) {
   const device = await startSession(userId);
-  let deviceToken = await readCookie(DEVICE_COOKIE);
+  let deviceToken = await readCookie(COOKIE.device);
   if (!deviceToken || deviceToken.length > 100) deviceToken = randomToken(24);
-  await writeCookie(DEVICE_COOKIE, deviceToken, 400 * 86_400);
+  await writeCookie(COOKIE.device, deviceToken, 400 * 86_400);
   const now = nowIso();
   const { alert } = rememberDevice(db(), userId, deviceToken, now);
   audit(db(), userId, "LOGIN", { detail: device, nowIso: now });
   const mail = mailDeps();
   const email = userEmail(db(), userId);
   if (alert && mail && email) {
-    const when = new Date(now).toLocaleString("fr-CH", { timeZone: TIME_ZONE, dateStyle: "long", timeStyle: "short" });
+    const when = formatTimestamp(now, "dateTimeLong");
     // Un courriel en échec ne doit pas empêcher la connexion.
     await mail.mailer.send(newDeviceMail(email, device, when)).catch((e) => console.error("[courriel] alerte de connexion :", e instanceof Error ? e.message : e));
   }
@@ -100,8 +100,8 @@ export function landingAfterLogin(userId: number, next: string): string {
 }
 
 export async function endSession() {
-  closeSession(db(), await readCookie(SESSION_COOKIE));
-  await deleteCookie(SESSION_COOKIE);
+  closeSession(db(), await readCookie(COOKIE.session));
+  await deleteCookie(COOKIE.session);
 }
 
 /** Pages de connexion : inutiles quand on est déjà connecté. */

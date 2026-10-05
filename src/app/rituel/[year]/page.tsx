@@ -9,10 +9,10 @@ import { formatDateLong } from "@/domain/dates";
 import { STRATEGY_INFO } from "@/domain/strategy";
 import { Awareness } from "../_parts/awareness";
 import { nextStep } from "../_parts/next-step";
-import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType } from "@/domain/lamal";
+import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType, FIRST_PREMIUM_YEAR } from "@/domain/lamal";
 import { DECISION_LABEL } from "@/domain/review";
 import { activeDataset } from "@/infrastructure/db/queries";
-import { db, today } from "@/server/context";
+import { currentYear, db, today } from "@/server/context";
 import { ActionForm } from "@/ui/action-form";
 import { Alert } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
@@ -44,7 +44,7 @@ const RENEWAL_BADGE = {
 export default async function RitualPage({ params }: { params: Promise<{ year: string }> }) {
   const scope = await pageScope();
   const year = Number((await params).year);
-  if (!Number.isInteger(year) || year < 2011 || year > Number(today().slice(0, 4)) + 1) notFound();
+  if (!Number.isInteger(year) || year < FIRST_PREMIUM_YEAR || year > currentYear() + 1) notFound();
   const h = getHousehold(db(), scope);
   const persons = h ? listPersons(db(), h.id) : [];
 

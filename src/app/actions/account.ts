@@ -13,9 +13,8 @@ import { toActionError, type ActionState } from "@/server/action";
 import { requireScope } from "@/server/auth";
 import { db, nowIso } from "@/server/context";
 import { headers } from "next/headers";
+import { COOKIE } from "@/server/cookie-names";
 
-const TOTP_COOKIE = "lamal_totp";
-const WEBAUTHN_COOKIE = "lamal_wa";
 
 /** Toute action sensible du compte est limitée en débit, par compte. */
 async function guard(name: string) {
@@ -67,12 +66,12 @@ export async function totpSetupAction(_: TotpSetupState, form: FormData): Promis
     const scope = await guard("totp");
     if (form.get("step") === "confirm") {
       // Pas de revalidation ici : la page se rafraîchit quand les codes ont été notés.
-      const codes = confirmTotpSetup(db(), scope.userId, await readCookie(TOTP_COOKIE), String(form.get("code") ?? ""), Date.now(), nowIso());
-      await deleteCookie(TOTP_COOKIE);
+      const codes = confirmTotpSetup(db(), scope.userId, await readCookie(COOKIE.totp), String(form.get("code") ?? ""), Date.now(), nowIso());
+      await deleteCookie(COOKIE.totp);
       return { codes };
     }
     const setup = startTotpSetup(db(), scope.userId, String(form.get("password") ?? ""), nowIso());
-    await writeCookie(TOTP_COOKIE, setup.token, 15 * 60);
+    await writeCookie(COOKIE.totp, setup.token, 15 * 60);
     return { secret: setup.secret, qr: await QRCode.toDataURL(setup.uri, { margin: 1, width: 220 }) };
   } catch (e) {
     const err = toActionError(e)?.error;
@@ -117,7 +116,7 @@ export async function passkeyRegistrationOptionsAction(password: string | null):
       if (!verifyPassword(db(), scope.userId, password)) return { needPassword: true, error: "Mot de passe incorrect." };
     }
     const { options, token } = await passkeyRegistrationOptions(db(), scope.userId, await relyingParty(), nowIso());
-    await writeCookie(WEBAUTHN_COOKIE, token, 5 * 60);
+    await writeCookie(COOKIE.webauthn, token, 5 * 60);
     return { options };
   } catch (e) {
     return { error: toActionError(e)?.error };
@@ -127,8 +126,8 @@ export async function passkeyRegistrationOptionsAction(password: string | null):
 export async function passkeyRegisterAction(response: RegistrationResponseJSON): Promise<{ error?: string }> {
   try {
     const scope = await guard("passkey");
-    const token = await readCookie(WEBAUTHN_COOKIE);
-    await deleteCookie(WEBAUTHN_COOKIE);
+    const token = await readCookie(COOKIE.webauthn);
+    await deleteCookie(COOKIE.webauthn);
     const name = describeDevice((await headers()).get("user-agent"));
     await finishPasskeyRegistration(db(), scope.userId, token, response, await relyingParty(), name, nowIso());
   } catch (e) {

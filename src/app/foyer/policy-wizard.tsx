@@ -5,10 +5,11 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { savePolicyAction, tariffOptionsAction } from "@/app/actions/household";
 import type { TariffOptions } from "@/application/tariffs";
 import { MODEL_HINT, MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
-import { formatChf } from "@/domain/money";
+import { formatChf, rpToInput } from "@/domain/money";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/cn";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
+import { foldForSearch } from "@/domain/text";
 
 const STEPS = ["Caisse", "Modèle", "Franchise", "Prime"] as const;
 
@@ -46,8 +47,8 @@ export function PolicyWizard({ personId, personName, year, insurers, employed, o
   }, [personId, year, insurerId]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    return q ? insurers.filter((i) => i.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q)) : insurers;
+    const q = foldForSearch(query.trim());
+    return q ? insurers.filter((i) => foldForSearch(i.name).includes(q)) : insurers;
   }, [insurers, query]);
   const official = options?.available && options.tariffs.length > 0;
   const models = official ? MODEL_TYPES.filter((m) => options!.tariffs.some((t) => t.modelType === m)) : MODEL_TYPES;
@@ -55,7 +56,7 @@ export function PolicyWizard({ personId, personName, year, insurers, employed, o
   const product = products.find((t) => t.code === code) ?? (products.length === 1 ? products[0]! : null);
   const officialRp = product && franchise !== null ? product.premiums[franchise]?.[accident ? 1 : 0] ?? null : null;
   const franchises = options?.franchises ?? [];
-  const premiumValue = premium ?? (officialRp !== null ? (officialRp / 100).toFixed(2) : "");
+  const premiumValue = premium ?? rpToInput(officialRp);
 
   function pickModel(m: ModelType) {
     setModel(m);
@@ -201,7 +202,7 @@ export function PolicyWizard({ personId, personName, year, insurers, employed, o
                   <span className="text-sm font-normal text-muted">/mois</span>
                 </p>
               </div>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setPremium((officialRp / 100).toFixed(2))}>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setPremium(rpToInput(officialRp))}>
                 Ma prime diffère
               </Button>
             </div>

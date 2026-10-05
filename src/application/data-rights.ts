@@ -28,6 +28,7 @@ import { feedbackOf } from "./feedback";
 import { eraseHousehold } from "./household";
 import type { Scope } from "./scope";
 import { listSignatures } from "./signatures";
+import { formatTimestamp } from "@/domain/dates";
 
 /*
  * Droits des personnes (nLPD) : obtenir une copie de ses données, supprimer son compte et son
@@ -253,7 +254,7 @@ export async function inactivityTick(db: Db, mail: MailDeps | null, nowIso: stri
     if (!due) continue;
     // Jamais de suppression moins de 7 jours après le dernier rappel.
     const shown = new Date(Math.max(deletionAt.getTime(), Date.parse(nowIso) + NOTICE_DAYS[1] * DAY));
-    const date = shown.toLocaleDateString("fr-CH", { timeZone: "Europe/Zurich", day: "numeric", month: "long", year: "numeric" });
+    const date = formatTimestamp(shown, "dateLong");
     try {
       await mail.mailer.send(inactivityMail(u.email!, date, `${mail.appUrl}/login`));
     } catch {

@@ -7,6 +7,7 @@ import { listSignatures } from "@/application/signatures";
 import { deleteLetterAction, deleteOfferAction, letterAckAction, letterSentAction, offerAnsweredAction, offerSentAction, prepareAllAction } from "@/app/actions/review";
 import { listOfferRequests } from "@/application/offers";
 import { getReviewByYear, getReviewView } from "@/application/review";
+import { isMinorOn } from "@/domain/age";
 import { formatDateLong, formatDateShort } from "@/domain/dates";
 import { displayTariffLabel, type ModelType } from "@/domain/lamal";
 import type { LetterContent } from "@/domain/letter";
@@ -99,7 +100,8 @@ export default async function ProceduresPage({ params }: { params: Promise<{ yea
     [...switching, ...adjusting].length > 0 && [...terminations, ...changes].length > 0 && [...terminations, ...changes].every((l) => l.sentAt && !failedAtPingen(l));
   const confirmDone = offers.every((o) => o.answeredAt) && terminations.every((l) => l.acknowledgedAt) && offers.length + terminations.length > 0;
   const involved = new Set([...switching, ...adjusting].map((p) => p.person.id));
-  const signers = listSignatures(db(), scope).filter((s) => involved.has(s.personId) && year - 1 - Number(s.birthDate.slice(0, 4)) >= 18);
+  // Seules les personnes majeures signent ; les lettres le font aussi (application/letters.ts).
+  const signers = listSignatures(db(), scope).filter((s) => involved.has(s.personId) && !isMinorOn(s.birthDate, today()));
   const pingen = pingenClientFor(scope);
   let n = 0;
 

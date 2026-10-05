@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { healthCostsAction } from "@/app/actions/review";
 import type { CurvePoint } from "@/domain/cost";
-import { formatChf } from "@/domain/money";
+import { formatChf, rpToInput } from "@/domain/money";
 import { ActionForm } from "@/ui/action-form";
 import { Button } from "@/ui/button";
 import { Sheet } from "@/ui/sheet";
@@ -82,7 +82,7 @@ export function FranchiseSimulator({ lineId, franchises, points, breakEvenRp, he
               : `La franchise ${franchises[0]} devient la moins chère dès ${formatChf(breakEvenRp, { whole: true })} de frais par an.`}
           </p>
         </div>
-        <ActionForm action={healthCostsAction} hidden={{ lineId, healthCosts: (h / 100).toFixed(0) }}>
+        <ActionForm action={healthCostsAction} hidden={{ lineId, healthCosts: rpToInput(h, 0) }}>
           <SubmitButton variant="secondary" block>
             Utiliser {formatChf(h, { whole: true })} comme frais attendus
           </SubmitButton>

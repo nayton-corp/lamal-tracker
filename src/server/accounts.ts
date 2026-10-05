@@ -6,6 +6,7 @@ import type { AccountDeps } from "@/application/account";
 import { UserError } from "@/application/errors";
 import type { RelyingParty } from "@/application/passkeys";
 import { pwnedCount } from "@/infrastructure/hibp";
+import { cookieVariants } from "./cookie-names";
 import { mailerFromEnv, type Mailer } from "@/infrastructure/mail/mailer";
 import { consume } from "@/infrastructure/rate-limit";
 
@@ -127,12 +128,12 @@ export async function isSecureRequest(): Promise<boolean> {
  * En HTTPS, les cookies portent le préfixe `__Host-` : le navigateur les refuse s'ils ne sont pas
  * sécurisés ou s'ils visent un autre chemin ou un sous-domaine. En HTTP (réseau local), nom simple.
  */
-export const cookieNames = (name: string) => [`__Host-${name}`, name];
+export { cookieVariants } from "./cookie-names";
 
 export async function readCookie(name: string): Promise<string | undefined> {
   const jar = await cookies();
   // En HTTPS, seul le cookie préfixé compte : un cookie simple a pu être posé par un sous-domaine.
-  const names = (await isSecureRequest()) ? [`__Host-${name}`] : cookieNames(name);
+  const names = (await isSecureRequest()) ? cookieVariants(name).slice(0, 1) : cookieVariants(name);
   for (const n of names) {
     const value = jar.get(n)?.value;
     if (value) return value;
@@ -147,7 +148,7 @@ export async function writeCookie(name: string, value: string, maxAgeSeconds: nu
 
 export async function deleteCookie(name: string) {
   const jar = await cookies();
-  for (const n of cookieNames(name)) {
+  for (const n of cookieVariants(name)) {
     if (jar.get(n)) jar.set(n, "", { httpOnly: true, sameSite: "lax", secure: n.startsWith("__Host-"), path: "/", maxAge: 0 });
   }
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { HouseholdHistory } from "@/application/history";
 import { cn } from "@/ui/cn";
+import { formatPermille } from "@/domain/money";
 
 const SERIES = ["#2563eb", "#db2777", "#0891b2", "#7c3aed", "#ea580c", "#65a30d"];
 const tooltipStyle = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, color: "var(--foreground)" };
@@ -13,7 +14,7 @@ export function TotalsChart({ totals }: { totals: HouseholdHistory["totals"] }) 
   const data = totals.map((t) => ({
     year: String(t.year),
     total: t.billedMonthlyRp / 100,
-    label: t.changePermille === null ? "" : `${t.changePermille > 0 ? "+" : ""}${(t.changePermille / 10).toFixed(1)} %`,
+    label: t.changePermille === null ? "" : formatPermille(t.changePermille),
   }));
   return (
     <div className="h-56" role="img" aria-label={`Prime mensuelle du foyer par année : ${data.map((d) => `${d.year} ${chf(d.total)}`).join(", ")}`}>

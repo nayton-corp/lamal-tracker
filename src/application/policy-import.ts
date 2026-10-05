@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { ageClassForYear } from "@/domain/age";
 import { guaranteeInfo, type LcaGuarantee } from "@/domain/lca";
-import { defaultSubgroup, type ModelType } from "@/domain/lamal";
+import { DEFAULT_HEALTH_COSTS_RP, defaultSubgroup, type ModelType, FIRST_PREMIUM_YEAR } from "@/domain/lamal";
 import { franchisesFor } from "@/domain/parameters";
 import { extractPolicy, findInsurer, readHolder, readYear, type HolderAddress, type HolderPerson, type PolicyExtract } from "@/domain/policy-import";
 import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/postal";
@@ -89,13 +89,13 @@ export function analyzePolicyText(db: Db, scope: Scope, text: string, currentYea
   const persons = listPersons(db, h.id);
   if (persons.length === 0) throw new UserError("Ajoutez d'abord les membres du foyer : leur date de naissance permet de les retrouver dans la police.");
   const insurers = listInsurers(db);
-  const guessYear = readYear(text, 2010, currentYear + 1) ?? currentYear;
+  const guessYear = readYear(text, FIRST_PREMIUM_YEAR, currentYear + 1) ?? currentYear;
   const franchises = [...new Set([...franchisesFor(parametersFor(db, guessYear), "ADULT"), ...franchisesFor(parametersFor(db, guessYear), "KID")])];
   const extract = extractPolicy(text, {
     persons: persons.filter((p) => Number(p.birthDate.slice(0, 4)) <= guessYear),
     insurers: importInsurers(insurers),
     franchises,
-    minYear: 2010,
+    minYear: FIRST_PREMIUM_YEAR,
     maxYear: currentYear + 1,
   });
   const warnings: string[] = [];
@@ -160,7 +160,7 @@ export function previewPolicyHolder(db: Db, text: string, currentYear: number): 
   const ins = insurers.find((i) => i.id === insurerId) ?? null;
   return {
     insurerName: ins ? insurerLabel(ins) : null,
-    year: readYear(text, 2010, currentYear + 1) ?? currentYear,
+    year: readYear(text, FIRST_PREMIUM_YEAR, currentYear + 1) ?? currentYear,
     persons: holder.persons,
     address: holder.address,
     communes: holder.address ? lookupPostalCode(holder.address.postalCode) : [],
@@ -184,7 +184,7 @@ export function createHouseholdFromPolicy(db: Db, scope: Scope, input: Household
       canton: input.address.canton as never,
     });
     const created = withHousehold(scope, id);
-    for (const p of input.persons) savePerson(db, created, { ...p, healthCostsRp: 50000 });
+    for (const p of input.persons) savePerson(db, created, { ...p, healthCostsRp: DEFAULT_HEALTH_COSTS_RP });
     setHouseholdMode(db, created, input.persons.length === 1 ? "SOLO" : "FAMILY");
     return id;
   });

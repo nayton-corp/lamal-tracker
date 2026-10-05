@@ -6,6 +6,7 @@ import { LCA_GUARANTEES } from "@/domain/lca";
 import { Alert } from "@/ui/alert";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
 import { SubmitButton } from "@/ui/submit";
+import { rpToInput } from "@/domain/money";
 
 export interface LcaDefaults {
   id?: number;
@@ -97,7 +98,7 @@ export function LcaForm({
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Prime mensuelle (CHF, facultatif)" htmlFor="monthly">
-          <Input id="monthly" name="monthly" inputMode="decimal" defaultValue={lca?.monthlyRp ? (lca.monthlyRp / 100).toFixed(2) : ""} />
+          <Input id="monthly" name="monthly" inputMode="decimal" defaultValue={lca?.monthlyRp ? rpToInput(lca.monthlyRp) : ""} />
         </Field>
         <Field label="N° de police" htmlFor="lcaPolicyNumber">
           <Input id="lcaPolicyNumber" name="policyNumber" defaultValue={lca?.policyNumber ?? ""} />

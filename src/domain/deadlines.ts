@@ -11,6 +11,11 @@ export interface ReviewDeadlines {
   insurerNoticeBy: IsoDate;
 }
 
+/** Marge entre l'envoi recommandé et la réception : acheminement et délai de retrait au guichet. */
+export const POSTAL_MARGIN_DAYS = 7;
+/** En deçà de ce nombre de jours avant la date d'envoi conseillée, l'échéance devient « bientôt ». */
+export const SOON_THRESHOLD_DAYS = 14;
+
 /**
  * Échéances pour changer d'assurance de base au 1er janvier de targetYear.
  * Prudence : si le 30 novembre tombe un week-end, on vise le vendredi précédent.
@@ -19,7 +24,7 @@ export function reviewDeadlines(targetYear: number): ReviewDeadlines {
   const year = targetYear - 1;
   let receipt: IsoDate = `${year}-11-30`;
   while (isWeekend(receipt)) receipt = addDays(receipt, -1);
-  let sendBy = addDays(receipt, -7);
+  let sendBy = addDays(receipt, -POSTAL_MARGIN_DAYS);
   while (isWeekend(sendBy)) sendBy = addDays(sendBy, -1);
   return {
     effectiveEnd: `${year}-12-31`,
@@ -35,7 +40,7 @@ export function urgency(today: IsoDate, deadlines: ReviewDeadlines): Urgency {
   if (daysBetween(today, deadlines.receiptDeadline) < 0) return "late";
   const toSend = daysBetween(today, deadlines.sendBy);
   if (toSend < 0) return "urgent";
-  if (toSend <= 14) return "soon";
+  if (toSend <= SOON_THRESHOLD_DAYS) return "soon";
   return "calm";
 }
 

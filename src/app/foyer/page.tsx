@@ -6,7 +6,7 @@ import { ageClassForYear } from "@/domain/age";
 import { AGE_CLASS_LABEL } from "@/domain/lamal";
 import { formatDateShort } from "@/domain/dates";
 import { insurerLabel } from "@/infrastructure/db/queries";
-import { db, today } from "@/server/context";
+import { currentYear, db } from "@/server/context";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Section } from "@/ui/card";
@@ -22,7 +22,7 @@ export default async function FoyerPage() {
   const scope = await pageScope();
   const h = getHousehold(db(), scope);
   if (!h) redirect("/bienvenue");
-  const year = Number(today().slice(0, 4));
+  const year = currentYear();
   const persons = listPersons(db(), h.id);
   const solo = getHouseholdMode(db(), scope) === "SOLO" && persons.length <= 1;
   const first = persons[0];

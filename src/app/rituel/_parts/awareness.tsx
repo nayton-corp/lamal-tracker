@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReviewView } from "@/application/review";
 import { formatDateLong } from "@/domain/dates";
 import { displayTariffLabel, type ModelType } from "@/domain/lamal";
-import { changePermille, formatChf } from "@/domain/money";
+import { changePermille, formatChf, formatPermille } from "@/domain/money";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/cn";
 import { Chf } from "@/ui/money";
@@ -58,7 +58,7 @@ export function Awareness({ view, detailed, cta = true }: { view: ReviewView; de
             <TrendingUp aria-hidden className="mt-1 size-5 shrink-0" />
             <span>
               {diff > 0 ? `${signed(diff)} par mois` : diff < 0 ? `${signed(diff)} par mois` : "Même prime"}
-              {permille !== null && diff !== 0 && <span className="font-normal text-white/85"> ({(permille / 10).toFixed(1)} %)</span>}
+              {permille !== null && diff !== 0 && <span className="font-normal text-white/85"> ({formatPermille(permille, false)})</span>}
             </span>
           </p>
           <p className="text-sm text-white/85">

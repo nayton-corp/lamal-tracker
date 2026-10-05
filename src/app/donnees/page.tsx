@@ -5,7 +5,7 @@ import type { ValidationReport } from "@/domain/ofsp/report";
 import { listDatasets, listParameters } from "@/application/reference-data";
 import { getSetting } from "@/infrastructure/db/settings";
 import { subscriptionCount } from "@/infrastructure/push/push";
-import { db, today } from "@/server/context";
+import { currentYear, db } from "@/server/context";
 import { importJob } from "@/server/jobs";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -13,7 +13,7 @@ import { Card, Section } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
 import { Co2Form } from "./co2-form";
 import { refreshReferenceAction } from "@/app/actions/data";
-import { formatDateLong } from "@/domain/dates";
+import { formatDateLong, formatTimestamp } from "@/domain/dates";
 import { officialCo2 } from "@/infrastructure/reference/apply";
 import type { ReferenceCheck } from "@/server/reference";
 import { ActionForm } from "@/ui/action-form";
@@ -37,11 +37,11 @@ const STATUS = {
 export default async function DataPage() {
   const scope = await pageScope();
   const datasets = listDatasets(db());
-  const currentYear = Number(today().slice(0, 4));
+  const year = currentYear();
   const activeYears = new Set(datasets.filter((d) => d.status === "ACTIVE").map((d) => d.year));
   // CO2 : années utiles seulement (primes importées, année en cours et suivante).
   const params = listParameters(db())
-    .filter((p) => activeYears.has(p.year) || p.year >= currentYear);
+    .filter((p) => activeYears.has(p.year) || p.year >= year);
   const visibleDatasets = datasets.filter((d) => d.status !== "SUPERSEDED");
   const insurers = listInsurers(db());
   const customAddresses = insurers.filter((i) => i.terminationAddress?.trim()).length;
@@ -60,7 +60,7 @@ export default async function DataPage() {
             <Card className="space-y-4">
               <p className="text-sm text-muted">
                 Publiées fin septembre par l&apos;OFSP, téléchargées automatiquement.
-                {lastCheck && ` Dernière vérification : ${new Date(lastCheck.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" })}${lastCheck.ok ? "" : " (échec, nouvel essai prévu)"}.`}
+                {lastCheck && ` Dernière vérification : ${formatTimestamp(lastCheck.at, "dateTime")}${lastCheck.ok ? "" : " (échec, nouvel essai prévu)"}.`}
               </p>
               {visibleDatasets.length > 0 && (
                 <ul className="divide-y divide-border rounded-xl border border-border">
@@ -134,7 +134,7 @@ export default async function DataPage() {
             <Card className="space-y-3">
               <p className="text-sm text-muted">
                 Adresses des caisses, indicateurs (réserves, frais) et redistribution CO2 sont vérifiés chaque semaine auprès de l&apos;OFSP et de l&apos;OFEV.
-                {reference && ` Dernière vérification : ${new Date(reference.at).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" })}${reference.ok ? "" : " (en partie impossible, nouvel essai prévu)"}.`}
+                {reference && ` Dernière vérification : ${formatTimestamp(reference.at, "dateTime")}${reference.ok ? "" : " (en partie impossible, nouvel essai prévu)"}.`}
               </p>
               <ActionForm action={refreshReferenceAction}>
                 <SubmitButton variant="secondary" size="sm" pendingLabel="Vérification…">

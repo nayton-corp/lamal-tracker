@@ -4,7 +4,7 @@ import { Stethoscope, UserRound } from "lucide-react";
 import { useActionState, useState } from "react";
 import { saveNeedsAction } from "@/app/actions/journey";
 import { MODEL_HINT, MODEL_LABEL, type ModelType } from "@/domain/lamal";
-import { formatChf } from "@/domain/money";
+import { formatChf, rpToInput } from "@/domain/money";
 import { USAGE_INFO, USAGE_PROFILES, usageFor, type UsageProfile } from "@/domain/strategy";
 import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
@@ -59,8 +59,8 @@ function PersonNeeds({ p, several, strategyLabel }: { p: NeedsPerson; several: b
   const [franchise, setFranchise] = useState<number | null>(p.franchise);
   const [models, setModels] = useState<Set<ModelType>>(new Set(p.models));
   const [usage, setUsage] = useState<UsageProfile | "CUSTOM">(usageFor(p.healthCostsRp) ?? "CUSTOM");
-  const [custom, setCustom] = useState((p.healthCostsRp / 100).toFixed(0));
-  const healthChf = usage === "CUSTOM" ? custom : (USAGE_INFO[usage].healthCostsRp / 100).toFixed(0);
+  const [custom, setCustom] = useState(rpToInput(p.healthCostsRp, 0));
+  const healthChf = usage === "CUSTOM" ? custom : rpToInput(USAGE_INFO[usage].healthCostsRp, 0);
   const needsDoctor = models.size === 0 || models.has("PRAXIS") || models.has("FLEX");
   const toggle = (m: ModelType) =>
     setModels((s) => {

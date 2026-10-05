@@ -2,6 +2,7 @@ import type { IsoDate } from "./dates";
 import type { LcaGuarantee } from "./lca";
 import type { ModelType } from "./lamal";
 import type { Rappen } from "./money";
+import { foldForSearch } from "./text";
 
 /**
  * Lecture d'une police d'assurance (texte extrait du PDF). Chaque caisse a sa mise en page :
@@ -44,7 +45,7 @@ export interface PolicyExtract {
   noText: boolean;
 }
 
-const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const norm = foldForSearch;
 
 /** Variantes écrites d'une date de naissance : 03.04.1990, 3.4.1990, 03/04/1990. */
 function dateVariants(iso: IsoDate): string[] {

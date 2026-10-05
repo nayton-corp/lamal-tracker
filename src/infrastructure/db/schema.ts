@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { DEFAULT_HEALTH_COSTS_RP, DEFAULT_KID_SUBGROUP } from "@/domain/lamal";
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /*
@@ -135,10 +136,10 @@ export const person = sqliteTable("person", {
   lastName: text("last_name").notNull(),
   birthDate: text("birth_date").notNull(),
   /** Échelon de rabais enfant (K1, K3…) lu sur la police. */
-  kidSubgroup: text("kid_subgroup").notNull().default("K1"),
+  kidSubgroup: text("kid_subgroup").notNull().default(DEFAULT_KID_SUBGROUP),
   /** Couvert par l'assurance-accidents de l'employeur (≥ 8 h/semaine) : accident exclu. */
   employedAccidentCover: integer("employed_accident_cover", { mode: "boolean" }).notNull().default(false),
-  healthCostsRp: integer("health_costs_rp").notNull().default(50000),
+  healthCostsRp: integer("health_costs_rp").notNull().default(DEFAULT_HEALTH_COSTS_RP),
   allowedModels: text("allowed_models", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
   excludedInsurerIds: text("excluded_insurer_ids", { mode: "json" }).$type<number[]>().notNull().default(sql`'[]'`),
   doctorName: text("doctor_name"),

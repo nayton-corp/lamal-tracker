@@ -1,5 +1,6 @@
-import { isCanton, type AgeClass, type Canton, type ModelType } from "../lamal";
+import { defaultSubgroup, isCanton, type AgeClass, type Canton, type ModelType } from "../lamal";
 import type { Rappen } from "../money";
+import { foldForSearch } from "../text";
 
 /**
  * Lecture d'une ligne du fichier « Prämien_CH » de l'OFSP. Deux générations de codes :
@@ -31,10 +32,7 @@ export const OPTIONAL_COLUMNS = ["Tarifbezeichnung", "Altersuntergruppe", "Hohei
 export type Column = (typeof REQUIRED_COLUMNS)[number] | (typeof OPTIONAL_COLUMNS)[number];
 
 function key(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
+  return foldForSearch(s)
     .replace(/[^a-z]/g, "");
 }
 
@@ -220,9 +218,7 @@ export function normalizeRow(
   const tariffLabel = get("Tarifbezeichnung") || tariffCode;
   const tariffTypeRaw = get("Tariftyp");
 
-  const subgroup =
-    get("Altersuntergruppe").toUpperCase() ||
-    (ageClass === "KID" ? "K1" : ageClass === "YOUNG" ? "J1" : "E1");
+  const subgroup = get("Altersuntergruppe").toUpperCase() || defaultSubgroup(ageClass);
 
   return {
     ok: true,

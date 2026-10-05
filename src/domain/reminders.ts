@@ -26,7 +26,10 @@ export interface Reminder {
 }
 
 /** Délai après lequel une caisse qui n'a pas confirmé mérite une relance. */
-export const CONFIRMATION_FOLLOW_UP_DAYS = 21;
+export const CONFIRMATION_FOLLOW_UP_DAYS = 21; // « plus de trois semaines » dans les textes ci-dessous
+
+/** Une semaine avant la date d'envoi, le rappel part aussi par courriel (en plus de la notification). */
+export const MAIL_REMINDER_DAYS_BEFORE = 7;
 /** Dernier rappel, après la date d'envoi conseillée : un recommandé posté ce jour-là arrive encore. */
 const LATE_REMINDER_DAYS = 2;
 
@@ -61,7 +64,7 @@ export function paperReminders(today: IsoDate, targetYear: number, deadlines: Re
       body,
       url: p.letters > 0 ? `${url}/lettres` : url,
       mail:
-        left === 7 || tomorrow
+        left === MAIL_REMINDER_DAYS_BEFORE || tomorrow
           ? {
               subject: tomorrow ? "Vos courriers d'assurance maladie : dernier jour conseillé demain" : "Vos courriers d'assurance maladie : plus qu'une semaine",
               text:

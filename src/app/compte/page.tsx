@@ -9,6 +9,7 @@ import { Alert } from "@/ui/alert";
 import { Card, Section } from "@/ui/card";
 import { Page, PageHeader } from "@/ui/page";
 import { EmailPanel, PasskeysPanel, PasswordPanel, SessionsPanel, TotpPanel } from "./panels";
+import { formatTimestamp } from "@/domain/dates";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Mon compte" };
@@ -79,7 +80,7 @@ export default async function AccountPage() {
                         {e.detail && <span className="text-muted"> · {e.detail}</span>}
                       </span>
                       <time dateTime={e.createdAt} className="text-muted tabular">
-                        {new Date(e.createdAt).toLocaleString("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "short", timeStyle: "short" })}
+                        {formatTimestamp(e.createdAt, "dateTime")}
                       </time>
                     </li>
                   ))}

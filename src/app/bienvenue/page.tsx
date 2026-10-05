@@ -4,7 +4,7 @@ import { chooseModeAction } from "@/app/actions/journey";
 import { getHousehold, listInsurers, listPersons, listPolicies } from "@/application/household";
 import { formatDateShort } from "@/domain/dates";
 import { insurerLabel } from "@/infrastructure/db/queries";
-import { db, today } from "@/server/context";
+import { currentYear, db } from "@/server/context";
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { cn } from "@/ui/cn";
@@ -12,6 +12,7 @@ import { Page } from "@/ui/page";
 import { ContractsStep, IdentityStep, MemberAdder } from "./steps";
 import { pageScope } from "@/server/auth";
 import { chosenMode } from "@/server/onboarding";
+import { selectableYears } from "@/domain/lamal";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bienvenue" };
@@ -40,7 +41,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   const h = getHousehold(db(), scope);
   const mode = await chosenMode(scope);
   const solo = mode === "SOLO";
-  const year = Number(today().slice(0, 4));
+  const year = currentYear();
   const persons = h ? listPersons(db(), h.id) : [];
   const withContracts = persons.map((p) => {
     const current = listPolicies(db(), p.id).find((x) => x.policy.coverageYear === year);
@@ -68,7 +69,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   const insurers = listInsurers(db())
     .map((i) => ({ id: i.id, name: insurerLabel(i) }))
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  const years = Array.from({ length: year + 2 - 2010 }, (_, i) => year + 1 - i);
+  const years = selectableYears(year);
   const first = persons[0];
 
   return (

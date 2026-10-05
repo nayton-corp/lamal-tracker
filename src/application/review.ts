@@ -3,7 +3,7 @@ import { ageClassForYear, ageTransition } from "@/domain/age";
 import { costOf, filterOffers, rankOffers, type Offer, type RankedOffer } from "@/domain/comparison";
 import { daysBetween, type IsoDate } from "@/domain/dates";
 import { reviewDeadlines, urgency } from "@/domain/deadlines";
-import { defaultSubgroup, type ModelType } from "@/domain/lamal";
+import { subgroupFor, type ModelType } from "@/domain/lamal";
 import { changePermille } from "@/domain/money";
 import { franchisesFor } from "@/domain/parameters";
 import { pingenFailed } from "@/domain/pingen";
@@ -48,7 +48,7 @@ function offerScope(db: Db, reviewRow: typeof review.$inferSelect, line: Pick<Li
 
 function renewalFor(db: Db, reviewRow: typeof review.$inferSelect, p: PersonRow, policy: PolicyRow) {
   const ageClass = ageClassForYear(p.birthDate, reviewRow.targetYear);
-  const subgroup = ageClass === "KID" ? p.kidSubgroup || "K1" : defaultSubgroup(ageClass);
+  const subgroup = subgroupFor(ageClass, p.kidSubgroup);
   const accident = policy.accident;
   const params = parametersFor(db, reviewRow.targetYear);
   const offers = offersFor(db, offerScope(db, reviewRow, { targetAgeClass: ageClass, accident, subgroup }));

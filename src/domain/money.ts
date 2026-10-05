@@ -64,9 +64,16 @@ export function changePermille(from: Rappen, to: Rappen): number | null {
   return Math.round(((to - from) * 1000) / from);
 }
 
+/** Pour-mille → texte « +3.2 % » (signe affiché si `signed`, « — » si inconnu). */
 export function formatPermille(permille: number | null, signed = true): string {
   if (permille === null) return "—";
   const sign = permille < 0 ? "−" : signed && permille > 0 ? "+" : "";
   const abs = Math.abs(permille);
   return `${sign}${Math.floor(abs / 10)}.${abs % 10} %`;
+}
+
+/** Montant en centimes → valeur d'un champ de saisie (« 412.50 », sans « CHF » ni séparateur). */
+export function rpToInput(rp: Rappen | null | undefined, decimals: 0 | 2 = 2): string {
+  if (rp === null || rp === undefined) return "";
+  return (rp / 100).toFixed(decimals);
 }

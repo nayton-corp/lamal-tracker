@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { EmptyState, Page, PageHeader } from "@/ui/page";
 import { MarketChart, PersonChart, TotalsChart } from "./charts";
 import { pageScope } from "@/server/auth";
+import { formatPermille } from "@/domain/money";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Historique" };
@@ -45,8 +46,8 @@ export default async function HistoryPage() {
         />
         <Stat
           label="Hausse moyenne par an"
-          value={s.avgChangePermille === null ? "—" : `${s.avgChangePermille >= 0 ? "+" : ""}${(s.avgChangePermille / 10).toFixed(1)} %`}
-          hint={s.avgMarketChangePermille === null ? "Marché : primes passées non importées." : `Marché : ${s.avgMarketChangePermille >= 0 ? "+" : ""}${(s.avgMarketChangePermille / 10).toFixed(1)} % par an.`}
+          value={formatPermille(s.avgChangePermille)}
+          hint={s.avgMarketChangePermille === null ? "Marché : primes passées non importées." : `Marché : ${formatPermille(s.avgMarketChangePermille)} par an.`}
           tone={s.avgChangePermille !== null && s.avgMarketChangePermille !== null ? (s.avgChangePermille <= s.avgMarketChangePermille ? "saving" : "increase") : undefined}
         />
         <Stat

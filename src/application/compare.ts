@@ -44,6 +44,13 @@ export interface DetailedOffer extends RankedOffer {
   standardMonthlyRp: number | null;
 }
 
+/**
+ * Courbe « coût total selon les frais de santé » : jusqu'à CHF 4'000 de frais pour un enfant,
+ * CHF 10'000 pour un adulte, en `CURVE_POINTS` pas égaux.
+ */
+const CURVE_MAX_HEALTH_COSTS_RP = { KID: 400_000, OTHER: 1_000_000 } as const;
+const CURVE_POINTS = 40;
+
 export const offerKey = (o: { tariffId: number; franchiseChf: number }) => `${o.tariffId}-${o.franchiseChf}`;
 
 export interface CompareView {
@@ -140,7 +147,7 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     coinsuranceMaxRp,
     co2AnnualRp: params.co2AnnualRp,
   };
-  const maxH = line.targetAgeClass === "KID" ? 400_000 : 1_000_000;
+  const curveMaxRp = line.targetAgeClass === "KID" ? CURVE_MAX_HEALTH_COSTS_RP.KID : CURVE_MAX_HEALTH_COSTS_RP.OTHER;
   return {
     lineId,
     targetYear: r.targetYear,
@@ -157,8 +164,8 @@ export function compareForLine(db: Db, scope: Scope, lineId: number, opts: Compa
     currentInsurerId: policy.insurerId,
     curve: {
       franchises: cheapest.map((o) => o.franchiseChf),
-      points: franchiseCurve(cheapest, base, maxH, maxH / 40),
-      breakEvenRp: breakEvenRp(cheapest, base, maxH * 2),
+      points: franchiseCurve(cheapest, base, curveMaxRp, curveMaxRp / CURVE_POINTS),
+      breakEvenRp: breakEvenRp(cheapest, base, curveMaxRp * 2),
     },
     renewalCandidates: [...new Map(
       all

@@ -1,5 +1,6 @@
 import type { Offer } from "./comparison";
 import type { ModelType } from "./lamal";
+import { foldForSearch } from "./text";
 
 export interface CurrentContract {
   insurerId: number;
@@ -28,10 +29,7 @@ export function nearestFranchise(current: number, allowed: readonly number[]): n
 
 /** « Bestcare (BESTCARE) » → « bestcare bestcare » ; accents, casse et ponctuation ignorés. */
 export function normalizeTariff(s: string | null | undefined): string {
-  return (s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
+  return foldForSearch(s ?? "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }

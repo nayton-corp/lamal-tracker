@@ -9,10 +9,11 @@ import { resetCo2, resetInsurerAddress, saveCo2 } from "@/application/reference-
 import { refreshReference } from "@/server/reference";
 import { saveSubscription, removeSubscription, notify, pushSubscriptionSchema } from "@/infrastructure/push/push";
 import { chfField, toActionError, type ActionState } from "@/server/action";
-import { db, nowIso, today } from "@/server/context";
+import { currentYear, db, nowIso } from "@/server/context";
 import { dataDir, importJob, startArchivesImport, startImport, startYearImport } from "@/server/jobs";
 import { checkForNewPremiums } from "@/server/watch";
 import { requireAdminScope, requireScope } from "@/server/auth";
+import { FIRST_PREMIUM_YEAR } from "@/domain/lamal";
 
 export async function checkPremiumsAction(): Promise<ActionState> {
   await requireAdminScope();
@@ -29,8 +30,8 @@ export async function checkPremiumsAction(): Promise<ActionState> {
  */
 export async function importYearAction(year: number): Promise<ActionState> {
   await requireScope();
-  const current = Number(today().slice(0, 4));
-  if (!Number.isInteger(year) || year < 2010 || year > current + 1) return { error: "Année invalide." };
+  const current = currentYear();
+  if (!Number.isInteger(year) || year < FIRST_PREMIUM_YEAR || year > current + 1) return { error: "Année invalide." };
   return startYearImport(year) ? { ok: `Import des primes ${year} lancé.` } : { error: "Un import est déjà en cours." };
 }
 

@@ -147,7 +147,8 @@ export function householdMembers(db: Db, scope: Scope) {
     .from(householdMember)
     .innerJoin(appUser, eq(appUser.id, householdMember.userId))
     .where(eq(householdMember.householdId, householdId))
-    .orderBy(asc(householdMember.createdAt), asc(householdMember.userId))
+    // Propriétaire d'abord (« OWNER » > « MEMBER »), puis par ancienneté.
+    .orderBy(desc(householdMember.role), asc(householdMember.createdAt), asc(householdMember.userId))
     .all()
     .map((m) => ({ ...m, you: m.userId === scope.userId }));
 }

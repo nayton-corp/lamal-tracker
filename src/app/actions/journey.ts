@@ -6,6 +6,7 @@ import { getHousehold, getHouseholdMode, listPersons, setHouseholdMode, type Hou
 import { UserError } from "@/application/errors";
 import { deleteSignature, saveSignature } from "@/application/signatures";
 import { saveNeeds, setStrategy } from "@/application/strategy";
+import { DEFAULT_HEALTH_COSTS_RP } from "@/domain/lamal";
 import { STRATEGIES, type Strategy } from "@/domain/strategy";
 import { chfField, toActionError, type ActionState } from "@/server/action";
 import { db, nowIso } from "@/server/context";
@@ -59,7 +60,7 @@ export async function saveNeedsAction(_: ActionState, form: FormData): Promise<A
           lineId: id,
           franchiseChf: franchise === "" || franchise === "auto" ? null : Number(franchise),
           models: form.getAll(`models-${id}`).map(String),
-          healthCostsRp: health ?? 50000,
+          healthCostsRp: health ?? DEFAULT_HEALTH_COSTS_RP,
           doctorName: doctor || null,
         };
       }),
