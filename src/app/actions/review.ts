@@ -146,20 +146,6 @@ export async function healthCostsAction(_: ActionState, form: FormData): Promise
   return { ok: "Frais attendus enregistrés." };
 }
 
-export async function generateLettersAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const scope = await requireScope();
-  try {
-    const res = generateLetters(db(), scope, Number(form.get("reviewId")), today());
-    revalidatePath("/", "layout");
-    if (res.blocked.length) {
-      return { error: res.blocked.map((b) => `${b.person} : ${b.reasons.join(" ")}`).join("\n") };
-    }
-    return { ok: res.created.length ? `${res.created.length} lettre(s) prête(s).` : "Aucune lettre à générer." };
-  } catch (e) {
-    return toActionError(e);
-  }
-}
-
 export async function letterSentAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
@@ -226,17 +212,6 @@ export async function deleteReviewAction(_: ActionState, form: FormData): Promis
   }
   done(year);
   return null;
-}
-
-export async function generateOffersAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const scope = await requireScope();
-  try {
-    const ids = generateOfferRequests(db(), scope, Number(form.get("reviewId")), today());
-    revalidatePath("/", "layout");
-    return { ok: ids.length ? `${ids.length} demande(s) prête(s).` : "Aucune nouvelle caisse choisie." };
-  } catch (e) {
-    return toActionError(e);
-  }
 }
 
 export async function offerSentAction(form: FormData) {

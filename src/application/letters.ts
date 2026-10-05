@@ -7,7 +7,8 @@ import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import type { Db } from "@/infrastructure/db/client";
 import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
 import { household, insurer, letter, review } from "@/infrastructure/db/schema";
-import { getReviewView, UserError } from "./review";
+import { UserError } from "./errors";
+import { getReviewView } from "./review";
 import { findLetter, type Scope } from "./scope";
 
 export interface GenerateResult {

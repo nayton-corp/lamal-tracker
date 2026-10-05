@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { saveInsurer } from "@/application/household";
-import { UserError } from "@/application/review";
+import { UserError } from "@/application/errors";
 import { resetCo2, resetInsurerAddress, saveCo2 } from "@/application/reference-data";
 import { refreshReference } from "@/server/reference";
 import { saveSubscription, removeSubscription, notify, pushSubscriptionSchema } from "@/infrastructure/push/push";

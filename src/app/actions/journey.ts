@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getHousehold, getHouseholdMode, listPersons, setHouseholdMode, type HouseholdMode } from "@/application/household";
-import { UserError } from "@/application/review";
+import { UserError } from "@/application/errors";
 import { deleteSignature, saveSignature } from "@/application/signatures";
 import { saveNeeds, setStrategy } from "@/application/strategy";
 import { STRATEGIES, type Strategy } from "@/domain/strategy";

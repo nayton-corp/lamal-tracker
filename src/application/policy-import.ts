@@ -10,7 +10,7 @@ import { activeDataset, insurerLabel, parametersFor } from "@/infrastructure/db/
 import { insurer, premium, tariff } from "@/infrastructure/db/schema";
 import { withHousehold, type Scope } from "./scope";
 import { getHousehold, listInsurers, listLca, listPersons, saveHousehold, saveLca, savePerson, savePolicy, setHouseholdMode } from "./household";
-import { UserError } from "./review";
+import { UserError } from "./errors";
 
 export interface ImportedPerson {
   personId: number;

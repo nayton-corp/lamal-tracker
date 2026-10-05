@@ -4,13 +4,6 @@
  */
 export type Rappen = number;
 
-export function assertRappen(value: number, label = "montant"): Rappen {
-  if (!Number.isSafeInteger(value)) {
-    throw new Error(`${label} doit être un entier en centimes, reçu ${value}`);
-  }
-  return value;
-}
-
 /** Accepte 432.1, "432.10", "432,10", "1'234.50", "1’234.50", "CHF 12". */
 export function parseChf(input: number | string): Rappen {
   if (typeof input === "number") {

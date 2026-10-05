@@ -1,7 +1,7 @@
 import "server-only";
 import { ZodError } from "zod";
 import { parseChf } from "@/domain/money";
-import { UserError } from "@/application/review";
+import { UserError } from "@/application/errors";
 
 export type ActionState = { ok?: string; error?: string; fieldErrors?: Record<string, string> } | null;
 

@@ -19,7 +19,7 @@ import { tariffOptions, type TariffOptions } from "@/application/tariffs";
 import { analyzePolicyText, applyPolicyImport, createHouseholdFromPolicy, previewPolicyHolder, type ConfirmedImport, type HouseholdFromPolicy, type PolicyHolderPreview, type PolicyImport } from "@/application/policy-import";
 import { readPdfText } from "@/infrastructure/pdf/read-text";
 import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/postal";
-import { UserError } from "@/application/review";
+import { UserError } from "@/application/errors";
 import { chfField, rethrowForeignKey, toActionError, type ActionState } from "@/server/action";
 import { db, today } from "@/server/context";
 import { requireScope } from "@/server/auth";

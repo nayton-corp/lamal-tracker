@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { abandonPingen, pingenFileName, sendLetterViaPingen, syncPingenLetters, type PingenDeps } from "@/application/pingen";
 import { getLetter } from "@/application/letters";
-import { UserError } from "@/application/review";
+import { UserError } from "@/application/errors";
 import { saveSignature } from "@/application/signatures";
 import { buildLetter } from "@/domain/letter";
 import { PINGEN_UNKNOWN } from "@/domain/pingen";

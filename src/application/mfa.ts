@@ -70,15 +70,6 @@ export function startTotpSetup(db: Db, userId: number, password: string, nowIso:
   return { token, secret, uri: totpUri(secret, user.email ?? "administrateur") };
 }
 
-/** Secret provisoire encore valable (page d'activation rechargée). */
-export function pendingTotpSetup(db: Db, userId: number, token: string | undefined, nowIso: string): { secret: string; uri: string } | null {
-  const row = peekToken(db, "TOTP_SETUP", token, nowIso);
-  if (!row || row.userId !== userId) return null;
-  const secret = setupSecret(db, userId, row.data);
-  if (!secret) return null;
-  return { secret, uri: totpUri(secret, userRow(db, userId).email ?? "administrateur") };
-}
-
 /** Le premier code juste active le double facteur ; renvoie les codes de secours à noter. */
 export function confirmTotpSetup(db: Db, userId: number, token: string | undefined, code: string, nowMs: number, nowIso: string): string[] {
   const row = peekToken(db, "TOTP_SETUP", token, nowIso);

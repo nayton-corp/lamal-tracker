@@ -5,10 +5,6 @@ export function Card({ className, ...props }: ComponentProps<"section">) {
   return <section className={cn("rounded-2xl border border-border bg-surface p-4 shadow-card", className)} {...props} />;
 }
 
-export function CardTitle({ className, ...props }: ComponentProps<"h2">) {
-  return <h2 className={cn("text-base font-semibold leading-tight", className)} {...props} />;
-}
-
 export function Section({ title, action, children, className }: { title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
     <section className={cn("space-y-3", className)}>

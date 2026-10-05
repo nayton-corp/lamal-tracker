@@ -21,8 +21,8 @@ import {
   openReview,
   reopenReview,
   undoDecision,
-  UserError,
 } from "@/application/review";
+import { UserError } from "@/application/errors";
 import { openDb, type Db } from "@/infrastructure/db/client";
 import { lamalPolicy, premium, tariffDataset } from "@/infrastructure/db/schema";
 import { importPremiumFile } from "@/infrastructure/ofsp/importer";

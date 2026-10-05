@@ -27,7 +27,6 @@ import { listPersons } from "./household";
 import { bumpUsage } from "./usage";
 import { findLetter, findLine, findReview, householdIdOf, ownedLetter, ownedLine, ownedReview, type Scope } from "./scope";
 
-export { UserError } from "./errors";
 
 type LineRow = typeof reviewLine.$inferSelect;
 type PersonRow = typeof person.$inferSelect;

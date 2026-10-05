@@ -38,7 +38,3 @@ export function coinsuranceMaxFor(params: LamalParameters, ageClass: AgeClass): 
   return ageClass === "KID" ? params.coinsuranceMaxKidRp : params.coinsuranceMaxAdultRp;
 }
 
-/** Part mensuelle de la redistribution CO2, arrondie au centime. */
-export function co2MonthlyRp(params: LamalParameters): Rappen {
-  return params.co2AnnualRp === null ? 0 : Math.round(params.co2AnnualRp / 12);
-}

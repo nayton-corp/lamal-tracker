@@ -8,7 +8,8 @@ import { formatChf } from "@/domain/money";
 import type { Db } from "@/infrastructure/db/client";
 import { insurerLabel, insurerRecipient } from "@/infrastructure/db/queries";
 import { household, insurer, lcaPolicy, offerRequest, review, reviewLine } from "@/infrastructure/db/schema";
-import { getReviewView, UserError } from "./review";
+import { UserError } from "./errors";
+import { getReviewView } from "./review";
 import { bumpUsage } from "./usage";
 import { findOfferRequest, ownedLine, ownedOfferRequest, ownedReview, type Scope } from "./scope";
 
