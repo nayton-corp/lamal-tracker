@@ -81,7 +81,7 @@ export function findReview(db: Db, scope: Scope, reviewId: number) {
 
 export function ownedReview(db: Db, scope: Scope, reviewId: number) {
   const row = findReview(db, scope, reviewId);
-  if (!row) throw new NotFoundError("Rituel");
+  if (!row) throw new NotFoundError("Bilan");
   return row;
 }
 

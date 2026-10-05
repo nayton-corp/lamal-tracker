@@ -2,13 +2,13 @@ import { daysBetween, formatDateLong, type IsoDate } from "./dates";
 import { REMINDER_OFFSETS, type ReviewDeadlines } from "./deadlines";
 
 /*
- * Rappels du rituel pour l'envoi des courriers postaux (notifications push, parfois aussi par
+ * Rappels du bilan pour l'envoi des courriers postaux (notifications push, parfois aussi par
  * courriel) : avant la date d'envoi conseillée, puis juste après.
  */
 
 /** Où en est un foyer dans l'envoi de ses courriers papier, pour une année cible. */
 export interface LetterProgress {
-  /** Rituel clôturé (tout est envoyé) : plus aucun rappel. */
+  /** Bilan clôturé (tout est envoyé) : plus aucun rappel. */
   closed: boolean;
   /** Personnes du foyer, et celles qui ont décidé de garder leur contrat. */
   persons: number;
@@ -42,7 +42,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
 export function letterReminders(today: IsoDate, targetYear: number, deadlines: ReviewDeadlines, p: LetterProgress): Reminder[] {
   if (p.closed || p.persons === 0) return [];
   const out: Reminder[] = [];
-  const url = `/rituel/${targetYear}`;
+  const url = `/bilan/${targetYear}`;
   const unsent = p.letters - p.lettersSent;
   const nothingToSend = p.persons > 0 && p.keeping === p.persons;
   const sendBy = formatDateLong(deadlines.sendBy, true);

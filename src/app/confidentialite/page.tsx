@@ -12,7 +12,7 @@ export default function PrivacyPage() {
     <LegalPage title="Confidentialité" subtitle="Ce que l'app enregistre, pourquoi, et vos droits.">
         <h2>Ce qui est enregistré</h2>
         <p>
-          Votre courriel et votre mot de passe (haché, jamais en clair) ; pour chaque personne du foyer, le prénom, le nom, la date de naissance et l&apos;adresse ; les contrats d&apos;assurance (caisse, franchise, modèle, prime, complémentaires) ; vos choix lors du rituel annuel, les lettres préparées et les signatures dessinées.
+          Votre courriel et votre mot de passe (haché, jamais en clair) ; pour chaque personne du foyer, le prénom, le nom, la date de naissance et l&apos;adresse ; les contrats d&apos;assurance (caisse, franchise, modèle, prime, complémentaires) ; vos choix lors du bilan annuel, les lettres préparées et les signatures dessinées.
         </p>
         <p>Ce sont des données relatives à la santé au sens de la loi sur la protection des données (nLPD). Elles ne servent qu&apos;à vous aider à suivre et comparer vos primes.</p>
         <p>Si vous envoyez un avis depuis l&apos;app, il est gardé avec votre courriel pour pouvoir vous répondre, et supprimé avec votre compte. L&apos;app tient aussi quelques compteurs globaux (comptes créés, courriers envoyés), sans lien avec un compte ou un foyer.</p>

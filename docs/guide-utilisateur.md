@@ -12,9 +12,9 @@ et l'administration d'une instance sont dans [exploitation/](exploitation/).
 | Menu | Contenu |
 |---|---|
 | **Accueil** | La carte de l'année (où vous en êtes pour l'an prochain) et la liste des choses à faire |
-| **Rituel** | La comparaison et le changement de l'automne |
+| **Bilan** | La comparaison et le changement de l'automne |
 | **Foyer** (ou **Moi** pour une personne seule) | Personnes, adresse, contrats LAMal et complémentaires |
-| **Historique** | Primes payées année après année, économies des rituels, position face au marché |
+| **Historique** | Primes payées année après année, économies des bilans, position face au marché |
 | **Réglages** | Primes officielles, CO2, caisses, rappels, accès à *Mon compte*, *Mes données* et *Donner un avis* |
 
 ## L'accueil
@@ -92,22 +92,22 @@ d'enregistrer. L'import est aussi proposé à la première configuration.
 
 *Foyer › Accès au foyer › Inviter* (propriétaire du foyer seulement) crée un lien valable
 **48 heures**, à usage unique. La personne invitée devient **membre** : elle voit tout, prépare
-le rituel et signe ses lettres, mais ne peut ni inviter, ni retirer quelqu'un, ni effacer le
+le bilan et signe ses lettres, mais ne peut ni inviter, ni retirer quelqu'un, ni effacer le
 foyer.
 
-## Le rituel d'automne
+## Le bilan d'automne
 
 Chaque automne, l'app vous aide à vérifier que vous payez le juste prix pour l'année suivante.
 
 | Quand | Ce qui se passe |
 |---|---|
 | Fin septembre | L'OFSP publie les primes de l'an prochain. L'app les importe toute seule et envoie une notification. |
-| Dès la publication | Le rituel s'ouvre seul. La carte de l'accueil montre la **hausse** : ce que vous paierez sans rien faire. |
+| Dès la publication | Le bilan s'ouvre seul. La carte de l'accueil montre la **hausse** : ce que vous paierez sans rien faire. |
 | Octobre – mi-novembre | Préférences, comparaison, choix, envoi des courriers. |
-| Avant le 30 novembre | Vos lettres doivent être **reçues** par la caisse. L'app indique la date d'envoi conseillée (environ une semaine avant). Le rituel se termine seul quand tout est envoyé. |
+| Avant le 30 novembre | Vos lettres doivent être **reçues** par la caisse. L'app indique la date d'envoi conseillée (environ une semaine avant). Le bilan se termine seul quand tout est envoyé. |
 | Décembre – janvier | Les caisses confirment par courrier : gardez ces confirmations. |
 
-Le rituel se trouve dans le menu *Rituel*. Une frise montre où vous en êtes :
+Le bilan se trouve dans le menu *Bilan*. Une frise montre où vous en êtes :
 **Hausse → Préférences → Choix → Envoi**.
 
 ### 1. La hausse
@@ -134,7 +134,7 @@ Une seule page, deux questions :
    quote-part).
 
 Sous **Affiner**, vous pouvez imposer une franchise, choisir les modèles acceptés et noter votre
-médecin. Tout reste modifiable depuis la page du rituel.
+médecin. Tout reste modifiable depuis la page du bilan.
 
 ### 3. Comparer et choisir
 
@@ -181,15 +181,15 @@ La page *Démarches* guide pas à pas, dans l'ordre :
   de suivi et le prix reviennent seuls dans l'app. Une lettre refusée par Pingen (adresse
   illisible, par exemple) est signalée par une notification et peut être reprise.
 
-### 5. La fin du rituel
+### 5. La fin du bilan
 
-Le rituel se termine **tout seul** dès que le dernier courrier est marqué envoyé (ou, si tout le
+Le bilan se termine **tout seul** dès que le dernier courrier est marqué envoyé (ou, si tout le
 monde garde son contrat, dès le dernier choix) : les contrats de l'année suivante sont
 enregistrés et l'historique est mis à jour. Un contrat de l'année suivante déjà saisi à la main
 ou importé d'un PDF est gardé tel quel. Si la prime facturée par la caisse diffère, ajustez-la
 dans le contrat. Gardez les confirmations que les caisses vous envoient.
 
-Annuler un envoi, ou une lettre refusée par Pingen, rouvre le rituel. En bas de la page,
+Annuler un envoi, ou une lettre refusée par Pingen, rouvre le bilan. En bas de la page,
 *Modifier mes choix* le rouvre aussi (refus de la nouvelle caisse, erreur : les choix restent,
 les contrats enregistrés sont retirés le temps de corriger), et *Recommencer à zéro* efface les
 choix et les courriers de l'année pour repartir des nouvelles primes. Les courriers déjà postés
@@ -242,7 +242,7 @@ la page de connexion envoie un lien valable une heure ; le double facteur reste 
 - **Journal du foyer** : les événements importants du foyer.
 - **Supprimer mon compte** : si vous êtes seul dans le foyer, le foyer part avec vous ; sinon il
   reste aux autres membres, et le plus ancien devient propriétaire.
-- **Supprimer le foyer** (propriétaire) : efface personnes, contrats, rituels, lettres et
+- **Supprimer le foyer** (propriétaire) : efface personnes, contrats, bilans, lettres et
   signatures pour tous les comptes du foyer. Les comptes restent et peuvent recommencer à zéro.
 
 **Comptes inactifs.** Un compte sans connexion depuis **24 mois** reçoit deux rappels par

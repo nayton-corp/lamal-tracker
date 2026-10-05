@@ -17,7 +17,7 @@ import {
   syncReviewClosure,
   undoDecision,
 } from "@/application/review";
-import { nextStep } from "@/app/rituel/_parts/next-step";
+import { nextStep } from "@/app/bilan/_parts/next-step";
 import { toActionError, rethrowForeignKey, type ActionState } from "@/server/action";
 import { db, nowIso, today } from "@/server/context";
 import { requireScope } from "@/server/auth";
@@ -25,8 +25,8 @@ import { findLine, findLetter, findOfferRequest, ownedLetter, type Scope } from 
 import { pingenClientFor, pingenDeps } from "@/server/pingen";
 
 /**
- * Après un choix : la personne suivante sans choix, sinon l'étape suivante du rituel (démarches).
- * Si tout le monde garde son contrat, il n'y a rien à envoyer : le rituel se clôt aussitôt.
+ * Après un choix : la personne suivante sans choix, sinon l'étape suivante du bilan (démarches).
+ * Si tout le monde garde son contrat, il n'y a rien à envoyer : le bilan se clôt aussitôt.
  */
 function afterDecision(scope: Scope, year: number, lineId: number) {
   const line = findLine(db(), scope, lineId);
@@ -36,18 +36,18 @@ function afterDecision(scope: Scope, year: number, lineId: number) {
   if (syncReviewClosure(db(), scope, line.reviewId, today(), nowIso()) === "closed") return redirectToReview(year);
   const step = nextStep(getReviewView(db(), scope, line.reviewId, today()));
   revalidatePath("/", "layout");
-  redirect(step.kind === "none" ? `/rituel/${year}#ligne-${lineId}` : step.href);
+  redirect(step.kind === "none" ? `/bilan/${year}#ligne-${lineId}` : step.href);
 }
 
-/** Clôt (ou rouvre) le rituel d'un courrier selon l'avancement ; message à afficher s'il vient de se clore. */
+/** Clôt (ou rouvre) le bilan d'un courrier selon l'avancement ; message à afficher s'il vient de se clore. */
 function syncAfterSending(scope: Scope, reviewId: number | undefined): string | null {
   if (reviewId === undefined) return null;
-  return syncReviewClosure(db(), scope, reviewId, today(), nowIso()) === "closed" ? "Tout est envoyé : le rituel est terminé et vos nouveaux contrats sont enregistrés." : null;
+  return syncReviewClosure(db(), scope, reviewId, today(), nowIso()) === "closed" ? "Tout est envoyé : le bilan est terminé et vos nouveaux contrats sont enregistrés." : null;
 }
 
 function redirectToReview(year: number, path = "") {
   revalidatePath("/", "layout");
-  redirect(`/rituel/${year}${path}`);
+  redirect(`/bilan/${year}${path}`);
 }
 
 export async function openReviewAction(_: ActionState, form: FormData): Promise<ActionState> {

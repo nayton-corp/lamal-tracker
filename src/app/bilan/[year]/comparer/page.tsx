@@ -10,8 +10,8 @@ export default async function CompareEntry({ params }: { params: Promise<{ year:
   const scope = await pageScope();
   const year = Number((await params).year);
   const reviewRow = getReviewByYear(db(), scope, year);
-  if (!reviewRow) redirect(`/rituel/${year}`);
+  if (!reviewRow) redirect(`/bilan/${year}`);
   const lines = listReviewLineTabs(db(), scope, reviewRow.id);
   const target = lines.find((l) => l.decision === "UNDECIDED") ?? lines[0];
-  redirect(target ? `/rituel/${year}/personne/${target.id}` : `/rituel/${year}`);
+  redirect(target ? `/bilan/${year}/personne/${target.id}` : `/bilan/${year}`);
 }

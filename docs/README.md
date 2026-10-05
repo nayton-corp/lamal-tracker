@@ -23,7 +23,7 @@ importante.
    quote-part, modèles, LCA, résiliation, données de l'OFSP). Sans ces notions, le code est
    difficile à suivre.
 2. [glossaire.md](glossaire.md) : correspondance entre les mots de l'interface (en français) et
-   les identifiants du code (en anglais), par exemple rituel et `review`.
+   les identifiants du code (en anglais), par exemple bilan et `review`.
 3. [architecture.md](architecture.md) : les couches, le chemin d'une requête, le cloisonnement
    des foyers, l'authentification, le chiffrement, les tâches de fond.
 4. [modele-de-donnees.md](modele-de-donnees.md) : les tables, leurs relations et leurs états.
@@ -36,7 +36,7 @@ Les règles courtes pour un agent de code sont dans [../CLAUDE.md](../CLAUDE.md)
 
 | Document | Contenu |
 |---|---|
-| [guide-utilisateur.md](guide-utilisateur.md) | Le rituel d'automne pas à pas, le foyer, la police PDF, les démarches, le compte et les données |
+| [guide-utilisateur.md](guide-utilisateur.md) | Le bilan d'automne pas à pas, le foyer, la police PDF, les démarches, le compte et les données |
 | [concepts.md](concepts.md) | Notions LAMal et données officielles |
 | [glossaire.md](glossaire.md) | Interface ↔ code ↔ table ou route |
 | [architecture.md](architecture.md) | Organisation du code et décisions de conception |

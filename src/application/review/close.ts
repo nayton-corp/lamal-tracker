@@ -1,5 +1,5 @@
 /**
- * Fin du rituel : clôture (contrats de l'année suivante créés), réouverture, suppression. La
+ * Fin du bilan : clôture (contrats de l'année suivante créés), réouverture, suppression. La
  * clôture est automatique : `syncReviewClosure` la fait dès que le dernier courrier est envoyé.
  */
 import { and, eq, inArray } from "drizzle-orm";
@@ -42,7 +42,7 @@ export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: stri
         billedMonthlyRp: l.chosenMonthlyRp!,
         source: "REVIEW" as const,
       };
-      // Un contrat non saisi à la main (clôture précédente de ce rituel) est remplacé par la décision.
+      // Un contrat non saisi à la main (clôture précédente de ce bilan) est remplacé par la décision.
       if (existing) tx.update(lamalPolicy).set(values).where(eq(lamalPolicy.id, existing.id)).run();
       else tx.insert(lamalPolicy).values(values).run();
     }
@@ -51,7 +51,7 @@ export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: stri
 }
 
 /**
- * Clôture ou réouverture automatique selon l'avancement : le rituel se clôt quand tout le monde a
+ * Clôture ou réouverture automatique selon l'avancement : le bilan se clôt quand tout le monde a
  * décidé et que chaque courrier nécessaire est envoyé, et se rouvre si ce n'est plus le cas (envoi
  * annulé). Appelé après chaque action qui peut changer l'avancement ; renvoie ce qui s'est passé.
  */
@@ -72,14 +72,14 @@ export function syncReviewClosure(db: Db, scope: Scope, reviewId: number, today:
 
 /**
  * Annule la clôture : retire les contrats de l'année cible créés par la clôture et rouvre la revue.
- * Les décisions restent, on peut les modifier ; le rituel se clôt à nouveau quand tout est envoyé.
+ * Les décisions restent, on peut les modifier ; le bilan se clôt à nouveau quand tout est envoyé.
  */
 export function reopenReview(db: Db, scope: Scope, reviewId: number) {
   reopenRow(db, ownedReview(db, scope, reviewId));
 }
 
 /**
- * Une lettre confiée à Pingen a été refusée : elle redevient à envoyer, donc son rituel, s'il était
+ * Une lettre confiée à Pingen a été refusée : elle redevient à envoyer, donc son bilan, s'il était
  * clôturé, se rouvre. Appelé par la synchronisation Pingen, qui passe sur tous les foyers.
  */
 export function reopenReviewOfFailedLetter(db: Db, letterId: number) {
@@ -89,7 +89,7 @@ export function reopenReviewOfFailedLetter(db: Db, letterId: number) {
   try {
     reopenRow(db, reviewRow);
   } catch (error) {
-    // Un rituel plus récent s'appuie sur ces contrats : on laisse tel quel, la lettre reste signalée.
+    // Un bilan plus récent s'appuie sur ces contrats : on laisse tel quel, la lettre reste signalée.
     if (!(error instanceof UserError)) throw error;
   }
 }
@@ -102,7 +102,7 @@ function reopenRow(db: Db, reviewRow: typeof review.$inferSelect) {
     const usedBy = db.select().from(reviewLine).where(inArray(reviewLine.currentPolicyId, ids)).get();
     if (usedBy) {
       const later = db.select().from(review).where(eq(review.id, usedBy.reviewId)).get()!;
-      throw new UserError(`Le rituel ${later.targetYear} s'appuie sur ces contrats : recommencez-le d'abord.`);
+      throw new UserError(`Le bilan ${later.targetYear} s'appuie sur ces contrats : recommencez-le d'abord.`);
     }
   }
   db.transaction((tx) => {
@@ -111,7 +111,7 @@ function reopenRow(db: Db, reviewRow: typeof review.$inferSelect) {
   });
 }
 
-/** Supprime le rituel (décisions et lettres comprises), même clôturé : on revient à l'état d'avant. */
+/** Supprime le bilan (décisions et lettres comprises), même clôturé : on revient à l'état d'avant. */
 export function deleteReview(db: Db, scope: Scope, reviewId: number) {
   const reviewRow = findReview(db, scope, reviewId);
   if (!reviewRow) return;

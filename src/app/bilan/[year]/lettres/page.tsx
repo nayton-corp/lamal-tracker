@@ -93,14 +93,14 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
   const scope = await pageScope();
   const year = Number((await params).year);
   const reviewRow = getReviewByYear(db(), scope, year);
-  if (!reviewRow) redirect(`/rituel/${year}`);
+  if (!reviewRow) redirect(`/bilan/${year}`);
   const view = getReviewView(db(), scope, reviewRow.id, today());
   const switching = view.lines.filter((p) => p.line.decision === "SWITCH");
   const adjusting = view.lines.filter((p) => p.line.decision === "ADJUST");
   const keeping = view.lines.filter((p) => p.line.decision === "KEEP");
   const undecided = view.lines.filter((p) => p.line.decision === "UNDECIDED");
   // Aucune décision prise : les démarches n'ont pas encore de sens.
-  if (undecided.length === view.lines.length) redirect(`/rituel/${year}`);
+  if (undecided.length === view.lines.length) redirect(`/bilan/${year}`);
   const offers = listOfferRequests(db(), scope, reviewRow.id);
   const terminations = view.letters.filter((l) => l.kind === "TERMINATION");
   const changes = view.letters.filter((l) => l.kind === "CHANGE");
@@ -122,11 +122,11 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
 
   return (
     <Page>
-      <PageHeader title="Démarches" subtitle="Dans l'ordre." back={`/rituel/${year}`} />
+      <PageHeader title="Démarches" subtitle="Dans l'ordre." back={`/bilan/${year}`} />
 
       {closed && (
         <Alert tone="success" title="Tout est envoyé">
-          Le rituel {year} est terminé et vos nouveaux contrats sont enregistrés. Gardez les confirmations que les caisses vous enverront.
+          Le bilan {year} est terminé et vos nouveaux contrats sont enregistrés. Gardez les confirmations que les caisses vous enverront.
         </Alert>
       )}
 
@@ -150,7 +150,7 @@ export default async function LettersPage({ params }: { params: Promise<{ year: 
           ))}
           {undecided.map((p) => (
             <li key={p.line.id}>
-              {p.person.firstName} : <Link className="text-primary underline" href={`/rituel/${year}/personne/${p.line.id}`}>choix à faire</Link>
+              {p.person.firstName} : <Link className="text-primary underline" href={`/bilan/${year}/personne/${p.line.id}`}>choix à faire</Link>
             </li>
           ))}
         </ul>

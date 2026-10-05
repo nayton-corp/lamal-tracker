@@ -1,10 +1,10 @@
 /*
- * Le rituel d'automne (« review » dans le code) : chaque année, on compare la nouvelle prime de
+ * Le bilan d'automne (« review » dans le code) : chaque année, on compare la nouvelle prime de
  * chaque personne aux offres de l'année suivante, on décide, puis on envoie les courriers.
  *
- *   open.ts       ouvrir le rituel d'une année (une ligne par personne, prime reconduite calculée)
+ *   open.ts       ouvrir le bilan d'une année (une ligne par personne, prime reconduite calculée)
  *   decisions.ts  décider pour une personne : garder, changer de caisse, changer de franchise
- *   view.ts       tout ce qu'affiche la page du rituel (meilleure offre, étapes, totaux)
+ *   view.ts       tout ce qu'affiche la page du bilan (meilleure offre, étapes, totaux)
  *   close.ts      clôturer (les contrats de l'année suivante sont créés), rouvrir, supprimer
  *   lines.ts      outils partagés par ces fichiers (non exportés au-delà du dossier)
  *

@@ -4,7 +4,7 @@ L'interface est en français, le code en anglais. Ce tableau fait la corresponda
 elles-mêmes sont expliquées dans [concepts.md](concepts.md) ; les tables dans
 [modele-de-donnees.md](modele-de-donnees.md).
 
-Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/rituel/2027`).
+Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/bilan/2027`).
 
 | Terme de l'interface | Identifiant de code | Table | Route |
 |---|---|---|---|
@@ -17,7 +17,7 @@ Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/rituel/2
 | Contrat LAMal | `lamalPolicy`, `ownedPolicy`, `savePolicy` | `lamal_policy` | `/foyer/personne/[id]` |
 | Complémentaire (LCA) | `lcaPolicy`, `ownedLca`, `LcaGuarantee` | `lca_policy` | `/foyer/personne/[id]` |
 | Importer une police | `src/application/policy-import.ts`, `src/domain/policy-import.ts` | — | `/foyer/importer?personne=[id]` (depuis « Ajouter un contrat ») |
-| Signature | `signature`, `src/application/signatures.ts` | `signature` | `/rituel/[year]/lettres` |
+| Signature | `signature`, `src/application/signatures.ts` | `signature` | `/bilan/[year]/lettres` |
 | Historique | `householdHistory` (`src/application/history.ts`) | — | `/historique` |
 | **Comptes** | | | |
 | Compte | `appUser` | `app_user` | `/compte` |
@@ -32,7 +32,7 @@ Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/rituel/2
 | En chiffres (administration) | `bumpUsage`, `UsageKey` | `usage_counter` | `/admin` |
 | **Référentiel** | | | |
 | Caisse | `insurer` | `insurer` | `/donnees/caisses` |
-| Portrait de la caisse | `insurerProfiles` (`src/application/insurers.ts`), `src/domain/insurer-profile.ts` | `insurer_indicator` | `/rituel/[year]/personne/[lineId]` |
+| Portrait de la caisse | `insurerProfiles` (`src/application/insurers.ts`), `src/domain/insurer-profile.ts` | `insurer_indicator` | `/bilan/[year]/personne/[lineId]` |
 | Jeu de primes | `tariffDataset` (`IMPORTING`, `ACTIVE`, `SUPERSEDED`, `FAILED`) | `tariff_dataset` | `/donnees` |
 | Tarif | `tariff`, `tariffCode` | `tariff` | — |
 | Prime | `premium`, `monthlyRp`, `Offer.monthlyPremiumRp` | `premium` | — |
@@ -44,24 +44,24 @@ Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/rituel/2
 | Modèle | `ModelType` : `STANDARD`, `PRAXIS`, `TELMED`, `PHARMACY`, `FLEX`, `OTHER` | `*.model_type` | — |
 | Région de primes | `region`, `lookupPostalCode` | `household.region` | `/foyer` |
 | Réglages | `src/app/donnees/` | `settings` | `/donnees` |
-| **Rituel** | | | |
-| Rituel | `review`, `findReview`, `ownedReview` | `review` | `/rituel`, `/rituel/[year]` |
-| Ligne (une personne du rituel) | `reviewLine`, `findLine`, `ownedLine` | `review_line` | `/rituel/[year]/personne/[lineId]` |
-| Hausse, reconduction | `renewal*`, `findRenewal`, `RenewalStatus` | `review_line.renewal_*` | `/rituel/[year]` |
-| Correspondance de tarif (lignée) | `tariffLineage`, `confirmLineage` | `tariff_lineage` | `/rituel/[year]/personne/[lineId]` |
-| Stratégie : Payer le moins possible / Ne rien changer au quotidien | `Strategy` : `ECONOMY` / `KEEP` | `review.strategy` | `/rituel/[year]/preferences` |
-| Préférences (stratégie et besoins) | `savePreferences`, `UsageProfile` | `review.needs_confirmed_at`, `review_line.wish_*` | `/rituel/[year]/preferences` |
-| Comparateur | `compareForLine` (`src/application/compare.ts`), `rankForStrategy` | — | `/rituel/[year]/comparer`, `/rituel/[year]/personne/[lineId]` |
-| Comparer des offres (côte à côte) | — | — | `/rituel/[year]/personne/[lineId]/comparer` |
-| Je garde / Je change de caisse / Je change de franchise ou de modèle | `Decision` : `KEEP` / `SWITCH` / `ADJUST` (`UNDECIDED` = À décider) | `review_line.decision` | `/rituel/[year]/personne/[lineId]` |
-| Rappel LCA (complémentaires) | `LcaNote`, `lcaProducts` | `lca_policy` | `/rituel/[year]/lettres` |
-| Étapes Hausse → Envoi | `RitualStepKey`, `ritualSteps`, `isRitualComplete` | — | `/rituel/[year]` |
-| Clôture automatique / Modifier mes choix / Recommencer à zéro | `syncReviewClosure`, `reopenReview`, `deleteReview` | `review.status` | `/rituel/[year]` |
-| Démarches | `src/app/rituel/[year]/lettres/page.tsx` | — | `/rituel/[year]/lettres` |
-| Demande d'offre / d'affiliation | `offerRequest`, `ownedOfferRequest` | `offer_request` | `/rituel/[year]/lettres` |
-| Lettre : résiliation / changement | `letter`, `ownedLetter`, `kind` : `TERMINATION` / `CHANGE` | `letter` | `/rituel/[year]/lettres` |
-| Envoi par Pingen | `src/application/pingen.ts`, `PingenPhase` | `letter.pingen_*` | `/rituel/[year]/lettres` |
-| Clôture, réouverture | `closeReview`, `reopenReview`, `deleteReview` | `review.status`, `review.closed_at` | `/rituel/[year]` |
+| **Bilan** | | | |
+| Bilan | `review`, `findReview`, `ownedReview` | `review` | `/bilan`, `/bilan/[year]` |
+| Ligne (une personne du bilan) | `reviewLine`, `findLine`, `ownedLine` | `review_line` | `/bilan/[year]/personne/[lineId]` |
+| Hausse, reconduction | `renewal*`, `findRenewal`, `RenewalStatus` | `review_line.renewal_*` | `/bilan/[year]` |
+| Correspondance de tarif (lignée) | `tariffLineage`, `confirmLineage` | `tariff_lineage` | `/bilan/[year]/personne/[lineId]` |
+| Stratégie : Payer le moins possible / Ne rien changer au quotidien | `Strategy` : `ECONOMY` / `KEEP` | `review.strategy` | `/bilan/[year]/preferences` |
+| Préférences (stratégie et besoins) | `savePreferences`, `UsageProfile` | `review.needs_confirmed_at`, `review_line.wish_*` | `/bilan/[year]/preferences` |
+| Comparateur | `compareForLine` (`src/application/compare.ts`), `rankForStrategy` | — | `/bilan/[year]/comparer`, `/bilan/[year]/personne/[lineId]` |
+| Comparer des offres (côte à côte) | — | — | `/bilan/[year]/personne/[lineId]/comparer` |
+| Je garde / Je change de caisse / Je change de franchise ou de modèle | `Decision` : `KEEP` / `SWITCH` / `ADJUST` (`UNDECIDED` = À décider) | `review_line.decision` | `/bilan/[year]/personne/[lineId]` |
+| Rappel LCA (complémentaires) | `LcaNote`, `lcaProducts` | `lca_policy` | `/bilan/[year]/lettres` |
+| Étapes Hausse → Envoi | `RitualStepKey`, `ritualSteps`, `isRitualComplete` | — | `/bilan/[year]` |
+| Clôture automatique / Modifier mes choix / Recommencer à zéro | `syncReviewClosure`, `reopenReview`, `deleteReview` | `review.status` | `/bilan/[year]` |
+| Démarches | `src/app/bilan/[year]/lettres/page.tsx` | — | `/bilan/[year]/lettres` |
+| Demande d'offre / d'affiliation | `offerRequest`, `ownedOfferRequest` | `offer_request` | `/bilan/[year]/lettres` |
+| Lettre : résiliation / changement | `letter`, `ownedLetter`, `kind` : `TERMINATION` / `CHANGE` | `letter` | `/bilan/[year]/lettres` |
+| Envoi par Pingen | `src/application/pingen.ts`, `PingenPhase` | `letter.pingen_*` | `/bilan/[year]/lettres` |
+| Clôture, réouverture | `closeReview`, `reopenReview`, `deleteReview` | `review.status`, `review.closed_at` | `/bilan/[year]` |
 | Rappels | `letterReminders`, `REMINDER_OFFSETS` | `notification_log`, `push_subscription` | `/donnees` (section Rappels) |
 | **Termes techniques** | | | |
 | Portée d'une requête (compte, foyer, rôles) | `Scope`, `pageScope`, `accountPageScope`, `requireScope`, `requireAdminScope` | — | — |

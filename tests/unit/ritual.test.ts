@@ -70,7 +70,7 @@ describe("import OFSP", () => {
   });
 });
 
-describe("rituel annuel", () => {
+describe("bilan annuel", () => {
   let lines: { adult: number; teen: number };
 
   it("prépare le foyer", () => {
@@ -279,7 +279,7 @@ describe("rituel annuel", () => {
     // Redistribution CO2 2027 : 57.00 / 12 = 4.75
     const p = history.persons[0]!.points[1]!;
     expect(p.billedMonthlyRp - p.netMonthlyRp).toBe(475);
-    // Statistiques : total payé, économie du rituel 2027, position dans le marché.
+    // Statistiques : total payé, économie du bilan 2027, position dans le marché.
     const s = history.stats;
     expect(s.totalPaidRp).toBe(history.persons.reduce((a, x) => a + x.points.reduce((b, pt) => b + pt.billedMonthlyRp * 12, 0), 0));
     expect(s.reviewSavings).toHaveLength(1);
@@ -290,7 +290,7 @@ describe("rituel annuel", () => {
     expect(s.gapToCheapestAnnualRp).toBeGreaterThanOrEqual(0);
   });
 
-  it("rouvre un rituel clôturé : les contrats créés disparaissent, les décisions restent", () => {
+  it("rouvre un bilan clôturé : les contrats créés disparaissent, les décisions restent", () => {
     reopenReview(db, scope, 1);
     expect(getReviewByYear(db, scope, 2027)?.status).toBe("OPEN");
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(0);
@@ -326,7 +326,7 @@ describe("rituel annuel", () => {
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(2);
   });
 
-  it("supprime un rituel clôturé et revient à l'état d'avant", () => {
+  it("supprime un bilan clôturé et revient à l'état d'avant", () => {
     deleteReview(db, scope, 1);
     expect(getReviewByYear(db, scope, 2027)).toBeNull();
     expect(db.select().from(lamalPolicy).where(eq(lamalPolicy.coverageYear, 2027)).all()).toHaveLength(0);

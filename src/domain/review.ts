@@ -1,6 +1,6 @@
 import type { IsoDate } from "./dates";
 
-/** Garde-fous des courriers (checkLetter) et vocabulaire des décisions du rituel. */
+/** Garde-fous des courriers (checkLetter) et vocabulaire des décisions du bilan. */
 
 /** Seuls OPEN et CLOSED sont écrits ; DECIDED et LETTERS_SENT sont des valeurs historiques du schéma. */
 export type ReviewStatus = "OPEN" | "DECIDED" | "LETTERS_SENT" | "CLOSED";

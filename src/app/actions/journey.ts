@@ -28,7 +28,7 @@ export async function chooseModeAction(form: FormData) {
   redirect(mode === "SOLO" ? "/bienvenue?etape=vous" : "/bienvenue?etape=adresse");
 }
 
-/** Préférences du rituel : la stratégie, puis un groupe de champs par personne, suffixés par l'id de ligne. */
+/** Préférences du bilan : la stratégie, puis un groupe de champs par personne, suffixés par l'id de ligne. */
 export async function savePreferencesAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   const year = Number(form.get("year"));
@@ -59,7 +59,7 @@ export async function savePreferencesAction(_: ActionState, form: FormData): Pro
     return toActionError(e);
   }
   revalidatePath("/", "layout");
-  redirect(`/rituel/${year}/comparer`);
+  redirect(`/bilan/${year}/comparer`);
 }
 
 export async function saveSignatureAction(personId: number, dataUrl: string): Promise<ActionState> {

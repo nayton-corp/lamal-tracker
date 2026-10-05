@@ -30,7 +30,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
     notFound();
   }
   const offers = keys.map((k) => view.offers.find((o) => offerKey(o) === k)).filter((o): o is DetailedOffer => Boolean(o));
-  const back = `/rituel/${year}/personne/${lineId}?c=${keys.join(",")}`;
+  const back = `/bilan/${year}/personne/${lineId}?c=${keys.join(",")}`;
 
   if (offers.length < 2) {
     return (

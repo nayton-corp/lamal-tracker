@@ -7,7 +7,7 @@ import { cn } from "./cn";
 
 const items = (solo: boolean) => [
   { href: "/", label: "Accueil", hint: "Vue d'ensemble", Icon: Home },
-  { href: "/rituel", label: "Rituel", hint: "Comparer et changer", Icon: CalendarCheck },
+  { href: "/bilan", label: "Bilan", hint: "Comparer et changer", Icon: CalendarCheck },
   solo ? { href: "/foyer", label: "Moi", hint: "Mon contrat", Icon: UserRound } : { href: "/foyer", label: "Foyer", hint: "Personnes et contrats", Icon: Users },
   { href: "/historique", label: "Historique", hint: "Primes année après année", Icon: LineChart },
   { href: "/donnees", label: "Réglages", hint: "Sécurité, primes, caisses", Icon: Settings },

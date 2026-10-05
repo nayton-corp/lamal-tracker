@@ -10,7 +10,7 @@ const line = (over: Partial<RitualLineFacts> = {}): RitualLineFacts => ({
 });
 const facts = { preferencesSaved: false };
 
-describe("étapes du rituel", () => {
+describe("étapes du bilan", () => {
   it("ne coche rien après une étape manquante", () => {
     const steps = ritualSteps({ ...facts, lines: [line({ affiliationRequested: true, letterSent: true })] });
     expect(steps.map((s) => [s.key, s.done])).toEqual([
@@ -24,7 +24,7 @@ describe("étapes du rituel", () => {
   it("tout décidé : les préférences ne bloquent plus", () => {
     const steps = ritualSteps({ ...facts, lines: [line({ decision: "KEEP" })] });
     expect(isStepDone(steps, "decide")).toBe(true);
-    // Garder sa caisse ne demande aucune démarche : le rituel est terminé.
+    // Garder sa caisse ne demande aucune démarche : le bilan est terminé.
     expect(isRitualComplete(steps)).toBe(true);
   });
 

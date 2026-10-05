@@ -44,7 +44,7 @@ export default async function PersonPage({ params, searchParams }: { params: Pro
       <ProfileCard
         person={p}
         needs={{ healthCostsRp: p.healthCostsRp, allowedModels: p.allowedModels, doctorName: p.doctorName }}
-        needsHref={openReview ? `/rituel/${openReview.targetYear}/preferences` : null}
+        needsHref={openReview ? `/bilan/${openReview.targetYear}/preferences` : null}
         year={year}
         ageLabel={`${AGE_CLASS_LABEL[ageClassForYear(p.birthDate, year)]} en ${year}`}
       />

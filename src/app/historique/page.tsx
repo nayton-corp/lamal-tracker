@@ -39,9 +39,9 @@ export default async function HistoryPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label={`Payé depuis ${history.years[0]}`} value={<Chf rp={s.totalPaidRp} whole />} hint="Primes LAMal du foyer, avant redistribution CO2." />
         <Stat
-          label="Économisé grâce aux rituels"
+          label="Économisé grâce aux bilans"
           value={<Chf rp={saved} whole />}
-          hint={s.reviewSavings.length ? s.reviewSavings.map((x) => `${x.year} : CHF ${Math.round(x.annualRp / 100)}`).join(" · ") : "Apparaît après la clôture d'un rituel."}
+          hint={s.reviewSavings.length ? s.reviewSavings.map((x) => `${x.year} : CHF ${Math.round(x.annualRp / 100)}`).join(" · ") : "Apparaît après la clôture d'un bilan."}
           tone={saved > 0 ? "saving" : undefined}
         />
         <Stat

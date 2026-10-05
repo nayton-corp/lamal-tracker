@@ -44,7 +44,7 @@ export default async function MyDataPage() {
       <Section title="Télécharger mes données">
         <Card className="space-y-3">
           <p className="text-sm text-muted">
-            Tout ce que l&apos;app garde sur votre compte{scope.householdId !== null ? " et votre foyer" : ""} : personnes, contrats, rituels, lettres, signatures, journal. Le fichier JSON est la copie complète ; le PDF en est un récapitulatif lisible.
+            Tout ce que l&apos;app garde sur votre compte{scope.householdId !== null ? " et votre foyer" : ""} : personnes, contrats, bilans, lettres, signatures, journal. Le fichier JSON est la copie complète ; le PDF en est un récapitulatif lisible.
           </p>
           {until ? (
             <div className="flex flex-col gap-2 sm:flex-row">

@@ -29,6 +29,13 @@ const config: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  // Le « rituel » s'appelle désormais « bilan » : les liens des anciens e-mails et favoris suivent.
+  async redirects() {
+    return [
+      { source: "/rituel", destination: "/bilan", permanent: true },
+      { source: "/rituel/:path*", destination: "/bilan/:path*", permanent: true },
+    ];
+  },
 };
 
 export default config;

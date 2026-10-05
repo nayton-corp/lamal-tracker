@@ -81,7 +81,7 @@ function insurerId(bag: number) {
   return listInsurers(db).find((i) => i.bagNumber === bag)!.id;
 }
 
-/** Un foyer complet : personne, contrat, complémentaire, signature, rituel décidé, lettre et demande d'offre. */
+/** Un foyer complet : personne, contrat, complémentaire, signature, bilan décidé, lettre et demande d'offre. */
 function makeHousehold(name: string): Fixture {
   let scope = testAccount(db);
   scope = withHousehold(scope, saveHousehold(db, scope, { name, street: "Rue du Lac 1", postalCode: "1003", city: "Lausanne", canton: "VD", region: 1 }));
@@ -181,7 +181,7 @@ describe("cloisonnement des foyers", () => {
       ["keepAsIs", () => keepAsIs(db, s, b.lineId, NOW)],
       ["undoDecision", () => undoDecision(db, s, b.lineId)],
       ["setLcaWishes", () => setLcaWishes(db, s, b.lineId, ["DENTAL"])],
-      ["savePreferences (rituel)", () => savePreferences(db, s, b.reviewId, "ECONOMY", [], NOW)],
+      ["savePreferences (bilan)", () => savePreferences(db, s, b.reviewId, "ECONOMY", [], NOW)],
       ["savePreferences (ligne)", () => savePreferences(db, s, a.reviewId, "ECONOMY", [{ lineId: b.lineId, franchiseChf: 300, models: [], healthCostsRp: 0, doctorName: null }], NOW)],
       ["generateLetters", () => generateLetters(db, s, b.reviewId, TODAY)],
       ["generateOfferRequests", () => generateOfferRequests(db, s, b.reviewId, TODAY)],

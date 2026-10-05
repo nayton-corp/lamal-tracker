@@ -21,7 +21,7 @@ describe("stratégies", () => {
     expect(usageFor(123_400)).toBeNull();
   });
 
-  it("ouvre la fenêtre du rituel de la publication au 30 novembre", () => {
+  it("ouvre la fenêtre du bilan de la publication au 30 novembre", () => {
     expect(isReviewWindowOpen("2026-10-05", 2027, true)).toBe(true);
     expect(isReviewWindowOpen("2026-10-05", 2027, false)).toBe(false);
     expect(isReviewWindowOpen("2026-11-30", 2027, true)).toBe(true);

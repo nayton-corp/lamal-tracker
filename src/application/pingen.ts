@@ -113,7 +113,7 @@ export async function syncPingenLetters(db: Db, client: PingenClient, nowIso: st
       applyPingen(db, r.id, found, nowIso);
       if (pingenPhase(found.status) === "FAILED") {
         result.newlyFailed.push(r.id);
-        // La lettre est à reprendre : le rituel, clôturé dès l'envoi, se rouvre.
+        // La lettre est à reprendre : le bilan, clôturé dès l'envoi, se rouvre.
         reopenReviewOfFailedLetter(db, r.id);
       }
     } catch (error) {

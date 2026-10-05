@@ -36,8 +36,8 @@ src/
     reminders.ts       règles des rappels d'envoi et des relances
     comparison.ts      filtres, classement déterministe, statistiques de marché
     renewal.ts         tarif de renouvellement d'un contrat (MATCHED, PROBABLE, AMBIGUOUS, MISSING)
-    strategy.ts        deux stratégies du rituel, profils de consommation, solidité d'une caisse
-    ritual-steps.ts    étapes du rituel, leur ordre et quand chacune est faite
+    strategy.ts        deux stratégies du bilan, profils de consommation, solidité d'une caisse
+    ritual-steps.ts    étapes du bilan, leur ordre et quand chacune est faite
     home.ts            accueil : état de la carte de l'année et tâches, dans l'ordre (homeTasks)
     review.ts          garde-fous des décisions, des lettres et du contrôle LCA
     letter.ts          contenu des lettres et des demandes d'offre (indépendant du rendu PDF)
@@ -52,7 +52,7 @@ src/
   application/       cas d'usage : chaque fonction reçoit la base (db) et un Scope
     scope.ts           Scope, cloisonnement des foyers, helpers owned* et find*
     errors.ts          UserError (message affichable), NotFoundError
-    review/            le rituel : open, decisions, view, close, lines (index.ts réexporte)
+    review/            le bilan : open, decisions, view, close, lines (index.ts réexporte)
     household.ts, letters.ts, offers.ts, compare.ts, history.ts, strategy.ts, tariffs.ts …
     auth.ts, account.ts, mfa.ts, totp.ts, passkeys.ts, tokens.ts, invitations.ts   comptes
     admin.ts, feedback.ts, usage.ts, ops.ts, audit.ts                             administration
@@ -81,7 +81,7 @@ src/
     reference.ts, pingen.ts   tâches de fond des référentiels et de Pingen
     operator.ts, onboarding.ts, pdf-response.ts
   cli/main.ts        commandes `pnpm cli …` (import, téléchargement, inspection d'un fichier OFSP)
-  app/               routes Next (pages en français : /foyer, /rituel, /donnees…), actions/ (server actions), api/
+  app/               routes Next (pages en français : /foyer, /bilan, /donnees…), actions/ (server actions), api/
   ui/                composants d'interface partagés (mobile d'abord, navigation latérale dès 1024 px)
 tests/
   unit/              tests d'intégration (Vitest, base en mémoire), dont isolation.test.ts
@@ -115,7 +115,7 @@ ESLint ne contrôle que les imports. Le fait que le domaine ne lise pas l'horlog
 
 ## 4. Le chemin d'une requête
 
-Prenons « choisir une offre pour une personne du rituel ».
+Prenons « choisir une offre pour une personne du bilan ».
 
 1. **`src/proxy.ts`** reçoit toutes les requêtes, sauf les fichiers statiques et `/api/health`.
    - Aucun compte en base : tout mène à `/login/creer` (création de l'administrateur).
@@ -126,7 +126,7 @@ Prenons « choisir une offre pour une personne du rituel ».
    - Un administrateur sans second facteur est envoyé sur `/compte?requis=1`.
    - Chaque page reçoit une **CSP avec nonce** : seuls les scripts portant le nonce de la requête
      s'exécutent.
-2. **Page** (`src/app/rituel/[year]/…/page.tsx`) : elle appelle `pageScope()` pour obtenir le
+2. **Page** (`src/app/bilan/[year]/…/page.tsx`) : elle appelle `pageScope()` pour obtenir le
    `Scope` (les pages du compte utilisent `accountPageScope()`, qui laisse entrer l'administrateur
    sans facteur). Le proxy a déjà contrôlé la session, mais la page le refait : on ne dépend jamais
    du seul proxy.
@@ -338,7 +338,7 @@ parseur lit les deux générations et les ramène à une seule forme. Une ligne 
 et comptée, jamais devinée. Le jeu est ensuite validé (années, cantons, bornes des primes,
 variation par rapport à l'année précédente) avant d'être activé (`importer.ts`). Le workflow
 GitHub *Surveillance du format OFSP* importe le vrai fichier chaque jour en septembre et octobre :
-un changement de format se voit avant le rituel. Les archives des années passées (`archive.ts`, dès 2015) servent à l'historique.
+un changement de format se voit avant le bilan. Les archives des années passées (`archive.ts`, dès 2015) servent à l'historique.
 Un seul import tourne à la fois (`server/jobs.ts`) ; un import interrompu est marqué `FAILED` au
 démarrage suivant. `IMPORT_CANTONS` limite l'import à certains cantons.
 
@@ -392,7 +392,7 @@ tarifs officiels par `application/policy-import.ts`. Le fichier n'est jamais enr
 - **Jeux de primes immuables.** Un fichier importé donne un jeu (`tariff_dataset`) identifié par
   son empreinte SHA-256. Un nouveau fichier pour la même année devient actif ; l'ancien reste,
   avec le statut `SUPERSEDED`. Réimporter le même fichier ne fait rien.
-- **Décisions figées.** Une décision du rituel copie la prime, le tarif et le coût choisis dans
+- **Décisions figées.** Une décision du bilan copie la prime, le tarif et le coût choisis dans
   `review_line` ; une lettre fige son contenu. Un nouvel import ne réécrit jamais l'historique.
 - **Garde-fou LCA.** Une lettre de résiliation est refusée tant que le contrôle LCA de la personne
   n'est pas confirmé (`domain/review.ts`).
@@ -401,16 +401,16 @@ tarifs officiels par `application/policy-import.ts`. Le fichier n'est jamais enr
 - **Minimisation.** Pas de journal d'accès, pas de donnée de santé dans les courriels ni dans le
   journal, police PDF lue en mémoire seulement.
 
-## 13. Le rituel dans le code
+## 13. Le bilan dans le code
 
-Le rituel d'automne s'appelle `review` dans le code. Ses étapes sont typées dans
-`domain/ritual-steps.ts` ; les routes sont sous `/rituel/[year]` : page d'accueil (reconduction
+Le bilan d'automne s'appelle `review` dans le code. Ses étapes sont typées dans
+`domain/ritual-steps.ts` ; les routes sont sous `/bilan/[year]` : page d'accueil (reconduction
 tacite), `preferences`, `comparer` et `personne/[lineId]`, `lettres` (Démarches). `lca` mène aux
-Démarches, `strategie` et `besoins` aux préférences. Le rituel se clôt seul quand tout est envoyé
+Démarches, `strategie` et `besoins` aux préférences. Le bilan se clôt seul quand tout est envoyé
 (`syncReviewClosure`).
 L'année visée est toujours l'année prochaine (`reviewTargetYear()`). Pendant la fenêtre de
 changement (`isReviewWindowOpen` : primes publiées et échéance du 30 novembre pas encore passée),
-la page du rituel et l'accueil (`homeOverview`) l'ouvrent tout seuls (`openReviewIfPossible`). Les statuts et transitions sont
+la page du bilan et l'accueil (`homeOverview`) l'ouvrent tout seuls (`openReviewIfPossible`). Les statuts et transitions sont
 décrits dans [modele-de-donnees.md](modele-de-donnees.md).
 
 ## 14. Sécurité de l'interface

@@ -21,7 +21,7 @@ export interface ReferenceCheck {
   ok: boolean;
 }
 
-/** Primes officielles de l'année importées (jeu actif) ? C'est la condition pour ouvrir le rituel. */
+/** Primes officielles de l'année importées (jeu actif) ? C'est la condition pour ouvrir le bilan. */
 export function premiumsAvailable(db: Db, year: number): boolean {
   return activeDataset(db, year) !== undefined;
 }

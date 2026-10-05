@@ -16,7 +16,7 @@ import type { Scope } from "./scope";
 import { effectiveNeeds, lineContext } from "./strategy";
 
 /*
- * Comparateur d'une ligne de revue (une personne du rituel) : offres de l'année cible filtrées
+ * Comparateur d'une ligne de revue (une personne du bilan) : offres de l'année cible filtrées
  * selon ses préférences (ou toutes), classées par coût réel, avec scénarios de coût et portrait des caisses.
  */
 
@@ -78,7 +78,7 @@ export interface CompareView {
 }
 
 /**
- * Tout ce qu'affiche le comparateur pour une personne du rituel. Les options (paramètres d'URL)
+ * Tout ce qu'affiche le comparateur pour une personne du bilan. Les options (paramètres d'URL)
  * priment sur les préférences enregistrées ; le classement suit toujours le coût réel de l'année.
  */
 export function compareForLine(db: Db, scope: Scope, lineId: number, opts: CompareOptions = {}): CompareView {

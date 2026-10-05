@@ -47,7 +47,7 @@ const chip = (active: boolean) =>
 const ICONS: Record<Strategy, typeof PiggyBank> = { ECONOMY: PiggyBank, KEEP: Repeat };
 
 /**
- * Préférences du rituel : la stratégie du foyer en tête, puis par personne la fréquence des soins
+ * Préférences du bilan : la stratégie du foyer en tête, puis par personne la fréquence des soins
  * (pour le coût réel) et, repliés, la franchise, les modèles et le médecin. Changer de stratégie
  * remet franchise et modèles aux réglages qu'elle propose.
  */

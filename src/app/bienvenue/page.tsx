@@ -98,7 +98,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
         <form action={chooseModeAction} className="space-y-3">
           <p className="font-medium">Pour qui gérez-vous l&apos;assurance maladie ?</p>
           <ModeButton value="SOLO" icon={<UserRound aria-hidden className="size-6" />} title="Pour moi seul·e" text="Votre contrat, vos échéances, vos économies." active={mode === "SOLO"} disabled={persons.length > 1} />
-          <ModeButton value="FAMILY" icon={<Users aria-hidden className="size-6" />} title="Pour mon foyer" text="Plusieurs personnes, un seul rituel pour tous." active={mode === "FAMILY"} />
+          <ModeButton value="FAMILY" icon={<Users aria-hidden className="size-6" />} title="Pour mon foyer" text="Plusieurs personnes, un seul bilan pour tous." active={mode === "FAMILY"} />
           {persons.length > 1 && <p className="text-sm text-muted">Plusieurs personnes sont déjà enregistrées : le mode foyer s&apos;applique.</p>}
         </form>
       )}

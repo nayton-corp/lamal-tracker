@@ -28,7 +28,7 @@ export function currentYear(): number {
   return Number(today().slice(0, 4));
 }
 
-/** Année visée par le rituel d'automne : toujours l'année prochaine. */
+/** Année visée par le bilan d'automne : toujours l'année prochaine. */
 export function reviewTargetYear(): number {
   return currentYear() + 1;
 }

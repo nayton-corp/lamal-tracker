@@ -91,7 +91,7 @@ export function generateOfferRequests(db: Db, scope: Scope, reviewId: number, to
   return created;
 }
 
-/** Demandes d'offre d'un rituel, avec un lien `mailto:` prérempli quand la caisse publie une adresse. */
+/** Demandes d'offre d'un bilan, avec un lien `mailto:` prérempli quand la caisse publie une adresse. */
 export function listOfferRequests(db: Db, scope: Scope, reviewId: number) {
   ownedReview(db, scope, reviewId);
   return db
@@ -130,7 +130,7 @@ export function markOfferRequestSent(db: Db, scope: Scope, id: number, at: IsoDa
       const line = tx.select().from(reviewLine).where(eq(reviewLine.id, lineId)).get();
       if (!line) continue;
       if (at && !line.affiliationRequestedAt) tx.update(reviewLine).set({ affiliationRequestedAt: at }).where(eq(reviewLine.id, lineId)).run();
-      // Envoi annulé : la demande n'est plus faite (le rituel, s'il était clôturé, se rouvre).
+      // Envoi annulé : la demande n'est plus faite (le bilan, s'il était clôturé, se rouvre).
       if (!at && line.affiliationRequestedAt) tx.update(reviewLine).set({ affiliationRequestedAt: null }).where(eq(reviewLine.id, lineId)).run();
     }
   });

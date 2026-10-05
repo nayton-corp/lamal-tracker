@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: { absolute: "Primes LAMal · vos prim
 const STEPS = [
   {
     src: "/apercus/hausse.webp",
-    alt: "Écran du rituel annuel : prime de l'année prochaine sans rien faire, hausse mensuelle et économie possible.",
+    alt: "Écran du bilan annuel : prime de l'année prochaine sans rien faire, hausse mensuelle et économie possible.",
     title: "Voir la hausse",
     text: "Dès la publication des primes, fin septembre, l'app calcule ce que vous paierez l'an prochain sans rien faire, et combien vous pourriez économiser.",
   },

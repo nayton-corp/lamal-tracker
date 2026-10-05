@@ -41,7 +41,7 @@ beforeEach(() => {
   mail = { mailer: fileMailer(mailDir), appUrl: "https://primes.exemple.ch" };
 });
 
-/** Foyer de deux personnes, dont le propriétaire a un courriel confirmé, et son rituel 2027. */
+/** Foyer de deux personnes, dont le propriétaire a un courriel confirmé, et son bilan 2027. */
 function household(withReview = true) {
   const owner = testHousehold(db);
   db.update(appUser).set({ email: "foyer@exemple.ch", emailVerifiedAt: NOW }).where(eq(appUser.id, owner.userId)).run();
@@ -68,7 +68,7 @@ describe("rappels d'envoi et relances", () => {
     expect(pushed.map((r) => r.key)).toEqual(["rappel-2027-J7", "rappel-2027-J7"]);
     expect(sent()).toHaveLength(1);
     expect(sent()[0]).toMatchObject({ to: "foyer@exemple.ch", subject: "Vos courriers d'assurance maladie : plus qu'une semaine" });
-    expect(sent()[0]!.text).toContain("https://primes.exemple.ch/rituel/2027");
+    expect(sent()[0]!.text).toContain("https://primes.exemple.ch/bilan/2027");
   });
 
   it("seuls les courriers non envoyés comptent ; une lettre refusée par Pingen est à reprendre", () => {

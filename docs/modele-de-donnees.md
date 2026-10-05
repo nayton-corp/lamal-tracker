@@ -5,7 +5,7 @@ Toute la base est un seul fichier SQLite, décrit en TypeScript par Drizzle dans
 carte : les tables par zone, leurs liens, les conventions de colonnes, les valeurs d'état et
 l'historique des migrations.
 
-Les notions métier (franchise, reconduction, rituel…) sont expliquées dans
+Les notions métier (franchise, reconduction, bilan…) sont expliquées dans
 [concepts.md](concepts.md). Seul `src/infrastructure` lit et écrit ces tables ; les règles de
 cloisonnement des foyers sont dans [architecture.md](architecture.md).
 
@@ -16,7 +16,7 @@ cloisonnement des foyers sont dans [architecture.md](architecture.md).
 | Référentiel OFSP | `tariff_dataset`, `tariff`, `premium`, `insurer`, `insurer_indicator`, `lamal_parameters` | Imports automatiques et administrateur ; partagé par tous les foyers |
 | Comptes et sécurité | `app_user`, `session`, `passkey`, `recovery_code`, `auth_token`, `invitation`, `known_device`, `audit_event` | Inscription, connexion, *Mon compte* |
 | Foyer | `household`, `household_member`, `household_setting`, `household_key`, `person`, `lamal_policy`, `lca_policy`, `tariff_lineage`, `signature` | Le foyer lui-même |
-| Rituel | `review`, `review_line`, `letter`, `offer_request` | Le foyer, pendant le rituel |
+| Bilan | `review`, `review_line`, `letter`, `offer_request` | Le foyer, pendant le bilan |
 | Divers | `settings`, `push_subscription`, `notification_log`, `feedback`, `usage_counter` | App et tâches de fond |
 
 Toute donnée d'un foyer se rattache à `household`, directement ou par `person` ou `review`.
@@ -245,7 +245,7 @@ erDiagram
 - `lamal_policy` : un seul contrat par personne et par année (`lamal_policy_person_year`).
 - `household_member.user_id` est unique : un compte n'a qu'un foyer.
 
-### Rituel
+### Bilan
 
 ```mermaid
 erDiagram
@@ -318,10 +318,10 @@ erDiagram
     }
 ```
 
-- `review` : un seul rituel par foyer et par année cible (`review_household_year`).
-- `review_line` : une seule ligne par personne et par rituel (`review_line_person`).
+- `review` : un seul bilan par foyer et par année cible (`review_household_year`).
+- `review_line` : une seule ligne par personne et par bilan (`review_line_person`).
 - Les colonnes `renewal_*` décrivent la reconduction tacite ; `chosen_*` figent le choix ;
-  `wish_*` et `lca_wishes` gardent les besoins exprimés pour ce rituel.
+  `wish_*` et `lca_wishes` gardent les besoins exprimés pour ce bilan.
 
 ### Divers
 
@@ -353,13 +353,13 @@ Quelques noms de propriété TypeScript diffèrent du nom de colonne : `letter.g
 
 ### Suppressions en cascade
 
-- `ON DELETE CASCADE` : tout ce qui dépend d'un foyer, d'une personne, d'un rituel ou d'un compte
+- `ON DELETE CASCADE` : tout ce qui dépend d'un foyer, d'une personne, d'un bilan ou d'un compte
   (personnes, contrats, lignes, lettres, sessions, passkeys, avis…), et `tariff`/`premium` d'un
   jeu de primes.
 - `ON DELETE SET NULL` : `invitation.created_by` (l'invitation survit à son auteur).
 - **Sans cascade** (la suppression est refusée tant qu'une ligne y renvoie) : les références à
   `insurer`, `review.dataset_id` et `review_line.current_policy_id`. Par exemple, un contrat
-  utilisé par un rituel ne peut pas être supprimé ; l'action traduit l'erreur SQLite en message
+  utilisé par un bilan ne peut pas être supprimé ; l'action traduit l'erreur SQLite en message
   lisible (`rethrowForeignKey` dans `src/server/action.ts`).
 
 `PRAGMA foreign_keys = ON` et `PRAGMA secure_delete = ON` sont posés à l'ouverture
@@ -388,11 +388,11 @@ données existantes, sauf à écrire une migration qui les convertit.
 | Colonne | Valeurs | Sens |
 |---|---|---|
 | `tariff_dataset.status` | `IMPORTING` → `ACTIVE` → `SUPERSEDED`, ou `FAILED` | Un seul jeu `ACTIVE` par année. Un import interrompu reste `IMPORTING` : au démarrage, il passe `FAILED` et ses lignes sont supprimées (`recoverInterruptedImports()`). |
-| `review.status` | `OPEN`, `CLOSED` (`DECIDED`, `LETTERS_SENT` : historiques, plus écrits) | Voir [concepts.md](concepts.md#statuts-du-rituel) |
+| `review.status` | `OPEN`, `CLOSED` (`DECIDED`, `LETTERS_SENT` : historiques, plus écrits) | Voir [concepts.md](concepts.md#statuts-du-bilan) |
 | `review_line.decision` | `UNDECIDED`, `KEEP`, `SWITCH`, `ADJUST` | Voir [concepts.md](concepts.md#décision-dune-ligne) |
 | `review_line.renewal_status` | `MATCHED`, `PROBABLE`, `AMBIGUOUS`, `MISSING` | Voir [concepts.md](concepts.md#lignée-de-tarif) |
 | `review_line.doctor_check` | `YES`, `NO`, `UNKNOWN` | Médecin dans la liste du modèle |
-| `lamal_policy.source` | `MANUAL`, `OFSP`, `REVIEW` | Saisi à la main, saisi avec un tarif officiel, créé par la clôture d'un rituel |
+| `lamal_policy.source` | `MANUAL`, `OFSP`, `REVIEW` | Saisi à la main, saisi avec un tarif officiel, créé par la clôture d'un bilan |
 | `letter.kind` | `TERMINATION`, `CHANGE` | Résiliation, ou changement de franchise ou de modèle |
 | `auth_token.kind` | `VERIFY_EMAIL`, `RESET_PASSWORD`, `LOGIN_MFA`, `WEBAUTHN`, `TOTP_SETUP` | Usage du jeton à usage unique |
 | `invitation.kind` | `SIGNUP`, `HOUSEHOLD` | Créer un compte (administrateur), rejoindre un foyer (propriétaire) |
@@ -405,17 +405,17 @@ Les migrations sont dans [`drizzle/`](../drizzle) (SQL et journal `meta/_journal
 
 | Migration | Contenu |
 |---|---|
-| `0000_init` | Schéma de départ : référentiel (`tariff_dataset`, `tariff`, `premium`, `insurer`, `lamal_parameters`), foyer unique (`household`, `person`, `lamal_policy`, `lca_policy`, `tariff_lineage`), rituel (`review`, `review_line`, `letter`), `settings`, `push_subscription`, `notification_log`. |
+| `0000_init` | Schéma de départ : référentiel (`tariff_dataset`, `tariff`, `premium`, `insurer`, `lamal_parameters`), foyer unique (`household`, `person`, `lamal_policy`, `lca_policy`, `tariff_lineage`), bilan (`review`, `review_line`, `letter`), `settings`, `push_subscription`, `notification_log`. |
 | `0001_household_commune` | Commune et n° OFS du foyer (`commune`, `bfs_number`). |
 | `0002_reference_offers` | Référentiels officiels : `insurer_indicator`, coordonnées de l'annuaire dans `insurer`, `co2_source` ; demandes d'offre (`offer_request`), garanties LCA (`guarantee`, `lca_wishes`). |
-| `0003_journey_strategy` | Signature dessinée (`signature`), stratégie et besoins du rituel (`strategy`, `needs_confirmed_at`, `wish_franchise_chf`, `wish_models`). |
+| `0003_journey_strategy` | Signature dessinée (`signature`), stratégie et besoins du bilan (`strategy`, `needs_confirmed_at`, `wish_franchise_chf`, `wish_models`). |
 | `0004_auth_sessions` | Sessions en base (`session`). |
 | `0005_letter_pingen` | Suivi de l'envoi par Pingen dans `letter` (`pingen_*`). |
 | `0006_multi_household` | Plusieurs foyers : `app_user`, `household_member`, `household_setting`. L'ancien mot de passe devient le compte administrateur n° 1, propriétaire du foyer existant ; sessions, abonnements push et correspondances de tarif sont rattachés au compte ou au foyer. |
 | `0007_accounts` | Comptes complets : `passkey`, `recovery_code`, `auth_token`, `invitation`, `known_device`, `audit_event` ; courriel confirmé, TOTP, consentement et suspension dans `app_user`. Pingen reste autorisé au foyer de l'administrateur existant. |
 | `0008_data_protection` | Clé de chiffrement par foyer (`household_key`), dernière activité et rappels d'inactivité, confirmation d'identité de la session (`confirmed_at`). |
 | `0009_feedback_usage` | Avis (`feedback`) et compteurs d'usage (`usage_counter`). |
-| `0010_strategy_two_choices` | Deux stratégies seulement : les rituels en « Équilibre » (`BALANCE`) passent à `ECONOMY`. |
+| `0010_strategy_two_choices` | Deux stratégies seulement : les bilans en « Équilibre » (`BALANCE`) passent à `ECONOMY`. |
 
 ## Modifier le schéma
 

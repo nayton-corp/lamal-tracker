@@ -3,7 +3,7 @@ import type { ModelType } from "./lamal";
 import type { Rappen } from "./money";
 
 /**
- * Ce qui compte le plus pour le foyer, première question des préférences du rituel. Chaque choix
+ * Ce qui compte le plus pour le foyer, première question des préférences du bilan. Chaque choix
  * pré-remplit les filtres de chaque personne (franchise, modèles), qu'elle peut ensuite affiner.
  * Les offres sont toujours classées par coût réel de l'année.
  */

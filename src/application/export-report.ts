@@ -99,7 +99,7 @@ export function exportReport(data: DataExport): Report {
     }
 
     const names = new Map(f.personnes.map((p) => [p.id, `${p.prenom} ${p.nom}`]));
-    for (const r of f.rituels) {
+    for (const r of f.bilans) {
       const blocks: ReportSection["blocks"] = [{ kind: "rows", rows: [["Statut", REVIEW_STATUS[r.statut] ?? r.statut], ["Ouvert le", day(r.ouvertLe)], ["Clôturé le", day(r.clotureLe)]] }];
       if (r.decisions.length)
         blocks.push({
@@ -118,7 +118,7 @@ export function exportReport(data: DataExport): Report {
         ...r.demandesOffre.map((o) => [o.content.subject, o.caisse ?? "—", day(o.generatedAt), o.sentAt ? day(o.sentAt) : "non envoyée"]),
       ];
       if (letters.length) blocks.push({ kind: "table", head: ["Courrier", "Destinataire", "Préparé le", "Envoyé le"], rows: letters });
-      sections.push({ heading: `Rituel ${r.annee}`, blocks });
+      sections.push({ heading: `Bilan ${r.annee}`, blocks });
     }
   }
 
