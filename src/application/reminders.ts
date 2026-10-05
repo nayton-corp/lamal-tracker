@@ -6,6 +6,7 @@ import type { Db } from "@/infrastructure/db/client";
 import { insurerLabel } from "@/infrastructure/db/queries";
 import { appUser, household, householdMember, insurer, letter, notificationLog, offerRequest, person, review, reviewLine } from "@/infrastructure/db/schema";
 import type { MailDeps } from "./account-mail";
+import { logMailError } from "@/infrastructure/mail/mailer";
 
 const SIGNATURE = "\n\n— Primes LAMal\nCe message est automatique : n'y répondez pas.";
 
@@ -71,7 +72,7 @@ export async function reminderTick(db: Db, deps: ReminderDeps, today: string, ta
       for (const { email } of recipients) {
         const text = `${r.mail.text}\n\nOuvrir l'app : ${deps.mail.appUrl}${r.url}${SIGNATURE}`;
         // Un courriel en échec n'empêche pas les autres ; il n'est pas retenté.
-        await deps.mail.mailer.send({ to: email!, subject: r.mail.subject, text }).catch((e) => console.error("[courriel] rappel :", e instanceof Error ? e.message : e));
+        await deps.mail.mailer.send({ to: email!, subject: r.mail.subject, text }).catch(logMailError("rappel"));
       }
       db.insert(notificationLog).values({ key: logKey }).onConflictDoNothing().run();
     }

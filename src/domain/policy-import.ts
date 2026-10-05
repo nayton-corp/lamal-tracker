@@ -96,10 +96,15 @@ export function readFranchise(text: string, allowed: readonly number[]): number 
   return null;
 }
 
+/**
+ * Couverture accidents lue sur la police : `false` si exclue, `true` si incluse, `null` si muette.
+ * Attention : deux `\s*` qui se suivent (« \s*:?\s* ») font exploser le temps de calcul sur une
+ * longue suite de sauts de ligne (ReDoS, tout le serveur gèle). D'où `\s*(?::\s*)?`.
+ */
 export function readAccident(text: string): boolean | null {
   const t = norm(text);
-  if (/(sans|ohne|senza|exclu\w*|ausgeschlossen|esclus\w*)\s+(la\s+)?(couverture\s+|deckung\s+)?(accidents?|unfall\w*|infortuni\w*)|(accidents?|unfall\w*|infortuni\w*)\s*:?\s*(non|nein|no|exclu|ausgeschlossen|escluso)\b/.test(t)) return false;
-  if (/(avec|mit|inkl\.?|incl\.?|inclus|y\.?\s?c\.?|con)\s+(la\s+)?(couverture\s+|deckung\s+)?(accidents?|unfall\w*|infortuni\w*)|(accidents?|unfall\w*|infortuni\w*)\s*:?\s*(oui|ja|si|inclus|eingeschlossen|incluso)\b|unfalldeckung|couverture accidents?/.test(t)) return true;
+  if (/(sans|ohne|senza|exclu\w*|ausgeschlossen|esclus\w*)\s+(la\s+)?(couverture\s+|deckung\s+)?(accidents?|unfall\w*|infortuni\w*)|(accidents?|unfall\w*|infortuni\w*)\s*(?::\s*)?(non|nein|no|exclu|ausgeschlossen|escluso)\b/.test(t)) return false;
+  if (/(avec|mit|inkl\.?|incl\.?|inclus|y\.?\s?c\.?|con)\s+(la\s+)?(couverture\s+|deckung\s+)?(accidents?|unfall\w*|infortuni\w*)|(accidents?|unfall\w*|infortuni\w*)\s*(?::\s*)?(oui|ja|si|inclus|eingeschlossen|incluso)\b|unfalldeckung|couverture accidents?/.test(t)) return true;
   return null;
 }
 
@@ -400,11 +405,14 @@ export function splitByPerson(text: string, persons: readonly ImportPerson[]): {
   return starts.map((s, i) => ({ personId: s.personId, text: text.slice(s.idx, starts[i + 1]?.idx ?? text.length) }));
 }
 
+/** Longueur maximale de texte analysée (une police tient en quelques pages). */
+export const MAX_POLICY_TEXT = 200_000;
+
 export function extractPolicy(
   text: string,
   ctx: { persons: readonly ImportPerson[]; insurers: readonly ImportInsurer[]; franchises: readonly number[]; minYear: number; maxYear: number },
 ): PolicyExtract {
-  const clean = text.replace(/ /g, " ").replace(/[ \t]+/g, " ");
+  const clean = text.slice(0, MAX_POLICY_TEXT).replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n");
   if (clean.replace(/\s/g, "").length < 40) return { insurerId: null, year: null, persons: [], noText: true };
   const head = clean.slice(0, 1500);
   const ids = readIdentifiers(clean);

@@ -15,6 +15,11 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/** Retire du cache toutes les pages vues, sauf la page « hors ligne ». */
+function forgetPrivatePages() {
+  return caches.open(PAGES).then((c) => c.keys().then((keys) => Promise.all(keys.filter((k) => new URL(k.url).pathname !== OFFLINE).map((k) => c.delete(k)))));
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -39,6 +44,11 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
+          // Renvoyé vers la connexion : plus de session, on oublie les pages privées gardées hors ligne.
+          if (new URL(res.url || req.url).pathname.startsWith("/login")) {
+            forgetPrivatePages();
+            return res;
+          }
           if (res.ok) {
             const copy = res.clone();
             caches.open(PAGES).then((c) => c.put(req, copy));

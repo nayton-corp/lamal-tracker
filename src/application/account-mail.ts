@@ -54,6 +54,15 @@ export function newDeviceMail(to: string, device: string, when: string): Mail {
   };
 }
 
+/** Changement de sécurité sur le compte (mot de passe, facteur, adresse) : la personne doit le savoir. */
+export function securityChangeMail(to: string, what: string, when: string): Mail {
+  return {
+    to,
+    subject: "Changement de sécurité sur votre compte",
+    text: `Bonjour,\n\n${what} (${when}).\n\nSi c'est vous, il n'y a rien à faire. Sinon, réinitialisez votre mot de passe (« Mot de passe oublié ») et prévenez l'administrateur.${SIGNATURE}`,
+  };
+}
+
 export function emailChangeMail(to: string, link: string): Mail {
   return {
     to,

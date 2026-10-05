@@ -22,6 +22,17 @@ export interface Mailer {
   send(mail: Mail): Promise<void>;
 }
 
+/**
+ * Journalise un envoi en échec sans l'adresse ni le contenu : le message d'erreur SMTP reprend
+ * souvent l'adresse du destinataire (« 550 <x@y.ch> recipient rejected »). Seuls les codes restent.
+ */
+export function logMailError(context: string) {
+  return (e: unknown) => {
+    const err = (e ?? {}) as { code?: string; responseCode?: number };
+    console.error(`[courriel] ${context} : échec`, err.code ?? "", err.responseCode ?? "");
+  };
+}
+
 export function mailerFromEnv(env: Record<string, string | undefined> = process.env): Mailer | null {
   const from = env.MAIL_FROM?.trim() || "Primes LAMal <no-reply@localhost>";
   const smtp = env.SMTP_URL?.trim();

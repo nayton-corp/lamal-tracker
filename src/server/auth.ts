@@ -2,12 +2,13 @@ import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { newDeviceMail } from "@/application/account-mail";
+import { newDeviceMail, securityChangeMail } from "@/application/account-mail";
 import { audit } from "@/application/audit";
 import { adminNeedsFactor, closeSession, describeDevice, openSession, passwordToDefine, rememberDevice, SESSION_MAX_DAYS, touchSession, userEmail, type SessionInfo } from "@/application/auth";
 import { UserError } from "@/application/errors";
 import { requireAdmin as assertAdmin, scopeForUser, type Scope } from "@/application/scope";
 import { randomToken } from "@/application/tokens";
+import { logMailError } from "@/infrastructure/mail/mailer";
 import { deleteCookie, mailDeps, readCookie, writeCookie } from "./accounts";
 import { db, nowIso } from "./context";
 import { formatTimestamp } from "@/domain/dates";
@@ -65,10 +66,10 @@ export async function accountPageScope(): Promise<Scope & { sessionId: string }>
   return scope;
 }
 
-async function startSession(userId: number): Promise<string> {
+async function startSession(userId: number, confirmed: boolean): Promise<string> {
   const h = await headers();
   const device = describeDevice(h.get("user-agent"));
-  const { token } = openSession(db(), userId, device, nowIso());
+  const { token } = openSession(db(), userId, device, nowIso(), confirmed);
   await writeCookie(COOKIE.session, token, SESSION_MAX_DAYS * 86_400);
   return device;
 }
@@ -77,8 +78,8 @@ async function startSession(userId: number): Promise<string> {
  * Connexion réussie (mot de passe et double facteur, passkey, lien de confirmation) : session
  * ouverte, appareil reconnu ou signalé par courriel, événement au journal.
  */
-export async function completeLogin(userId: number) {
-  const device = await startSession(userId);
+export async function completeLogin(userId: number, { viaEmailLink = false } = {}) {
+  const device = await startSession(userId, !viaEmailLink);
   let deviceToken = await readCookie(COOKIE.device);
   if (!deviceToken || deviceToken.length > 100) deviceToken = randomToken(24);
   await writeCookie(COOKIE.device, deviceToken, 400 * 86_400);
@@ -90,7 +91,7 @@ export async function completeLogin(userId: number) {
   if (alert && mail && email) {
     const when = formatTimestamp(now, "dateTimeLong");
     // Un courriel en échec ne doit pas empêcher la connexion.
-    await mail.mailer.send(newDeviceMail(email, device, when)).catch((e) => console.error("[courriel] alerte de connexion :", e instanceof Error ? e.message : e));
+    await mail.mailer.send(newDeviceMail(email, device, when)).catch(logMailError("alerte de connexion"));
   }
 }
 
@@ -113,11 +114,29 @@ export function accountExists(): boolean {
   return !passwordToDefine(db());
 }
 
+/**
+ * Prévient le titulaire d'un changement de sécurité. Un courriel en échec n'annule pas le
+ * changement ; seul le code d'erreur est journalisé (le message SMTP peut contenir l'adresse).
+ */
+export async function notifySecurityChange(to: string | null, what: string) {
+  const mail = mailDeps();
+  if (!mail || !to) return;
+  await mail.mailer.send(securityChangeMail(to, what, formatTimestamp(nowIso(), "dateTimeLong"))).catch(logMailError("changement de sécurité"));
+}
+
+/** Même chose, à partir du compte. */
+export async function notifyUserSecurityChange(userId: number, what: string) {
+  await notifySecurityChange(userEmail(db(), userId), what);
+}
+
 /** Chemin de retour après connexion : seulement un chemin local. */
 export function safeNext(next: unknown): string {
   const s = String(next ?? "");
   // Les navigateurs ignorent tabulations et retours à la ligne : « /\t/site.ch » mène ailleurs.
   if (!/^\/(?![/\\])/.test(s) || /[\u0000-\u0020\u007f\\]/.test(s)) return "/";
   const url = new URL(s, "http://app.invalid");
-  return url.origin === "http://app.invalid" ? url.pathname + url.search + url.hash : "/";
+  if (url.origin !== "http://app.invalid") return "/";
+  // La normalisation peut recréer un chemin réseau : « /.//site.ch » devient « //site.ch ».
+  const path = url.pathname + url.search + url.hash;
+  return path.startsWith("//") || path.startsWith("/\\") ? "/" : path;
 }

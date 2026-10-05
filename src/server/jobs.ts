@@ -4,7 +4,7 @@ import path from "node:path";
 import { activeDataset } from "@/infrastructure/db/queries";
 import { importPremiumFile, type ImportOutcome } from "@/infrastructure/ofsp/importer";
 import { download, listArchives, resolvePremiumsUrl } from "@/infrastructure/ofsp/source";
-import { db } from "./context";
+import { currentYear, db } from "./context";
 
 export interface ImportJob {
   running: boolean;
@@ -95,14 +95,16 @@ export function startImport(
 }
 
 /**
- * Importe les primes d'une année : le fichier courant s'il porte sur cette année, sinon
- * l'archive annuelle. Sans effet si l'année est déjà présente.
+ * Importe les primes d'une année : son archive annuelle, ou le fichier courant pour l'année en
+ * cours et la suivante (pas encore archivées). Sans effet si l'année est déjà présente.
+ * Une année passée sans archive échoue tout de suite : le fichier courant ne la contiendrait pas,
+ * et le retélécharger à chaque demande occuperait l'unique créneau d'import pour rien.
  */
 export function startYearImport(year: number): boolean {
   return run(`Primes ${year}`, async (s) => {
     if (activeDataset(db(), year)) return;
-    const archives = await listArchives();
-    const archive = archives.find((a) => a.year === year);
+    const archive = (await listArchives()).find((a) => a.year === year);
+    if (!archive && year < currentYear()) throw new Error(`Aucune archive OFSP pour ${year}.`);
     const url = archive?.url ?? (await resolvePremiumsUrl());
     const file = await download(url, path.join(dataDir(), "downloads"));
     s.outcome = await importOne(s, file, url);

@@ -155,11 +155,20 @@ describe("inscription sur invitation", () => {
     const token = tokenOf(lastLink());
     expect(lastLink()).toMatch(/^https:\/\/primes\.exemple\.ch\/verifier\?t=/);
     expect(login(db, { email: "alex@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: true }).kind).toBe("unverified");
-    const userId = confirmEmail(db, token, NOW);
+    const { userId, autoLogin, previousEmail } = confirmEmail(db, token, NOW);
+    // Première confirmation, juste après l'inscription : la personne est connectée directement.
+    expect({ autoLogin, previousEmail }).toEqual({ autoLogin: true, previousEmail: null });
     expect(() => confirmEmail(db, token, NOW)).toThrow(UserError);
     expect(login(db, { email: "alex@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: true })).toEqual({ kind: "ok", userId });
     // Le nouveau compte n'a pas de foyer et n'est pas administrateur.
     expect(scopeForUser(db, userId)).toEqual({ userId, householdId: null, householdRole: null, admin: false });
+  });
+
+  it("un lien de confirmation ancien n'ouvre pas de session", async () => {
+    const a = admin();
+    const code = createSignupInvitation(db, a, { maxUses: 1, days: 7 }, NOW);
+    await signUp(db, { code, email: "tard@exemple.ch", password: PW, consent: true }, deps, NOW);
+    expect(confirmEmail(db, tokenOf(lastLink()), later(60)).autoLogin).toBe(false);
   });
 
   it("ne révèle pas une adresse déjà inscrite et ne consomme pas l'invitation", async () => {
@@ -329,13 +338,20 @@ describe("administration", () => {
     expect(await requestEmailChange(db, a.userId, { email: "neuve@exemple.ch", password: PW }, mail, NOW)).toBe("sent");
     expect(sent().at(-1)?.to).toBe("neuve@exemple.ch");
     expect(login(db, { email: "admin@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: true }).kind).toBe("ok");
-    confirmEmail(db, tokenOf(lastLink()), NOW);
+    // Un changement d'adresse ne connecte jamais : l'ancienne adresse est prévenue.
+    expect(confirmEmail(db, tokenOf(lastLink()), NOW)).toMatchObject({ autoLogin: false, previousEmail: "admin@exemple.ch" });
     expect(login(db, { email: "neuve@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: true }).kind).toBe("ok");
     expect(login(db, { email: "admin@exemple.ch", password: PW }, { nowIso: NOW, mailEnabled: true }).kind).toBe("refused");
   });
 });
 
 describe("infrastructure", () => {
+  it("garde en mémoire une empreinte courte des clés démesurées", () => {
+    const huge = `login-email:${"x".repeat(1_000_000)}`;
+    for (let i = 0; i < 2; i++) expect(consume(huge, 2, 1000, 0)).toBe(true);
+    expect(consume(huge, 2, 1000, 0)).toBe(false);
+  });
+
   it("limite le débit par fenêtre", () => {
     for (let i = 0; i < 3; i++) expect(consume("k", 3, 1000, 0)).toBe(true);
     expect(consume("k", 3, 1000, 10)).toBe(false);

@@ -2,6 +2,7 @@ import { and, count, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
 import { appUser, auditEvent, notificationLog } from "@/infrastructure/db/schema";
 import type { MailDeps } from "./account-mail";
+import { logMailError } from "@/infrastructure/mail/mailer";
 
 /*
  * Alertes d'exploitation envoyées aux administrateurs par courriel : disque presque plein, vague
@@ -46,7 +47,7 @@ export async function opsTick(db: Db, deps: OpsDeps, nowIso: string): Promise<st
   for (const a of alerts) {
     if (db.select().from(notificationLog).where(eq(notificationLog.key, a.key)).get()) continue;
     for (const { email } of admins) {
-      await deps.mail.mailer.send({ to: email!, subject: `Alerte : ${a.subject.toLowerCase()}`, text: `${a.text}${SIGNATURE}` }).catch((e) => console.error("[courriel] alerte :", e instanceof Error ? e.message : e));
+      await deps.mail.mailer.send({ to: email!, subject: `Alerte : ${a.subject.toLowerCase()}`, text: `${a.text}${SIGNATURE}` }).catch(logMailError("alerte"));
     }
     db.insert(notificationLog).values({ key: a.key }).onConflictDoNothing().run();
     sent.push(a.key);

@@ -5,7 +5,7 @@ import { appUser, auditEvent, passkey, recoveryCode } from "@/infrastructure/db/
 import { totpContext } from "@/infrastructure/crypto/legacy";
 import { openSecret, sealSecret } from "@/infrastructure/crypto/vault";
 import { audit } from "./audit";
-import { verifyPassword } from "./auth";
+import { requirePassword } from "./auth";
 import { UserError } from "./errors";
 import { consumeToken, countAttempt, digest, issueToken, peekToken } from "./tokens";
 import { newTotpSecret, totpUri, verifyTotp } from "./totp";
@@ -64,7 +64,7 @@ export function recoveryCodesLeft(db: Db, userId: number): number {
 export function startTotpSetup(db: Db, userId: number, password: string, nowIso: string): { token: string; secret: string; uri: string } {
   const user = userRow(db, userId);
   if (user.totpEnabledAt) throw new UserError("Le double facteur est déjà actif.");
-  if (!verifyPassword(db, userId, password)) throw new UserError("Mot de passe incorrect.");
+  requirePassword(db, userId, password, nowIso);
   const secret = newTotpSecret();
   const token = issueToken(db, { userId, kind: "TOTP_SETUP", ttlMs: SETUP_MINUTES * 60_000, data: { secret: sealSecret(db, secret, setupContext(userId)) } }, nowIso);
   return { token, secret, uri: totpUri(secret, user.email ?? "administrateur") };
@@ -88,7 +88,7 @@ export function confirmTotpSetup(db: Db, userId: number, token: string | undefin
 
 export function regenerateRecoveryCodes(db: Db, userId: number, password: string, nowIso: string): string[] {
   if (!userRow(db, userId).totpEnabledAt) throw new UserError("Activez d'abord le double facteur.");
-  if (!verifyPassword(db, userId, password)) throw new UserError("Mot de passe incorrect.");
+  requirePassword(db, userId, password, nowIso);
   audit(db, userId, "RECOVERY_REGENERATED", { nowIso });
   return replaceRecoveryCodes(db, userId);
 }
@@ -96,7 +96,7 @@ export function regenerateRecoveryCodes(db: Db, userId: number, password: string
 export function disableTotp(db: Db, userId: number, password: string, nowIso: string) {
   const user = userRow(db, userId);
   if (!user.totpEnabledAt) return;
-  if (!verifyPassword(db, userId, password)) throw new UserError("Mot de passe incorrect.");
+  requirePassword(db, userId, password, nowIso);
   const hasPasskey = db.select({ id: passkey.id }).from(passkey).where(eq(passkey.userId, userId)).limit(1).get();
   if (user.role === "ADMIN" && !hasPasskey) throw new UserError("L'administrateur doit garder un second facteur : ajoutez d'abord une passkey.");
   db.transaction((tx) => {

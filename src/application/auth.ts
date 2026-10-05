@@ -212,7 +212,7 @@ export function login(db: Db, input: { email: string; password: string }, option
 
 /** Nouveau mot de passe choisi depuis le compte : les autres appareils sont déconnectés. */
 export async function changePassword(db: Db, userId: number, current: string, next: string, pwned: PwnedCheck, keepSessionId: string, nowIso: string) {
-  if (!verifyPassword(db, userId, current)) throw new UserError("Mot de passe actuel incorrect.");
+  requirePassword(db, userId, current, nowIso, "Mot de passe actuel incorrect.");
   await checkNewPassword(next, pwned);
   setPassword(db, userId, next);
   closeOtherSessions(db, userId, keepSessionId);
@@ -262,12 +262,16 @@ export function markActive(db: Db, userId: number, nowIso: string) {
 }
 
 /** Ouvre une session et renvoie le jeton à placer dans le cookie (jamais conservé en clair). */
-export function openSession(db: Db, userId: number, device: string, nowIso: string): { id: string; token: string; expiresAt: string } {
+/**
+ * Ouvre une session. `confirmed` : l'identité vient d'être prouvée (mot de passe, passkey), la
+ * session est « fraîche » quelques minutes ; un lien de courriel, lui, ne prouve que l'accès à la boîte.
+ */
+export function openSession(db: Db, userId: number, device: string, nowIso: string, confirmed = true): { id: string; token: string; expiresAt: string } {
   purgeExpiredSessions(db, nowIso);
   const token = randomBytes(32).toString("base64url");
   const id = randomBytes(8).toString("hex");
   const expiresAt = new Date(Date.parse(nowIso) + SESSION_DAYS * 86_400_000).toISOString();
-  db.insert(session).values({ id, userId, tokenHash: tokenHash(token), device: device.slice(0, 200), createdAt: nowIso, lastSeenAt: nowIso, expiresAt }).run();
+  db.insert(session).values({ id, userId, tokenHash: tokenHash(token), device: device.slice(0, 200), createdAt: nowIso, lastSeenAt: nowIso, expiresAt, confirmedAt: confirmed ? nowIso : NEVER_CONFIRMED }).run();
   markActive(db, userId, nowIso);
   return { id, token, expiresAt };
 }
@@ -314,6 +318,9 @@ export function closeSession(db: Db, token: string | undefined) {
 /** Durée pendant laquelle une identité confirmée ouvre les actions sensibles. */
 export const CONFIRM_MINUTES = 10;
 
+/** Date de confirmation d'une session ouverte sans preuve d'identité (lien de courriel). */
+const NEVER_CONFIRMED = new Date(0).toISOString();
+
 /**
  * Fin de la période de confirmation de cette session : ouverture (le mot de passe vient d'être
  * saisi) ou dernière confirmation par mot de passe ou passkey. Null si elle est passée.
@@ -321,7 +328,7 @@ export const CONFIRM_MINUTES = 10;
 export function confirmedUntil(db: Db, sessionId: string, nowIso: string, minutes = CONFIRM_MINUTES): string | null {
   const row = db.select({ createdAt: session.createdAt, confirmedAt: session.confirmedAt }).from(session).where(eq(session.id, sessionId)).get();
   if (!row) return null;
-  const last = row.confirmedAt && row.confirmedAt > row.createdAt ? row.confirmedAt : row.createdAt;
+  const last = row.confirmedAt ?? row.createdAt;
   const until = new Date(Date.parse(last) + minutes * 60_000).toISOString();
   return until > nowIso ? until : null;
 }
@@ -343,13 +350,21 @@ export function markConfirmed(db: Db, sessionId: string, nowIso: string) {
 
 /** Confirmation par mot de passe ; les échecs comptent pour le verrouillage du compte. */
 export function confirmWithPassword(db: Db, userId: number, sessionId: string, password: string, nowIso: string) {
-  const res = attemptLogin(db, userId, password, nowIso);
-  if (!res.ok) {
-    audit(db, userId, res.lockedSeconds > 0 ? "LOCKED" : "LOGIN_FAILED", { nowIso });
-    if (res.lockedSeconds > 0) throw new UserError(`Trop d'essais : réessayez dans ${Math.ceil(res.lockedSeconds / 60)} min.`);
-    throw new UserError("Mot de passe incorrect.");
-  }
+  requirePassword(db, userId, password, nowIso);
   markConfirmed(db, sessionId, nowIso);
+}
+
+/**
+ * Mot de passe redemandé dans le compte (changer de courriel, ajouter un facteur…). Les échecs
+ * comptent comme des échecs de connexion : verrou, journal. Une session volée ne permet donc pas
+ * de deviner le mot de passe à l'infini.
+ */
+export function requirePassword(db: Db, userId: number, password: string, nowIso: string, wrongMessage = "Mot de passe incorrect.") {
+  const res = attemptLogin(db, userId, password, nowIso);
+  if (res.ok) return;
+  audit(db, userId, res.lockedSeconds > 0 ? "LOCKED" : "LOGIN_FAILED", { nowIso });
+  if (res.lockedSeconds > 0) throw new UserError(`Trop d'essais : réessayez dans ${Math.ceil(res.lockedSeconds / 60)} min.`);
+  throw new UserError(wrongMessage);
 }
 
 /** Ferme toutes les sessions d'un compte (réinitialisation du mot de passe, suspension). */

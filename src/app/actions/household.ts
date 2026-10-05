@@ -17,7 +17,9 @@ import {
 } from "@/application/household";
 import { tariffOptions, type TariffOptions } from "@/application/tariffs";
 import { analyzePolicyText, applyPolicyImport, createHouseholdFromPolicy, previewPolicyHolder, type ConfirmedImport, type HouseholdFromPolicy, type PolicyHolderPreview, type PolicyImport } from "@/application/policy-import";
-import { readPdfText } from "@/infrastructure/pdf/read-text";
+import { MAX_PDF_PAGES, readPdfText } from "@/infrastructure/pdf/read-text";
+import { MAX_POLICY_TEXT } from "@/domain/policy-import";
+import { rateLimit } from "@/server/accounts";
 import { lookupPostalCode, type CommuneOption } from "@/infrastructure/regions/postal";
 import { UserError } from "@/application/errors";
 import { DEFAULT_HEALTH_COSTS_RP, DEFAULT_KID_SUBGROUP } from "@/domain/lamal";
@@ -236,22 +238,27 @@ export async function tariffOptionsAction(personId: number, year: number, insure
 const MAX_PDF = 20 * 1024 * 1024;
 
 /** Texte du PDF envoyé, ou un message d'erreur lisible. */
-async function pdfText(form: FormData): Promise<{ text: string } | { error: string }> {
+async function pdfText(form: FormData, scope: Scope): Promise<{ text: string } | { error: string }> {
+  try {
+    rateLimit([`pdf:${scope.userId}`], 10, 60);
+  } catch (e) {
+    return { error: toActionError(e)?.error ?? "Trop de demandes." };
+  }
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choisissez le PDF de votre police." };
   if (file.size > MAX_PDF) return { error: "Fichier trop volumineux (20 Mo au plus)." };
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") return { error: "Ce fichier n'est pas un PDF." };
   try {
-    return { text: await readPdfText(bytes) };
+    return { text: (await readPdfText(bytes)).slice(0, MAX_POLICY_TEXT) };
   } catch {
-    return { error: "Ce fichier n'a pas pu être lu comme un PDF." };
+    return { error: `Ce fichier n'a pas pu être lu comme une police (PDF de ${MAX_PDF_PAGES} pages au plus).` };
   }
 }
 
 export async function analyzePolicyAction(form: FormData): Promise<{ result?: PolicyImport; error?: string }> {
   const scope = await requireScope();
-  const read = await pdfText(form);
+  const read = await pdfText(form, scope);
   if ("error" in read) return read;
   try {
     return { result: analyzePolicyText(db(), scope, read.text, currentYear()) };
@@ -263,11 +270,11 @@ export async function analyzePolicyAction(form: FormData): Promise<{ result?: Po
 
 /** Accueil depuis la police : personnes et adresse lues, avant tout foyer. Le texte est renvoyé pour l'étape suivante. */
 export async function analyzePolicyStartAction(form: FormData): Promise<{ preview?: PolicyHolderPreview; text?: string; error?: string }> {
-  await requireScope();
-  const read = await pdfText(form);
+  const scope = await requireScope();
+  const read = await pdfText(form, scope);
   if ("error" in read) return read;
   try {
-    return { preview: previewPolicyHolder(db(), read.text, currentYear()), text: read.text.slice(0, 200_000) };
+    return { preview: previewPolicyHolder(db(), read.text, currentYear()), text: read.text };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     return { error: "Lecture impossible." };
@@ -286,7 +293,7 @@ export async function createFromPolicyAction(input: HouseholdFromPolicy, text: s
   }
   // Pas de revalidation ici : l'écran reste monté pour vérifier les contrats ; l'enregistrement final rafraîchit.
   try {
-    return { result: analyzePolicyText(db(), mine, String(text).slice(0, 200_000), currentYear()) };
+    return { result: analyzePolicyText(db(), mine, String(text).slice(0, MAX_POLICY_TEXT), currentYear()) };
   } catch (e) {
     return { error: e instanceof UserError ? e.message : "Lecture impossible." };
   }
