@@ -17,7 +17,7 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -59,7 +59,7 @@ jobs:
     # Dépendances de production sans faille haute ni critique connue ; aucun secret dans l'historique.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
@@ -76,7 +76,7 @@ jobs:
     # critiques corrigibles). L'image multi-architecture n'est publiée qu'après la CI, sur main.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
@@ -112,7 +112,7 @@ jobs:
     # Vérifie l'import sur le VRAI fichier de primes publié par l'OFSP (format, colonnes, codes).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
