@@ -11,11 +11,33 @@ et l'administration d'une instance sont dans [exploitation/](exploitation/).
 
 | Menu | Contenu |
 |---|---|
-| **Accueil** | La situation de l'année, et pendant l'automne la hausse annoncée et le compte à rebours |
+| **Accueil** | La carte de l'année (où vous en êtes pour l'an prochain) et la liste des choses à faire |
 | **Rituel** | La comparaison et le changement de l'automne |
 | **Foyer** (ou **Moi** pour une personne seule) | Personnes, adresse, contrats LAMal et complémentaires |
 | **Historique** | Primes payées année après année, économies des rituels, position face au marché |
 | **Réglages** | Primes officielles, CO2, caisses, rappels, accès à *Mon compte*, *Mes données* et *Donner un avis* |
+
+## L'accueil
+
+En haut, **la carte de l'année** dit où vous en êtes pour l'an prochain, avec un montant, une
+phrase et un seul bouton :
+
+| Moment | La carte montre | Bouton |
+|---|---|---|
+| Primes de l'an prochain pas encore publiées | Votre prime actuelle par mois | aucun |
+| Primes publiées, bilan pas commencé | Ce que vous paierez sans rien faire, la hausse et l'économie possible | Commencer le bilan |
+| Choix en cours | Le total avec vos choix, combien de personnes ont choisi | Choisir pour la personne suivante |
+| Tout choisi, courriers à envoyer | L'économie prévue et le nombre de courriers à envoyer | Envoyer les courriers |
+| Terminé | La prime de l'an prochain et l'économie réalisée, sur fond vert | Voir le bilan |
+| Délai passé sans envoi | La prime de l'an prochain : la caisse renouvelle aux nouvelles conditions | aucun |
+
+Touchez la carte pour voir le détail par personne. Pendant la période de changement, un compte à
+rebours indique les jours restants avant le 30 novembre.
+
+Dessous, **À faire** liste les autres tâches, la plus urgente en haut : courriers à envoyer,
+signatures, choix à faire, produit de votre caisse à préciser, contrat de l'année à indiquer,
+compte à sécuriser (passkey ou double facteur). La tâche déjà sur le bouton de la carte n'y est
+pas répétée. « Tout est à jour » quand il n'y a rien d'autre.
 
 ## Premiers pas
 
@@ -80,7 +102,7 @@ Chaque automne, l'app vous aide à vérifier que vous payez le juste prix pour l
 | Quand | Ce qui se passe |
 |---|---|
 | Fin septembre | L'OFSP publie les primes de l'an prochain. L'app les importe toute seule et envoie une notification. |
-| Dès la publication | Le rituel s'ouvre seul. L'accueil montre la **hausse** : ce que chaque personne paiera sans rien faire. |
+| Dès la publication | Le rituel s'ouvre seul. La carte de l'accueil montre la **hausse** : ce que vous paierez sans rien faire. |
 | Octobre – mi-novembre | Préférences, comparaison, choix, envoi des courriers. |
 | Avant le 30 novembre | Vos lettres doivent être **reçues** par la caisse. L'app indique la date d'envoi conseillée (environ une semaine avant). Le rituel se termine seul quand tout est envoyé. |
 | Décembre – janvier | Les caisses confirment par courrier : gardez ces confirmations. |

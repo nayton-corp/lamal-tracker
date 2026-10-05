@@ -7,7 +7,6 @@ import { openReviewIfPossible, getReviewByYear, getReviewView, type ReviewLineVi
 import { reviewDeadlines, isReviewWindowOpen } from "@/domain/deadlines";
 import { formatDateLong } from "@/domain/dates";
 import { STRATEGY_INFO } from "@/domain/strategy";
-import { Awareness } from "../_parts/awareness";
 import { nextStep } from "../_parts/next-step";
 import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType, FIRST_PREMIUM_YEAR } from "@/domain/lamal";
 import { DECISION_LABEL } from "@/domain/review";
@@ -111,7 +110,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
     <Page wide>
       <PageHeader title={`Rituel ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${householdRow.canton}, région ${householdRow.region}`} />
 
-      <Awareness view={view} detailed={false} cta={false} />
+      {!closed && <DeadlineLine view={view} />}
       {closed && (
         <Alert tone="success" title="C'est terminé">
           {view.lines.some((p) => p.line.decision === "SWITCH" || p.line.decision === "ADJUST")
@@ -205,6 +204,22 @@ function OtherActions({ year, reviewId, closed, sentCount }: { year: number; rev
         </ActionForm>
       </Card>
     </Section>
+  );
+}
+
+/** Échéance du bilan en une ligne (la carte de l'année est sur l'accueil). */
+function DeadlineLine({ view }: { view: ReviewView }) {
+  const late = view.urgency === "late";
+  const pressing = view.urgency === "urgent" || late;
+  return (
+    <p className={cn("flex items-center gap-2 rounded-xl p-3 text-sm shadow-card", pressing ? "bg-increase-soft text-increase" : "bg-surface")}>
+      <CalendarClock aria-hidden className="size-4 shrink-0" />
+      <span className="flex-1">
+        {late ? "Délai passé : " : "Pour changer, courrier reçu par la caisse au plus tard le "}
+        {late ? "votre caisse renouvelle aux nouvelles conditions." : <strong>{formatDateLong(view.deadlines.receiptDeadline)}</strong>}
+      </span>
+      {!late && <span className="shrink-0 font-semibold tabular">J-{view.daysToDeadline}</span>}
+    </p>
   );
 }
 

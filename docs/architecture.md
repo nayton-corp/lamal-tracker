@@ -38,6 +38,7 @@ src/
     renewal.ts         tarif de renouvellement d'un contrat (MATCHED, PROBABLE, AMBIGUOUS, MISSING)
     strategy.ts        deux stratégies du rituel, profils de consommation, solidité d'une caisse
     ritual-steps.ts    étapes du rituel, leur ordre et quand chacune est faite
+    home.ts            accueil : état de la carte de l'année et tâches, dans l'ordre (homeTasks)
     review.ts          garde-fous des décisions, des lettres et du contrôle LCA
     letter.ts          contenu des lettres et des demandes d'offre (indépendant du rendu PDF)
     lca.ts             familles de complémentaires
@@ -409,7 +410,7 @@ Démarches, `strategie` et `besoins` aux préférences. Le rituel se clôt seul 
 (`syncReviewClosure`).
 L'année visée est toujours l'année prochaine (`reviewTargetYear()`). Pendant la fenêtre de
 changement (`isReviewWindowOpen` : primes publiées et échéance du 30 novembre pas encore passée),
-la page ouvre le rituel toute seule (`openReviewIfPossible`). Les statuts et transitions sont
+la page du rituel et l'accueil (`homeOverview`) l'ouvrent tout seuls (`openReviewIfPossible`). Les statuts et transitions sont
 décrits dans [modele-de-donnees.md](modele-de-donnees.md).
 
 ## 14. Sécurité de l'interface

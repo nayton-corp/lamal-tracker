@@ -12,6 +12,7 @@ Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/rituel/2
 | Foyer | `household`, `src/application/household.ts` | `household` | `/foyer` |
 | Mode « une personne » / « foyer » (menu *Moi* ou *Foyer*) | `HouseholdMode` : `SOLO`, `FAMILY` | `household_setting` (clé `mode`) | `/foyer` |
 | Accueil guidé | `WelcomePage` | — | `/bienvenue` |
+| Carte de l'année, tâches de l'accueil | `yearCardState`, `homeTasks` (`src/domain/home.ts`), `homeOverview` | — | `/` |
 | Personne | `person`, `findPerson`, `ownedPerson` | `person` | `/foyer/personne/[id]`, `/foyer/personne/nouvelle` |
 | Contrat LAMal | `lamalPolicy`, `ownedPolicy`, `savePolicy` | `lamal_policy` | `/foyer/personne/[id]` |
 | Complémentaire (LCA) | `lcaPolicy`, `ownedLca`, `LcaGuarantee` | `lca_policy` | `/foyer/personne/[id]` |

@@ -31,6 +31,8 @@ export interface ReviewLineView {
   increasePermille: number | null;
   bestOffer: RankedOffer | null;
   renewalTotalRp: number | null;
+  /** Économie annuelle attendue du choix fait (coût total), 0 pour « je garde » ; null sans choix. */
+  chosenSavingsRp: number | null;
   /** Complémentaires LCA actives de la personne (« Hospitalisation demi-privée, Visana »). */
   lcaProducts: string[];
   letterCheck: LetterCheck;
@@ -51,9 +53,23 @@ export interface ReviewView {
     chosenMonthlyRp: number | null;
     bestMonthlyRp: number | null;
     potentialAnnualSavingsRp: number;
+    /** Somme des économies des choix déjà faits. */
+    chosenAnnualSavingsRp: number;
   };
   letters: (typeof letter.$inferSelect & { insurerName: string })[];
   steps: RitualStep[];
+}
+
+function renewalTotalFor(db: Db, r: typeof review.$inferSelect, line: LineRow, p: PersonRow): number | null {
+  if (line.renewalMonthlyRp === null) return null;
+  const ctx = { ageClass: line.targetAgeClass, params: parametersFor(db, r.targetYear), healthCostsRp: p.healthCostsRp };
+  return costOf({ monthlyPremiumRp: line.renewalMonthlyRp, franchiseChf: line.renewalFranchiseChf }, ctx).totalRp;
+}
+
+function chosenSavings(line: LineRow, renewalTotalRp: number | null): number | null {
+  if (line.decision === "UNDECIDED") return null;
+  if (line.decision === "KEEP") return 0;
+  return renewalTotalRp === null || line.chosenTotalRp === null ? null : renewalTotalRp - line.chosenTotalRp;
 }
 
 function bestOfferFor(
@@ -62,20 +78,17 @@ function bestOfferFor(
   line: LineRow,
   p: PersonRow,
   offers: Offer[] = offersFor(db, premiumProfileFor(db, r, line)),
-): { best: RankedOffer | null; renewalTotalRp: number | null } {
+): RankedOffer | null {
   const params = parametersFor(db, r.targetYear);
   const ctx = { ageClass: line.targetAgeClass, params, healthCostsRp: p.healthCostsRp };
-  const renewalTotalRp =
-    line.renewalMonthlyRp === null
-      ? null
-      : costOf({ monthlyPremiumRp: line.renewalMonthlyRp, franchiseChf: line.renewalFranchiseChf }, ctx).totalRp;
+  const renewalTotalRp = renewalTotalFor(db, r, line, p);
   const filtered = filterOffers(offers, {
     models: p.allowedModels as ModelType[],
     franchises: franchisesFor(params, line.targetAgeClass),
     excludedInsurerIds: p.excludedInsurerIds,
   });
   const ranked = rankOffers(filtered, { ...ctx, referenceTotalRp: renewalTotalRp });
-  return { best: ranked[0] ?? null, renewalTotalRp };
+  return ranked[0] ?? null;
 }
 
 /** Vue complète d'un rituel du foyer ; `today` sert aux échéances et à l'urgence affichée. */
@@ -91,7 +104,8 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
     const policy = db.select().from(lamalPolicy).where(eq(lamalPolicy.id, line.currentPolicyId)).get()!;
     const current = insurers.get(policy.insurerId)!;
     const lca = db.select().from(lcaPolicy).where(and(eq(lcaPolicy.personId, personRow.id), eq(lcaPolicy.active, true))).all();
-    const { best, renewalTotalRp } = reviewRow.status === "CLOSED" ? { best: null, renewalTotalRp: null } : bestOfferFor(db, reviewRow, line, personRow);
+    const best = reviewRow.status === "CLOSED" ? null : bestOfferFor(db, reviewRow, line, personRow);
+    const renewalTotalRp = renewalTotalFor(db, reviewRow, line, personRow);
     return {
       line,
       person: personRow,
@@ -103,6 +117,7 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
       increasePermille: line.renewalMonthlyRp === null ? null : changePermille(policy.billedMonthlyRp, line.renewalMonthlyRp),
       bestOffer: best,
       renewalTotalRp,
+      chosenSavingsRp: chosenSavings(line, renewalTotalRp),
       lcaProducts: lca.map((c) => `${c.productName}, ${c.insurerName}`),
       letterCheck: checkLetter({
         decision: line.decision,
@@ -142,6 +157,7 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
       chosenMonthlyRp: sum(lineViews.map((x) => x.line.chosenMonthlyRp)),
       bestMonthlyRp: sum(lineViews.map((x) => x.bestOffer?.monthlyPremiumRp ?? null)),
       potentialAnnualSavingsRp: lineViews.reduce((a, x) => a + Math.max(x.bestOffer?.savingsRp ?? 0, 0), 0),
+      chosenAnnualSavingsRp: lineViews.reduce((a, x) => a + (x.chosenSavingsRp ?? 0), 0),
     },
     letters,
     steps: ritualSteps({
