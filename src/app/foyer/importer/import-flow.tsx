@@ -1,11 +1,12 @@
 "use client";
 
-import { CheckCircle2, FileUp, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, FileUp, Loader2, MapPin, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { analyzePolicyAction, applyPolicyImportAction } from "@/app/actions/household";
 import type { ImportedPerson, PolicyImport } from "@/application/policy-import";
+import { domicileLabel } from "@/domain/domicile";
 import { MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { Alert } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
@@ -94,6 +95,7 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved, focu
       const res = await applyPolicyImportAction({
         insurerId: Number(insurerId),
         year,
+        domicile: result?.domicile,
         persons: included.map((r) => ({
           personId: r.personId,
           tariffCode: r.tariffCode,
@@ -179,6 +181,9 @@ export function ImportFlow({ insurers, years, hasPersons, initial, onSaved, focu
                 ))}
               </Select>
             </Field>
+            <p className="col-span-2 flex items-center gap-1.5 text-sm text-muted">
+              <MapPin aria-hidden className="size-4 shrink-0" /> Domicile au 1er janvier : {domicileLabel(result.domicile)}
+            </p>
           </Card>
 
           {rows.map((r, i) => (

@@ -156,6 +156,31 @@ Code : `lookupPostalCode()` dans `src/infrastructure/regions/postal.ts` (table g
 `scripts/build-postal-regions.ts`) ; colonnes `household.canton`, `household.region`,
 `household.bfs_number` (n° OFS de la commune).
 
+### Domicile au 1er janvier
+
+Les primes d'une année sont celles de la commune où la personne habite au **1er janvier**. Un
+foyer peut déménager d'une année à l'autre (Fribourg en 2026, Valais en 2027), et un membre peut
+habiter ailleurs (un étudiant). Chaque contrat garde donc son propre domicile (commune, canton,
+région) ; l'adresse du foyer ne sert qu'aux courriers et comme valeur proposée par défaut.
+
+- Un contrat saisi ou importé prend l'adresse du foyer, ou celle imprimée sur la police si elle
+  est dans une autre commune ; on peut la changer dans le contrat.
+- Le bilan propose, pour chaque personne, l'adresse actuelle du foyer comme domicile au
+  1er janvier de l'année cible ; « Modifier » en indique un autre. Les offres et la prime
+  reconduite suivent ce domicile, et le choix déjà fait est remis à zéro. À la clôture, le
+  contrat de l'année cible reprend ce domicile.
+- Changer l'adresse du foyer demande s'il s'agit d'un **déménagement** (seul le bilan en cours
+  suit) ou d'une **correction** (les contrats qui avaient l'ancienne commune prennent la nouvelle).
+- Si la caisse actuelle n'assure pas dans le nouveau canton, sa reconduction est « plus
+  proposée » : il faut en choisir une autre (LAMal, art. 7 al. 3).
+
+Un déménagement en cours d'année n'est pas suivi au mois près : la caisse ajuste elle-même la
+prime, l'app retient le domicile au 1er janvier.
+
+Code : `src/domain/domicile.ts`, `setLineDomiciles()` dans `src/application/review/domicile.ts`,
+`saveHouseholdAddress()` dans `src/application/domicile.ts` ; colonnes `commune`, `bfs_number`,
+`canton`, `region` de `lamal_policy` et `review_line`.
+
 ### Couverture accident
 
 La LAMal couvre aussi les accidents, sauf si la personne est déjà assurée par son employeur

@@ -78,6 +78,11 @@ export const policyInput = z.object({
   franchiseChf: z.coerce.number().int().min(0).max(5000),
   accident: z.coerce.boolean(),
   billedMonthlyRp: z.coerce.number().int().positive("Prime requise"),
+  /** Domicile au 1er janvier de l'année ; sans canton, l'adresse actuelle du foyer. */
+  commune: text().optional(),
+  bfsNumber: z.coerce.number().int().positive().optional().nullable(),
+  canton: z.enum(CANTONS).optional(),
+  region: z.coerce.number().int().min(0).max(3).optional(),
 });
 
 export const lcaInput = z.object({
@@ -178,12 +183,17 @@ export function listPolicies(db: Db, personId: number) {
 /**
  * Crée ou modifie un contrat LAMal. Sans `id`, un contrat existant de la même personne pour la
  * même année est remplacé (un seul par année). `source` : d'où vient le contrat (saisie, clôture…).
+ * Sans domicile indiqué, le contrat prend l'adresse actuelle du foyer.
  */
 export function savePolicy(db: Db, scope: Scope, input: z.input<typeof policyInput>, source: "MANUAL" | "OFSP" | "REVIEW" = "MANUAL") {
-  const { id, ...data } = policyInput.parse(input);
+  const { id, commune, bfsNumber, canton, region, ...data } = policyInput.parse(input);
   ownedPerson(db, scope, data.personId);
   if (!db.select({ id: insurer.id }).from(insurer).where(eq(insurer.id, data.insurerId)).get()) throw new UserError("Caisse inconnue.");
-  const values = { ...data, modelType: data.modelType as never, source };
+  const home = db.select().from(household).where(eq(household.id, householdIdOf(scope))).get()!;
+  const domicile = canton
+    ? { commune: commune ?? "", bfsNumber: bfsNumber ?? null, canton, region: region ?? 0 }
+    : { commune: home.commune, bfsNumber: home.bfsNumber, canton: home.canton, region: home.region };
+  const values = { ...data, ...domicile, modelType: data.modelType as never, source };
   if (id) {
     ownedPolicy(db, scope, id);
     db.update(lamalPolicy).set(values).where(eq(lamalPolicy.id, id)).run();

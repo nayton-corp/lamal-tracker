@@ -1,6 +1,7 @@
 /** Décision pour une personne : garder, changer de caisse, changer de franchise ou de modèle. */
 import { eq } from "drizzle-orm";
 import { costOf } from "@/domain/comparison";
+import { domicileOf } from "@/domain/domicile";
 import type { Db } from "@/infrastructure/db/client";
 import { offersFor, parametersFor } from "@/infrastructure/db/queries";
 import { reviewLine, tariffLineage } from "@/infrastructure/db/schema";
@@ -19,7 +20,7 @@ export function confirmLineage(db: Db, scope: Scope, lineId: number, toCode: str
       set: { toCode },
     })
     .run();
-  db.update(reviewLine).set(renewalFor(db, r, p, policy)).where(eq(reviewLine.id, line.id)).run();
+  db.update(reviewLine).set(renewalFor(db, r, p, policy, domicileOf(line))).where(eq(reviewLine.id, line.id)).run();
 }
 
 export interface Choice {
@@ -30,7 +31,7 @@ export interface Choice {
 /** Enregistre un choix : la décision (garder, changer de caisse, ajuster) en découle. Valeurs figées. */
 export function decide(db: Db, scope: Scope, lineId: number, choice: Choice, nowIso: string) {
   const { line, review: r, policy, person: p } = loadLine(db, scope, lineId);
-  const offers = offersFor(db, premiumProfileFor(db, r, line));
+  const offers = offersFor(db, premiumProfileFor(r, line));
   const offer = offers.find((o) => o.tariffId === choice.tariffId && o.franchiseChf === choice.franchiseChf);
   if (!offer) throw new UserError("Offre introuvable pour ce profil.");
   const params = parametersFor(db, r.targetYear);

@@ -28,6 +28,7 @@ import { currentYear, db } from "@/server/context";
 import { requireScope } from "@/server/auth";
 import { chosenMode } from "@/server/onboarding";
 import { withHousehold, type Scope } from "@/application/scope";
+import { saveHouseholdAddress } from "@/application/domicile";
 
 const formText = (f: FormData, k: string) => {
   const v = f.get(k);
@@ -41,7 +42,7 @@ const formTextOrNull = (f: FormData, k: string) => {
 export async function saveHouseholdAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
-    const id = saveHousehold(db(), scope, {
+    const id = saveHouseholdAddress(db(), scope, {
       name: formText(form, "name") ?? "",
       street: formText(form, "street"),
       postalCode: formText(form, "postalCode"),
@@ -50,7 +51,7 @@ export async function saveHouseholdAction(_: ActionState, form: FormData): Promi
       bfsNumber: formTextOrNull(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
       canton: (formText(form, "canton") ?? "") as never,
       region: Number(formText(form, "region")),
-    });
+    }, form.get("addressChange") === "CORRECTION" ? "CORRECTION" : "MOVE");
     const mine = withHousehold(scope, id);
     if (!getHouseholdMode(db(), mine)) setHouseholdMode(db(), mine, (await chosenMode(scope)) ?? "FAMILY");
   } catch (e) {
@@ -112,7 +113,7 @@ export async function saveSoloAction(_: ActionState, form: FormData): Promise<Ac
     const firstName = formText(form, "firstName") ?? "";
     const lastName = formText(form, "lastName") ?? "";
     const householdRow = getHousehold(db(), scope);
-    const id = saveHousehold(db(), scope, {
+    const id = saveHouseholdAddress(db(), scope, {
       name: `${firstName} ${lastName}`.trim(),
       street: formText(form, "street"),
       postalCode: formText(form, "postalCode"),
@@ -121,7 +122,7 @@ export async function saveSoloAction(_: ActionState, form: FormData): Promise<Ac
       bfsNumber: formTextOrNull(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
       canton: (formText(form, "canton") ?? "") as never,
       region: Number(formText(form, "region")),
-    });
+    }, form.get("addressChange") === "CORRECTION" ? "CORRECTION" : "MOVE");
     const existing = householdRow ? listPersons(db(), householdRow.id)[0] : undefined;
     const mine = withHousehold(scope, id);
     savePerson(db(), mine, {
@@ -157,6 +158,18 @@ export async function deletePersonAction(form: FormData) {
   redirect("/foyer");
 }
 
+/** Domicile choisi dans le formulaire (sélecteur de commune) ; vide si aucun canton n'est indiqué. */
+function domicileFromForm(form: FormData) {
+  const canton = formText(form, "canton");
+  if (!canton) return {};
+  return {
+    commune: formText(form, "commune") ?? "",
+    bfsNumber: formTextOrNull(form, "bfsNumber") ? Number(form.get("bfsNumber")) : null,
+    canton: canton as never,
+    region: Number(form.get("region")),
+  };
+}
+
 export async function savePolicyAction(_: ActionState, form: FormData): Promise<ActionState> {
   const scope = await requireScope();
   try {
@@ -174,6 +187,7 @@ export async function savePolicyAction(_: ActionState, form: FormData): Promise<
       franchiseChf: Number(form.get("franchiseChf")),
       accident: form.get("accident") === "on",
       billedMonthlyRp: billed,
+      ...domicileFromForm(form),
     }, formTextOrNull(form, "tariffCode") ? "OFSP" : "MANUAL");
   } catch (e) {
     return toActionError(e);
@@ -230,9 +244,10 @@ export async function postalCodeAction(npa: string): Promise<CommuneOption[]> {
   return lookupPostalCode(npa);
 }
 
-export async function tariffOptionsAction(personId: number, year: number, insurerId: number): Promise<TariffOptions> {
+export async function tariffOptionsAction(personId: number, year: number, insurerId: number, where?: { canton: string; region: number }): Promise<TariffOptions> {
   const scope = await requireScope();
-  return tariffOptions(db(), scope, Number(personId), Number(year), Number(insurerId));
+  const place = where?.canton ? { canton: String(where.canton), region: Number(where.region) } : undefined;
+  return tariffOptions(db(), scope, Number(personId), Number(year), Number(insurerId), place);
 }
 
 const MAX_PDF = 20 * 1024 * 1024;

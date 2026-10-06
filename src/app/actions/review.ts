@@ -14,9 +14,12 @@ import {
   reopenReview,
   getReviewView,
   listReviewLineTabs,
+  setLineDomiciles,
   syncReviewClosure,
   undoDecision,
 } from "@/application/review";
+import { CANTONS } from "@/domain/lamal";
+import { UserError } from "@/application/errors";
 import { nextStep } from "@/app/bilan/_parts/next-step";
 import { toActionError, rethrowForeignKey, type ActionState } from "@/server/action";
 import { db, nowIso, today } from "@/server/context";
@@ -48,6 +51,30 @@ function syncAfterSending(scope: Scope, reviewId: number | undefined): string | 
 function redirectToReview(year: number, path = "") {
   revalidatePath("/", "layout");
   redirect(`/bilan/${year}${path}`);
+}
+
+/** Domicile au 1er janvier de l'année cible pour les personnes cochées (déménagement). */
+export async function setDomicileAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const scope = await requireScope();
+  const year = Number(form.get("year"));
+  try {
+    const canton = String(form.get("canton") ?? "");
+    const region = Number(form.get("region"));
+    if (!(CANTONS as readonly string[]).includes(canton) || !Number.isInteger(region) || region < 0 || region > 3) throw new UserError("Indiquez le code postal de la commune.");
+    const personIds = form.getAll("personId").map(Number).filter(Number.isInteger);
+    if (personIds.length === 0) throw new UserError("Cochez au moins une personne.");
+    const bfs = Number(form.get("bfsNumber"));
+    const commune = String(form.get("commune") ?? "").trim().slice(0, 200);
+    const { locked } = setLineDomiciles(db(), scope, Number(form.get("reviewId")), personIds, { commune, bfsNumber: Number.isInteger(bfs) && bfs > 0 ? bfs : null, canton, region });
+    if (locked.length) {
+      revalidatePath("/", "layout");
+      return { error: `Lettre déjà envoyée pour ${locked.join(", ")} : son domicile n'a pas changé.` };
+    }
+  } catch (e) {
+    return toActionError(e);
+  }
+  revalidatePath("/", "layout");
+  redirect(`/bilan/${year}`);
 }
 
 export async function openReviewAction(_: ActionState, form: FormData): Promise<ActionState> {

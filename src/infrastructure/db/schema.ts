@@ -204,6 +204,14 @@ export const lamalPolicy = sqliteTable(
     /** Prime brute mensuelle réellement facturée (police), avant redistribution CO2. */
     billedMonthlyRp: integer("billed_monthly_rp").notNull(),
     /**
+     * Domicile au 1er janvier de l'année du contrat (commune, n° OFS, canton, région de primes) :
+     * fixe les primes de cette année. Repris de l'adresse du foyer, de la police ou du bilan.
+     */
+    commune: text("commune").notNull().default(""),
+    bfsNumber: integer("bfs_number"),
+    canton: text("canton").notNull().default(""),
+    region: integer("region").notNull().default(0),
+    /**
      * MANUAL : saisi ou importé d'une police ; REVIEW : créé par la clôture d'un bilan (retiré si
      * on le rouvre). OFSP n'est écrit par aucun code actuel.
      */
@@ -284,6 +292,14 @@ export const reviewLine = sqliteTable(
     targetAgeClass: text("target_age_class", { enum: ["KID", "YOUNG", "ADULT"] }).notNull(),
     accident: integer("accident", { mode: "boolean" }).notNull(),
     subgroup: text("subgroup").notNull(),
+    /**
+     * Domicile de la personne au 1er janvier de l'année cible : les offres et la prime reconduite
+     * en dépendent. Repris de l'adresse du foyer à l'ouverture, modifiable (déménagement).
+     */
+    commune: text("commune").notNull().default(""),
+    bfsNumber: integer("bfs_number"),
+    canton: text("canton").notNull().default(""),
+    region: integer("region").notNull().default(0),
     /**
      * Fiabilité du tarif de renouvellement retrouvé (domain/renewal.ts) : MATCHED certain, PROBABLE
      * à confirmer, AMBIGUOUS plusieurs candidats, MISSING aucune offre de la caisse actuelle.

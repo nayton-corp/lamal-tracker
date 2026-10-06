@@ -43,6 +43,7 @@ Les routes sont relatives à `src/app/` (`[year]` = année cible, ex. `/bilan/20
 | Classe d'âge | `AgeClass` : `KID`, `YOUNG`, `ADULT` | `premium.age_class` | — |
 | Modèle | `ModelType` : `STANDARD`, `PRAXIS`, `TELMED`, `PHARMACY`, `FLEX`, `OTHER` | `*.model_type` | — |
 | Région de primes | `region`, `lookupPostalCode` | `household.region` | `/foyer` |
+| Domicile au 1er janvier | `Domicile`, `setLineDomiciles`, `saveHouseholdAddress` | `lamal_policy.canton`, `review_line.canton` (et `commune`, `bfs_number`, `region`) | `/bilan/[year]/domicile` |
 | Réglages | `src/app/donnees/` | `settings` | `/donnees` |
 | **Bilan** | | | |
 | Bilan | `review`, `findReview`, `ownedReview` | `review` | `/bilan`, `/bilan/[year]` |

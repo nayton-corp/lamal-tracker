@@ -215,6 +215,8 @@ erDiagram
         text tariff_code
         int franchise_chf
         int billed_monthly_rp
+        text canton "domicile au 1er janvier"
+        int region
         text source "MANUAL OFSP REVIEW"
     }
     lca_policy {
@@ -274,6 +276,8 @@ erDiagram
         int review_id FK
         int person_id FK
         int current_policy_id FK
+        text canton "domicile au 1er janvier de l'année cible"
+        int region
         text renewal_status "MATCHED PROBABLE AMBIGUOUS MISSING"
         int renewal_monthly_rp
         text decision "UNDECIDED KEEP SWITCH ADJUST"

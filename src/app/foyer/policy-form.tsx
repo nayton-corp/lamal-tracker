@@ -1,17 +1,19 @@
 "use client";
 
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { importYearAction } from "@/app/actions/data";
 import { savePolicyAction, tariffOptionsAction } from "@/app/actions/household";
 import type { TariffOptions } from "@/application/tariffs";
+import { domicileLabel, type Domicile } from "@/domain/domicile";
 import { MODEL_LABEL, MODEL_TYPES, displayTariffLabel, type ModelType } from "@/domain/lamal";
 import { formatChf, rpToInput } from "@/domain/money";
 import { Alert } from "@/ui/alert";
 import { Button } from "@/ui/button";
 import { Checkbox, Field, FormError, Input, Select } from "@/ui/form";
 import { SubmitButton } from "@/ui/submit";
+import { CommunePicker } from "./commune-picker";
 
 export interface PolicyDefaults {
   id?: number;
@@ -24,6 +26,8 @@ export interface PolicyDefaults {
   franchiseChf: number;
   accident: boolean;
   billedMonthlyRp: number | null;
+  /** Domicile au 1er janvier de l'année du contrat (l'adresse du foyer pour un nouveau contrat). */
+  domicile: Domicile;
 }
 
 /**
@@ -52,11 +56,16 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
   const [changed, setChanged] = useState(false);
   const [loading, startLoading] = useTransition();
   const [importing, setImporting] = useState(false);
+  const [editPlace, setEditPlace] = useState(false);
+  const [place, setPlace] = useState({ canton: policy.domicile.canton, region: policy.domicile.region });
+  const onPlace = useCallback((p: { canton: string; region: number }) => {
+    setPlace((cur) => (cur.canton === p.canton && cur.region === p.region ? cur : p));
+  }, []);
 
   useEffect(() => {
     if (!insurerId) return;
-    startLoading(async () => setOptions(await tariffOptionsAction(personId, year, insurerId)));
-  }, [personId, year, insurerId, importing]);
+    startLoading(async () => setOptions(await tariffOptionsAction(personId, year, insurerId, place)));
+  }, [personId, year, insurerId, importing, place]);
 
   useEffect(() => {
     if (state?.ok) onDone?.();
@@ -125,6 +134,24 @@ export function PolicyForm({ personId, insurers, years, policy, onDone }: {
           </Select>
         </Field>
       </div>
+
+      {editPlace ? (
+        <div className="space-y-2 rounded-xl border border-border p-3">
+          <p className="text-sm font-medium">Domicile au 1er janvier {year}</p>
+          <CommunePicker place={{ postalCode: "", ...policy.domicile }} onPlace={onPlace} />
+        </div>
+      ) : (
+        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+          <MapPin aria-hidden className="size-4 shrink-0" /> Domicile au 1er janvier {year} : {domicileLabel(policy.domicile)}
+          <button type="button" className="min-h-11 text-primary underline-offset-2 hover:underline" onClick={() => setEditPlace(true)}>
+            Modifier
+          </button>
+          <input type="hidden" name="canton" value={policy.domicile.canton} />
+          <input type="hidden" name="region" value={policy.domicile.region} />
+          <input type="hidden" name="commune" value={policy.domicile.commune} />
+          <input type="hidden" name="bfsNumber" value={policy.domicile.bfsNumber ?? ""} />
+        </p>
+      )}
 
       {insurerId && loading && !options && (
         <p className="flex items-center gap-2 text-sm text-muted">

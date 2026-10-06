@@ -1,3 +1,4 @@
+import { domicileLabel } from "@/domain/domicile";
 import { formatDateLong, type IsoDate } from "@/domain/dates";
 import { MODEL_LABEL, type ModelType } from "@/domain/lamal";
 import { guaranteeInfo } from "@/domain/lca";
@@ -78,9 +79,10 @@ export function exportReport(data: DataExport): Report {
       if (p.contratsLamal.length)
         blocks.push({
           kind: "table",
-          head: ["Année", "Caisse", "Modèle", "Franchise", "Accident", "Prime / mois"],
+          head: ["Année", "Domicile", "Caisse", "Modèle", "Franchise", "Accident", "Prime / mois"],
           rows: p.contratsLamal.map((k) => [
             String(k.coverageYear),
+            k.canton ? domicileLabel(k) : "—",
             k.caisse ?? "—",
             k.tariffLabel || MODEL_LABEL[k.modelType as ModelType],
             `CHF ${k.franchiseChf}`,

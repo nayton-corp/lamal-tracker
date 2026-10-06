@@ -27,8 +27,11 @@ export interface TariffOptions {
   tariffs: TariffOption[];
 }
 
-/** Tarifs d'un assureur pour une personne et une année, pour pré-remplir un contrat. */
-export function tariffOptions(db: Db, scope: Scope, personId: number, year: number, insurerId: number): TariffOptions {
+/**
+ * Tarifs d'un assureur pour une personne et une année, pour pré-remplir un contrat. Les primes
+ * sont celles du domicile au 1er janvier de cette année (`where`), sinon de l'adresse du foyer.
+ */
+export function tariffOptions(db: Db, scope: Scope, personId: number, year: number, insurerId: number, where?: { canton: string; region: number }): TariffOptions {
   const p = getPerson(db, scope, personId);
   const householdRow = getHousehold(db, scope);
   const ageClass = p ? ageClassForYear(p.birthDate, year) : "ADULT";
@@ -44,8 +47,8 @@ export function tariffOptions(db: Db, scope: Scope, personId: number, year: numb
       and(
         eq(premium.datasetId, ds.id),
         eq(tariff.insurerId, insurerId),
-        eq(premium.canton, householdRow.canton),
-        eq(premium.region, householdRow.region),
+        eq(premium.canton, where?.canton ?? householdRow.canton),
+        eq(premium.region, where?.region ?? householdRow.region),
         eq(premium.ageClass, ageClass),
         eq(premium.subgroup, subgroup),
       ),

@@ -6,6 +6,7 @@
  *   decisions.ts  décider pour une personne : garder, changer de caisse, changer de franchise
  *   view.ts       tout ce qu'affiche la page du bilan (meilleure offre, étapes, totaux)
  *   close.ts      clôturer (les contrats de l'année suivante sont créés), rouvrir, supprimer
+ *   domicile.ts   domicile au 1er janvier de l'année cible (déménagement)
  *   lines.ts      outils partagés par ces fichiers (non exportés au-delà du dossier)
  *
  * Les courriers eux-mêmes sont dans ../letters.ts, les demandes d'offres dans ../offers.ts.
@@ -14,3 +15,4 @@ export * from "./open";
 export * from "./decisions";
 export * from "./view";
 export * from "./close";
+export * from "./domicile";
