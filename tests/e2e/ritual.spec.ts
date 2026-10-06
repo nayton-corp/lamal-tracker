@@ -121,11 +121,21 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText(/Helsana · franchise 2500/)).toBeVisible();
   await page.getByRole("link", { name: /voir mon tableau de bord/ }).click();
 
-  // Fenêtre du rituel ouverte : l'accueil montre la reconduction tacite.
-  await expect(page.getByText("Sans rien faire, en 2027 vous paierez")).toBeVisible();
-  await expect(page.getByText(/Sans courrier, votre caisse renouvelle/)).toBeVisible();
-  // Rituel ouvert : l'accueil ne prétend pas qu'il n'y a rien à faire.
-  await expect(page.getByText("Rien à faire pour le moment.")).toHaveCount(0);
+  // Fenêtre du bilan ouverte : la carte de l'année montre la reconduction tacite, un seul bouton.
+  const card = page.locator("section", { has: page.locator("#carte-annee") });
+  await expect(card.getByText("Sans rien faire, en 2027")).toBeVisible();
+  await expect(card.getByRole("link", { name: /Commencer le bilan/ })).toBeVisible();
+  await expect(card.getByText(/Hausse de \+CHF/)).toBeVisible();
+  // Le détail par personne se déplie en touchant la carte.
+  await expect(card.getByText("Helsana, sans rien changer")).toBeHidden();
+  await card.getByText("Détail", { exact: true }).click();
+  await expect(card.getByText("Helsana, sans rien changer")).toBeVisible();
+  // Les autres tâches, sans répéter celle de la carte ; le compte a déjà son double facteur.
+  await expect(page.getByRole("heading", { name: "À faire" })).toBeVisible();
+  await expect(page.getByText(/Voir la hausse 2027/)).toHaveCount(0);
+  await expect(page.getByText("Sécuriser votre compte")).toHaveCount(0);
+  await shot(page, "03a-accueil-carte");
+  await expectAccessible(page);
   // Les démarches n'ont pas de sens avant une décision : retour au rituel.
   await page.goto("/rituel/2027/lettres");
   await expect(page).toHaveURL(/\/rituel\/2027$/);
@@ -149,7 +159,8 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
 
   // Rituel 2027 : reconduction, préférences, comparaison
   await page.getByRole("link", { name: "Rituel" }).click();
-  await expect(page.getByText("Sans rien faire, en 2027 vous paierez")).toBeVisible();
+  await expect(page.getByText(/Pour changer, courrier reçu par la caisse au plus tard le/)).toBeVisible();
+  await expect(page.locator("#carte-annee")).toHaveCount(0);
   // Le tarif renommé entre 2026 et 2027 est retrouvé sans rien demander.
   await expect(page.getByText("Produit à préciser")).toHaveCount(0);
   await shot(page, "05-rituel");
@@ -312,6 +323,8 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await shot(page, "10-historique");
   await expectAccessible(page);
   await page.goto("/");
+  await expect(page.getByText(/C'est fait, CHF .* économisés\./)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Voir le bilan/ })).toBeVisible();
   await shot(page, "11-accueil");
   await expectAccessible(page);
 });
