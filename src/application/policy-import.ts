@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { ageClassForYear } from "@/domain/age";
+import { domicileLabel, domicileOf, samePremiumRegion, type Domicile } from "@/domain/domicile";
 import { guaranteeInfo, type LcaGuarantee } from "@/domain/lca";
 import { DEFAULT_HEALTH_COSTS_RP, defaultSubgroup, type ModelType, FIRST_PREMIUM_YEAR } from "@/domain/lamal";
 import { franchisesFor } from "@/domain/parameters";
@@ -38,6 +39,8 @@ export interface PolicyImport {
   insurerId: number | null;
   insurerName: string | null;
   year: number;
+  /** Domicile du contrat : l'adresse de la police, sinon celle du foyer. */
+  domicile: Domicile;
   persons: ImportedPerson[];
   warnings: string[];
 }
@@ -52,11 +55,10 @@ interface Candidate {
   monthly: number;
 }
 
-/** Primes officielles d'une personne pour l'année, dont le montant figure sur la police. */
-function candidates(db: Db, scope: Scope, year: number, birthDate: string, kidSubgroup: string, amounts: number[], insurerId: number | null): Candidate[] {
-  const householdRow = getHousehold(db, scope);
+/** Primes officielles d'une personne pour l'année et le domicile, dont le montant figure sur la police. */
+function candidates(db: Db, domicile: Domicile, year: number, birthDate: string, kidSubgroup: string, amounts: number[], insurerId: number | null): Candidate[] {
   const ds = activeDataset(db, year);
-  if (!householdRow || !ds || amounts.length === 0) return [];
+  if (!ds || amounts.length === 0) return [];
   const ageClass = ageClassForYear(birthDate, year);
   return db
     .select({ insurerId: tariff.insurerId, code: tariff.code, label: tariff.label, modelType: tariff.modelType, franchise: premium.franchiseChf, accident: premium.accident, monthly: premium.monthlyRp })
@@ -65,8 +67,8 @@ function candidates(db: Db, scope: Scope, year: number, birthDate: string, kidSu
     .where(
       and(
         eq(premium.datasetId, ds.id),
-        eq(premium.canton, householdRow.canton),
-        eq(premium.region, householdRow.region),
+        eq(premium.canton, domicile.canton),
+        eq(premium.region, domicile.region),
         eq(premium.ageClass, ageClass),
         eq(premium.subgroup, ageClass === "KID" ? kidSubgroup : defaultSubgroup(ageClass)),
         inArray(premium.monthlyRp, amounts),
@@ -75,6 +77,18 @@ function candidates(db: Db, scope: Scope, year: number, birthDate: string, kidSu
     )
     .all()
     .map((c) => ({ ...c, modelType: c.modelType as ModelType }));
+}
+
+/**
+ * Domicile de la police : l'adresse imprimée, si son code postal est connu (la commune du foyer
+ * si elle en fait partie, sinon la plus probable) ; à défaut, l'adresse actuelle du foyer.
+ */
+function policyDomicile(text: string, home: Domicile, insurers: ReturnType<typeof listInsurers>, maxYear: number): { domicile: Domicile; fromPolicy: boolean } {
+  const address = readHolder(text, { maxYear, insurerNames: insurerNames(insurers) }).address;
+  const options = address ? lookupPostalCode(address.postalCode) : [];
+  if (options.length === 0 || options.some((o) => o.bfs === home.bfsNumber)) return { domicile: home, fromPolicy: false };
+  const o = options[0]!;
+  return { domicile: { commune: o.commune, bfsNumber: o.bfs, canton: o.canton, region: o.region }, fromPolicy: true };
 }
 
 /** Préfère le candidat cohérent avec ce qu'on a lu (franchise, accident, modèle). */
@@ -111,12 +125,17 @@ export function analyzePolicyText(db: Db, scope: Scope, text: string, currentYea
   if (!extract.year) warnings.push(`Année de la police non trouvée : ${year} par défaut.`);
   if (extract.persons.length === 0) warnings.push("Aucune personne reconnue : vérifiez les dates de naissance.");
 
+  const place = policyDomicile(text, domicileOf(householdRow), insurers, currentYear + 1);
+  if (place.fromPolicy && !samePremiumRegion(place.domicile, householdRow)) {
+    warnings.push(`Adresse de la police : ${domicileLabel(place.domicile)}, pas celle du foyer. Le contrat garde ce domicile et ses primes.`);
+  }
+
   let insurerId = extract.insurerId;
   const out: ImportedPerson[] = extract.persons.map((read) => {
     const p = persons.find((x) => x.id === read.personId)!;
-    let list = candidates(db, scope, year, p.birthDate, p.kidSubgroup, read.amountsRp, insurerId);
+    let list = candidates(db, place.domicile, year, p.birthDate, p.kidSubgroup, read.amountsRp, insurerId);
     // Caisse mal reconnue (ou absente) : la prime exacte suffit à retrouver le tarif.
-    if (list.length === 0) list = candidates(db, scope, year, p.birthDate, p.kidSubgroup, read.amountsRp, null);
+    if (list.length === 0) list = candidates(db, place.domicile, year, p.birthDate, p.kidSubgroup, read.amountsRp, null);
     const c = bestCandidate(list, read);
     if (c && (insurerId === null || list.every((x) => x.insurerId === c.insurerId))) insurerId = c.insurerId;
     return {
@@ -137,7 +156,11 @@ export function analyzePolicyText(db: Db, scope: Scope, text: string, currentYea
   for (const p of out) if (!p.matched) warnings.push(`${p.name} : prime non retrouvée dans les primes officielles ${year}, à compléter.`);
   const insurerRow = insurerId ? db.select().from(insurer).where(eq(insurer.id, insurerId)).get() : null;
   if (!insurerRow) warnings.push("Caisse non reconnue : choisissez-la.");
-  return { insurerId: insurerRow?.id ?? null, insurerName: insurerRow ? insurerLabel(insurerRow) : null, year, persons: out, warnings };
+  return { insurerId: insurerRow?.id ?? null, insurerName: insurerRow ? insurerLabel(insurerRow) : null, year, domicile: place.domicile, persons: out, warnings };
+}
+
+function insurerNames(insurers: ReturnType<typeof listInsurers>) {
+  return insurers.flatMap((i) => [i.name, i.displayName, i.legalNameFr, i.groupName]).filter((n): n is string => Boolean(n));
 }
 
 const NO_TEXT = "Ce PDF ne contient pas de texte lisible (document scanné) : passez par la saisie guidée.";
@@ -162,7 +185,7 @@ export interface PolicyHolderPreview {
 export function previewPolicyHolder(db: Db, text: string, currentYear: number): PolicyHolderPreview {
   if (text.replace(/\s/g, "").length < 40) throw new UserError(NO_TEXT);
   const insurers = listInsurers(db);
-  const holder = readHolder(text, { maxYear: currentYear, insurerNames: insurers.flatMap((i) => [i.name, i.displayName, i.legalNameFr, i.groupName]).filter((n): n is string => Boolean(n)) });
+  const holder = readHolder(text, { maxYear: currentYear, insurerNames: insurerNames(insurers) });
   const insurerId = findInsurer(text.slice(0, 1500), importInsurers(insurers)) ?? findInsurer(text, importInsurers(insurers));
   const insurerRow = insurers.find((i) => i.id === insurerId) ?? null;
   return {
@@ -200,6 +223,8 @@ export function createHouseholdFromPolicy(db: Db, scope: Scope, input: Household
 export interface ConfirmedImport {
   insurerId: number;
   year: number;
+  /** Domicile du contrat ; absent, l'adresse actuelle du foyer. */
+  domicile?: Domicile;
   persons: {
     personId: number;
     tariffCode: string | null;
@@ -230,6 +255,7 @@ export function applyPolicyImport(db: Db, scope: Scope, input: ConfirmedImport):
         franchiseChf: p.franchiseChf,
         accident: p.accident,
         billedMonthlyRp: p.billedMonthlyRp,
+        ...(input.domicile ? { ...input.domicile, canton: input.domicile.canton as never } : {}),
       });
       const existing = new Set(listLca(db, p.personId).filter((c) => c.active).map((c) => c.guarantee));
       for (const l of p.lca.filter((x) => !existing.has(x.guarantee))) {

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { ShieldAlert, Trash2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { deleteLcaAction, deletePersonAction, deletePolicyAction } from "@/app/actions/household";
-import { getPerson, listInsurers, listLca, listPolicies } from "@/application/household";
+import { getHousehold, getPerson, listInsurers, listLca, listPolicies } from "@/application/household";
 import { activeReview } from "@/application/review";
 import { ageClassForYear } from "@/domain/age";
+import { domicileLabel, domicileOf, sameDomicile } from "@/domain/domicile";
 import { AGE_CLASS_LABEL, displayTariffLabel, type ModelType, selectableYears } from "@/domain/lamal";
 import { insurerLabel } from "@/domain/insurer";
 import { currentYear, db } from "@/server/context";
@@ -36,6 +37,7 @@ export default async function PersonPage({ params, searchParams }: { params: Pro
   const lamalInsurerId = policies[0]?.policy.insurerId ?? null;
   const hasCurrent = policies.some((x) => x.policy.coverageYear === year);
   const openReview = activeReview(db(), scope);
+  const home = domicileOf(getHousehold(db(), scope)!);
 
   return (
     <Page wide>
@@ -58,7 +60,7 @@ export default async function PersonPage({ params, searchParams }: { params: Pro
             insurers={insurers}
             years={years}
             label="add"
-            policy={{ coverageYear: hasCurrent ? year - 1 : year, insurerId: policies[0]?.policy.insurerId ?? null, policyNumber: policies[0]?.policy.policyNumber ?? null, tariffCode: null, tariffLabel: null, modelType: "STANDARD", franchiseChf: 300, accident: !p.employedAccidentCover, billedMonthlyRp: null }}
+            policy={{ coverageYear: hasCurrent ? year - 1 : year, insurerId: policies[0]?.policy.insurerId ?? null, policyNumber: policies[0]?.policy.policyNumber ?? null, tariffCode: null, tariffLabel: null, modelType: "STANDARD", franchiseChf: 300, accident: !p.employedAccidentCover, billedMonthlyRp: null, domicile: home }}
           />
         }
       >
@@ -84,9 +86,9 @@ export default async function PersonPage({ params, searchParams }: { params: Pro
                   <p className="min-w-0 flex-1 text-sm text-muted">
                     {displayTariffLabel(policy.tariffLabel, policy.modelType as ModelType)} · franchise {policy.franchiseChf}
                     {policy.accident ? " · avec accident" : ""}
-                    
+                    {!sameDomicile(domicileOf(policy), home) && ` · ${domicileLabel(domicileOf(policy))}`}
                   </p>
-                  <PolicySheet personId={p.id} insurers={insurers} years={years} label="edit" policy={{ ...policy, insurerId: policy.insurerId }} />
+                  <PolicySheet personId={p.id} insurers={insurers} years={years} label="edit" policy={{ ...policy, insurerId: policy.insurerId, domicile: domicileOf(policy) }} />
                   <form action={deletePolicyAction}>
                     <input type="hidden" name="id" value={policy.id} />
                     <ConfirmButton size="icon" variant="ghost" aria-label={`Supprimer le contrat ${policy.coverageYear}`} className="text-increase" message={`Supprimer le contrat ${policy.coverageYear} ?`} confirmLabel="Supprimer" details={<p>Le contrat disparaît de l&apos;historique. Votre vraie assurance n&apos;est pas touchée : rien n&apos;est envoyé à la caisse.</p>}>

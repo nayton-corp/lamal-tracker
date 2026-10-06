@@ -1,9 +1,9 @@
-import { ArrowRight, CalendarClock, Check, CircleAlert, FileText, Pencil, RotateCcw, Scale, Sparkles, Users } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, CircleAlert, FileText, MapPin, Pencil, RotateCcw, Scale, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteReviewAction, openReviewAction, reopenReviewAction, undoAction } from "@/app/actions/review";
 import { getHousehold, listPersons, listPolicies } from "@/application/household";
-import { openReviewIfPossible, getReviewByYear, getReviewView, type ReviewLineView, type ReviewView } from "@/application/review";
+import { domicileGroups, openReviewIfPossible, getReviewByYear, getReviewView, type ReviewLineView, type ReviewView } from "@/application/review";
 import { reviewDeadlines, isReviewWindowOpen } from "@/domain/deadlines";
 import { formatDateLong } from "@/domain/dates";
 import { STRATEGY_INFO } from "@/domain/strategy";
@@ -108,9 +108,10 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
   const missingPersons = persons.filter((p) => !view.lines.some((x) => x.person.id === p.id));
   return (
     <Page wide>
-      <PageHeader title={`Bilan ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${householdRow.canton}, région ${householdRow.region}`} />
+      <PageHeader title={`Bilan ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : undefined} />
 
       {!closed && <DeadlineLine view={view} />}
+      {!closed && <DomicileLine view={view} year={year} />}
       {closed && (
         <Alert tone="success" title="C'est terminé">
           {view.lines.some((p) => p.line.decision === "SWITCH" || p.line.decision === "ADJUST")
@@ -223,6 +224,31 @@ function DeadlineLine({ view }: { view: ReviewView }) {
   );
 }
 
+/** Domicile au 1er janvier de l'année cible : les primes comparées sont celles de cette commune. */
+function DomicileLine({ view, year }: { view: ReviewView; year: number }) {
+  const groups = domicileGroups(view.lines.map((p) => p.line));
+  const name = (id: number) => view.lines.find((p) => p.person.id === id)?.person.firstName ?? "";
+  return (
+    <p className="flex items-center gap-2 rounded-xl bg-surface p-3 text-sm shadow-card">
+      <MapPin aria-hidden className="size-4 shrink-0" />
+      <span className="flex-1">
+        Domicile au 1er janvier {year} :{" "}
+        {groups.length === 1
+          ? <strong>{groups[0]!.label}</strong>
+          : groups.map((g, i) => (
+              <span key={g.label}>
+                {i > 0 && " ; "}
+                <strong>{g.label}</strong> pour {g.personIds.map(name).join(", ")}
+              </span>
+            ))}
+      </span>
+      <Link className="shrink-0 text-primary underline" href={`/bilan/${year}/domicile`} aria-label={`Modifier le domicile au 1er janvier ${year}`}>
+        Modifier
+      </Link>
+    </p>
+  );
+}
+
 function Steps({ view }: { view: ReviewView }) {
   return (
     <ol className="grid grid-cols-4 gap-1" aria-label="Étapes du bilan">
@@ -291,7 +317,11 @@ function PersonCard({ pr, year, closed, ready }: { pr: ReviewLineView; year: num
             <CircleAlert aria-hidden className="size-3.5" />
             {badge.label}
           </Badge>
-          <span className="text-muted">{badge.hint.replace("{year}", String(year))}</span>
+          <span className="text-muted">
+            {pr.line.renewalStatus === "MISSING" && pr.line.canton !== pr.policy.canton
+              ? `Votre caisse n'assure pas dans le canton ${pr.line.canton} : choisissez-en une autre. Avec le déménagement, votre contrat actuel prend fin (LAMal, art. 7 al. 3).`
+              : badge.hint.replace("{year}", String(year))}
+          </span>
         </p>
       )}
 

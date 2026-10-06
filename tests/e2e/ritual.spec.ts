@@ -163,6 +163,12 @@ test("bilan annuel complet sur mobile", async ({ page }) => {
   await expect(page.locator("#carte-annee")).toHaveCount(0);
   // Le tarif renommé entre 2026 et 2027 est retrouvé sans rien demander.
   await expect(page.getByText("Produit à préciser")).toHaveCount(0);
+  // Les primes 2027 sont celles du domicile au 1er janvier, modifiable en cas de déménagement.
+  await expect(page.getByText(/Domicile au 1er janvier 2027 : Lausanne \(VD\)/)).toBeVisible();
+  await page.getByRole("link", { name: "Modifier le domicile au 1er janvier 2027" }).click();
+  await expect(page.getByRole("heading", { name: "Domicile au 1er janvier 2027" })).toBeVisible();
+  await expectAccessible(page);
+  await page.getByRole("link", { name: "Retour" }).click();
   await shot(page, "05-bilan");
   await expectAccessible(page);
   await page.getByRole("link", { name: "Régler mes préférences" }).first().click();

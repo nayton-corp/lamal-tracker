@@ -67,14 +67,18 @@ guidée pose quelques questions. Ajouter une deuxième personne fait passer en m
 Dans *Foyer* :
 
 - **Adresse** : le code postal propose la commune et la **région de primes**. Si le code postal
-  couvre plusieurs communes, choisissez la vôtre ; la région figure aussi sur la police.
+  couvre plusieurs communes, choisissez la vôtre ; la région figure aussi sur la police. Si la
+  région change, l'app demande s'il s'agit d'un déménagement (les contrats déjà saisis gardent
+  l'ancienne commune) ou d'une correction (ils prennent la nouvelle).
 - **Personnes** : prénom, nom, date de naissance. Cochez « assuré contre les accidents par
   l'employeur » si la personne travaille au moins 8 heures par semaine : l'accident peut alors
   être exclu de la LAMal.
 - **Contrat LAMal** de l'année en cours, pour chaque personne : *Ajouter un contrat* propose
   d'importer le PDF de la police ou de saisir à la main la caisse, le tarif officiel, la
   franchise et la prime réellement facturée. Vous pouvez aussi saisir les contrats des années
-  passées (2010 et suivantes) : l'historique se construit à partir d'eux.
+  passées (2010 et suivantes) : l'historique se construit à partir d'eux. Chaque contrat garde
+  le domicile de son année (l'adresse du foyer d'office, « Modifier » pour une autre commune) :
+  ses primes officielles sont celles de cette commune.
 - **Complémentaires (LCA)** : choisissez la garantie dans la liste ; l'assureur est prérempli
   d'après la caisse LAMal. Les enregistrer permet à l'app de vous les rappeler au moment de
   résilier la LAMal.
@@ -118,6 +122,11 @@ tarif qui succède au vôtre, elle vous demande de confirmer la correspondance.
 
 Si une personne change de classe d'âge (enfant → jeune adulte, jeune adulte → adulte), un
 avertissement l'indique.
+
+Les primes de l'an prochain dépendent du **domicile au 1er janvier**, affiché en haut du bilan.
+Si vous déménagez avant cette date, touchez *Modifier* et indiquez la nouvelle commune (pour
+tout le foyer ou certaines personnes) : la hausse et les offres sont recalculées. Si votre caisse
+n'assure pas dans le nouveau canton, il faudra en choisir une autre.
 
 ### 2. Vos préférences
 

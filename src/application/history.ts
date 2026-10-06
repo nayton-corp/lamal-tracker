@@ -87,8 +87,8 @@ export function householdHistory(db: Db, scope: Scope): HouseholdHistory {
         const ageClass = ageClassForYear(p.birthDate, pol.coverageYear);
         const offers = offersFor(db, {
           datasetId: ds.id,
-          canton: householdRow.canton,
-          region: householdRow.region,
+          canton: pol.canton,
+          region: pol.region,
           ageClass,
           accident: pol.accident,
           subgroup: ageClass === "KID" ? p.kidSubgroup : defaultSubgroup(ageClass),

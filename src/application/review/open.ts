@@ -1,12 +1,13 @@
 /** Ouverture du bilan d'une année : une ligne par personne qui a un contrat l'année en cours. */
 import { and, desc, eq } from "drizzle-orm";
+import { domicileOf } from "@/domain/domicile";
 import type { Db } from "@/infrastructure/db/client";
 import { activeDataset } from "@/infrastructure/db/queries";
 import { review, reviewLine } from "@/infrastructure/db/schema";
 import { UserError } from "../errors";
 import { listPersons } from "../household";
 import { householdIdOf, type Scope } from "../scope";
-import { renewalFor, currentPolicy } from "./lines";
+import { renewalFor, currentPolicy, householdDomicile } from "./lines";
 
 /**
  * Ouvre (ou rafraîchit) la revue annuelle pour targetYear. Idempotent : les lignes déjà
@@ -32,18 +33,21 @@ export function openReview(db: Db, scope: Scope, targetYear: number): { reviewId
     throw new UserError(`Indiquez d'abord ${persons.length > 1 ? "les contrats" : "votre contrat"} ${targetYear - 1}.`);
   }
   const skipped: string[] = [];
+  // Domicile au 1er janvier de l'année cible : l'adresse actuelle du foyer pour une nouvelle ligne,
+  // celui déjà indiqué (déménagement) pour une ligne existante.
+  const domicile = householdDomicile(db, householdRow.id);
   for (const p of persons) {
     const policy = currentPolicy(db, p.id, targetYear - 1);
     if (!policy) {
       skipped.push(`${p.firstName} ${p.lastName} (pas de contrat ${targetYear - 1})`);
       continue;
     }
-    const computed = renewalFor(db, row, p, policy);
     const existing = db
       .select()
       .from(reviewLine)
       .where(and(eq(reviewLine.reviewId, row.id), eq(reviewLine.personId, p.id)))
       .get();
+    const computed = renewalFor(db, row, p, policy, existing?.canton ? domicileOf(existing) : domicile);
     if (!existing) {
       db.insert(reviewLine).values({ reviewId: row.id, personId: p.id, currentPolicyId: policy.id, ...computed }).run();
     } else if (existing.decision === "UNDECIDED") {

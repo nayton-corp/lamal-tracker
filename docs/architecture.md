@@ -52,7 +52,7 @@ src/
   application/       cas d'usage : chaque fonction reçoit la base (db) et un Scope
     scope.ts           Scope, cloisonnement des foyers, helpers owned* et find*
     errors.ts          UserError (message affichable), NotFoundError
-    review/            le bilan : open, decisions, view, close, lines (index.ts réexporte)
+    review/            le bilan : open, decisions, view, close, domicile, lines (index.ts réexporte)
     household.ts, letters.ts, offers.ts, compare.ts, history.ts, strategy.ts, tariffs.ts …
     auth.ts, account.ts, mfa.ts, totp.ts, passkeys.ts, tokens.ts, invitations.ts   comptes
     admin.ts, feedback.ts, usage.ts, ops.ts, audit.ts                             administration

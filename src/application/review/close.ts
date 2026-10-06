@@ -40,6 +40,10 @@ export function closeReview(db: Db, scope: Scope, reviewId: number, nowIso: stri
         franchiseChf: l.chosenFranchiseChf!,
         accident: l.accident,
         billedMonthlyRp: l.chosenMonthlyRp!,
+        commune: l.commune,
+        bfsNumber: l.bfsNumber,
+        canton: l.canton,
+        region: l.region,
         source: "REVIEW" as const,
       };
       // Un contrat non saisi à la main (clôture précédente de ce bilan) est remplacé par la décision.

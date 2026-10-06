@@ -77,7 +77,7 @@ function bestOfferFor(
   r: typeof review.$inferSelect,
   line: LineRow,
   p: PersonRow,
-  offers: Offer[] = offersFor(db, premiumProfileFor(db, r, line)),
+  offers: Offer[] = offersFor(db, premiumProfileFor(r, line)),
 ): RankedOffer | null {
   const params = parametersFor(db, r.targetYear);
   const ctx = { ageClass: line.targetAgeClass, params, healthCostsRp: p.healthCostsRp };
