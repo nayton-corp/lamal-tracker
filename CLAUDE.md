@@ -1,6 +1,6 @@
 # CLAUDE.md — Primes LAMal
 
-PWA (Next.js App Router, SQLite/Drizzle) : suivi des primes LAMal de plusieurs foyers et rituel annuel de comparaison/résiliation. Déployée en Docker sur un Raspberry Pi (arm64) ou un serveur suisse.
+PWA (Next.js App Router, SQLite/Drizzle) : suivi des primes LAMal de plusieurs foyers et bilan annuel de comparaison/résiliation. Déployée en Docker sur un Raspberry Pi (arm64) ou un serveur suisse.
 
 - Lire [`docs/README.md`](docs/README.md) (index), [`docs/architecture.md`](docs/architecture.md) (couches, requête, Scope, chiffrement) et [`docs/developpement.md`](docs/developpement.md) (lancer, tester, conventions).
 - `src/domain` est pur : ESLint y interdit les imports de Next, React, Drizzle, `node:*` et des autres couches. Ne pas y lire l'horloge (`new Date()`, `Date.now()`) : convention, la date est passée en paramètre.

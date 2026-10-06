@@ -7,7 +7,7 @@ import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "driz
  *  - référentiel OFSP (jeux de tarifs immuables, un par année et par fichier), partagé par tous ;
  *  - comptes (utilisateurs, appartenance à un foyer, sessions) ;
  *  - foyer (personnes, contrats LAMal par année, contrats LCA, réglages) ;
- *  - rituel (revue annuelle, décisions figées, lettres).
+ *  - bilan (revue annuelle, décisions figées, lettres).
  * Toute donnée de foyer se rattache à un `household` (directement, ou par la personne ou la revue).
  * Montants en centimes entiers (*_rp). Dates ISO en texte.
  */
@@ -204,7 +204,7 @@ export const lamalPolicy = sqliteTable(
     /** Prime brute mensuelle réellement facturée (police), avant redistribution CO2. */
     billedMonthlyRp: integer("billed_monthly_rp").notNull(),
     /**
-     * MANUAL : saisi ou importé d'une police ; REVIEW : créé par la clôture d'un rituel (retiré si
+     * MANUAL : saisi ou importé d'une police ; REVIEW : créé par la clôture d'un bilan (retiré si
      * on le rouvre). OFSP n'est écrit par aucun code actuel.
      */
     source: text("source", { enum: ["MANUAL", "OFSP", "REVIEW"] }).notNull(),
@@ -250,14 +250,14 @@ export const tariffLineage = sqliteTable(
   (t) => [uniqueIndex("lineage_unique").on(t.householdId, t.insurerId, t.fromYear, t.fromCode, t.toYear)],
 );
 
-/** Rituel annuel (« review ») d'un foyer pour une année cible : comparer, décider, envoyer les courriers. */
+/** Bilan annuel (« review ») d'un foyer pour une année cible : comparer, décider, envoyer les courriers. */
 export const review = sqliteTable(
   "review",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     householdId: integer("household_id").notNull().references(() => household.id, { onDelete: "cascade" }),
     targetYear: integer("target_year").notNull(),
-    /** Jeu de primes de l'année cible ; un rituel ouvert passe au nouveau jeu actif quand il est rafraîchi. */
+    /** Jeu de primes de l'année cible ; un bilan ouvert passe au nouveau jeu actif quand il est rafraîchi. */
     datasetId: integer("dataset_id").notNull().references(() => tariffDataset.id),
     /** Seuls OPEN et CLOSED sont écrits ; DECIDED et LETTERS_SENT sont des valeurs historiques. */
     status: text("status", { enum: ["OPEN", "DECIDED", "LETTERS_SENT", "CLOSED"] }).notNull(),
@@ -271,7 +271,7 @@ export const review = sqliteTable(
   (t) => [uniqueIndex("review_household_year").on(t.householdId, t.targetYear)],
 );
 
-/** Ligne de revue : une personne dans un rituel, avec sa prime reconduite et sa décision figée. */
+/** Ligne de revue : une personne dans un bilan, avec sa prime reconduite et sa décision figée. */
 export const reviewLine = sqliteTable(
   "review_line",
   {
@@ -316,7 +316,7 @@ export const reviewLine = sqliteTable(
     lcaWishes: text("lca_wishes", { mode: "json" }).$type<string[]>(),
     /** Franchise souhaitée pour comparer ; null = l'app cherche la plus avantageuse. */
     wishFranchiseChf: integer("wish_franchise_chf"),
-    /** Modèles acceptés pour ce rituel ; null = préférences de la personne. */
+    /** Modèles acceptés pour ce bilan ; null = préférences de la personne. */
     wishModels: text("wish_models", { mode: "json" }).$type<string[]>(),
   },
   (t) => [uniqueIndex("review_line_person").on(t.reviewId, t.personId)],

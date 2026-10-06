@@ -1,4 +1,4 @@
-/** Ouverture du rituel d'une année : une ligne par personne qui a un contrat l'année en cours. */
+/** Ouverture du bilan d'une année : une ligne par personne qui a un contrat l'année en cours. */
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/infrastructure/db/client";
 import { activeDataset } from "@/infrastructure/db/queries";
@@ -54,9 +54,9 @@ export function openReview(db: Db, scope: Scope, targetYear: number): { reviewId
 }
 
 /**
- * Ouvre le rituel de l'année cible si c'est possible : primes de l'année cible importées et au
+ * Ouvre le bilan de l'année cible si c'est possible : primes de l'année cible importées et au
  * moins un contrat de l'année en cours. Retourne son id, sinon null. Ne vérifie pas la fenêtre du
- * rituel (`isReviewWindowOpen`) : c'est à l'appelant de le faire.
+ * bilan (`isReviewWindowOpen`) : c'est à l'appelant de le faire.
  */
 export function openReviewIfPossible(db: Db, scope: Scope, targetYear: number): number | null {
   const existing = getReviewByYear(db, scope, targetYear);
@@ -67,7 +67,7 @@ export function openReviewIfPossible(db: Db, scope: Scope, targetYear: number): 
 }
 
 /**
- * Rituel en cours : le dernier non clôturé, quelle que soit l'année (en décembre et janvier,
+ * Bilan en cours : le dernier non clôturé, quelle que soit l'année (en décembre et janvier,
  * l'année civile a changé mais les confirmations et la clôture restent à faire).
  */
 export function activeReview(db: Db, scope: Scope) {
@@ -75,7 +75,7 @@ export function activeReview(db: Db, scope: Scope) {
   return db.select().from(review).where(and(eq(review.householdId, scope.householdId), eq(review.status, "OPEN"))).orderBy(desc(review.targetYear)).get() ?? null;
 }
 
-/** Rituel du foyer pour une année cible, quel que soit son statut ; null s'il n'existe pas. */
+/** Bilan du foyer pour une année cible, quel que soit son statut ; null s'il n'existe pas. */
 export function getReviewByYear(db: Db, scope: Scope, targetYear: number) {
   if (scope.householdId === null) return null;
   return db.select().from(review).where(and(eq(review.householdId, scope.householdId), eq(review.targetYear, targetYear))).get() ?? null;

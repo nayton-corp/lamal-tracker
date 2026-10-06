@@ -59,11 +59,11 @@ export default async function AdminPage() {
           </dl>
           {usage.years.length > 0 && (
             <table className="w-full text-left text-sm">
-              <caption className="sr-only">Rituels par année</caption>
+              <caption className="sr-only">Bilans par année</caption>
               <thead className="text-muted">
                 <tr>
                   <th scope="col" className="py-1 font-medium">Année</th>
-                  <th scope="col" className="py-1 font-medium">Rituels</th>
+                  <th scope="col" className="py-1 font-medium">Bilans</th>
                   <th scope="col" className="py-1 font-medium">Clôturés</th>
                   <th scope="col" className="py-1 font-medium">Courriers préparés</th>
                   <th scope="col" className="py-1 font-medium">Envoyés</th>
@@ -82,7 +82,7 @@ export default async function AdminPage() {
               </tbody>
             </table>
           )}
-          <p className="text-xs text-muted">Des totaux seulement : rien ne permet de suivre un compte. Les rituels et courriers comptent les foyers encore présents ; les cumuls survivent aux suppressions.</p>
+          <p className="text-xs text-muted">Des totaux seulement : rien ne permet de suivre un compte. Les bilans et courriers comptent les foyers encore présents ; les cumuls survivent aux suppressions.</p>
         </Card>
       </Section>
 

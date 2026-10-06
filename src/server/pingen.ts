@@ -53,7 +53,7 @@ export async function pingenTick(): Promise<void> {
     await notify(
       db(),
       { householdId: row.householdId },
-      { title: "Lettre non envoyée par Pingen", body: `Le courrier à ${insurerLabel(row.insurer)} doit être repris : ouvrez les démarches.`, url: `/rituel/${row.year}/lettres` },
+      { title: "Lettre non envoyée par Pingen", body: `Le courrier à ${insurerLabel(row.insurer)} doit être repris : ouvrez les démarches.`, url: `/bilan/${row.year}/lettres` },
       householdNotificationKey(row.householdId, `pingen-echec-${id}`),
     );
   }

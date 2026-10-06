@@ -1,4 +1,4 @@
-/** Outils partagés par les fichiers du rituel : types de lignes, offres de l'année cible, prime reconduite. */
+/** Outils partagés par les fichiers du bilan : types de lignes, offres de l'année cible, prime reconduite. */
 import { and, eq } from "drizzle-orm";
 import { ageClassForYear } from "@/domain/age";
 import { subgroupFor, type ModelType } from "@/domain/lamal";

@@ -151,7 +151,7 @@ export async function deletePersonAction(form: FormData) {
   try {
     deletePerson(db(), scope, Number(form.get("id")));
   } catch (e) {
-    rethrowForeignKey(e, "Cette personne participe à un rituel en cours : supprimez d'abord le rituel.");
+    rethrowForeignKey(e, "Cette personne participe à un bilan en cours : supprimez d'abord le bilan.");
   }
   revalidatePath("/", "layout");
   redirect("/foyer");
@@ -187,7 +187,7 @@ export async function deletePolicyAction(form: FormData) {
   try {
     deletePolicy(db(), scope, Number(form.get("id")));
   } catch (e) {
-    rethrowForeignKey(e, "Ce contrat sert à un rituel en cours : supprimez d'abord le rituel.");
+    rethrowForeignKey(e, "Ce contrat sert à un bilan en cours : supprimez d'abord le bilan.");
   }
   revalidatePath("/", "layout");
 }

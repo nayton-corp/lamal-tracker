@@ -140,7 +140,7 @@ describe("adresse du client et retour après connexion", () => {
   });
 
   it("refuse tout retour hors de l'app", () => {
-    expect(safeNext("/rituel/2027?etape=2#lettres")).toBe("/rituel/2027?etape=2#lettres");
+    expect(safeNext("/bilan/2027?etape=2#lettres")).toBe("/bilan/2027?etape=2#lettres");
     for (const evil of ["//evil.com", "/.//evil.com/x", "/..//evil.com", "/a/..//evil.com", "/%2e//evil.com", "/%2e%2e//evil.com", "/\\evil.com", "/\t/evil.com", "/\n/evil.com", "/ /evil.com", "https://evil.com", "evil.com", "/%09/evil.com\t", null, undefined]) {
       expect(safeNext(evil)).toBe("/");
     }

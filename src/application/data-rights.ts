@@ -110,7 +110,7 @@ export function exportData(db: Db, scope: Scope, nowIso: string) {
         .filter((c) => c.personId === p.id)
         .map((c) => ({ ...c, caisseLiee: insurerName(c.linkedInsurerId) })),
     })),
-    rituels: reviews.map((r) => ({
+    bilans: reviews.map((r) => ({
       annee: r.targetYear,
       statut: r.status,
       strategie: r.strategy,

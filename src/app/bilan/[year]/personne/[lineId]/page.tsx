@@ -34,7 +34,7 @@ export default async function ReviewLinePage({ params, searchParams }: { params:
   const lineId = Number(l);
   const overview = lineOverview(db(), scope, lineId);
   if (!overview) notFound();
-  if (overview.review.status === "CLOSED") redirect(`/rituel/${year}`);
+  if (overview.review.status === "CLOSED") redirect(`/bilan/${year}`);
   const { line, policy, currentInsurer } = overview;
 
   // Sans paramètre, les préférences de la personne s'appliquent ; « all » lève le filtre.
@@ -56,14 +56,14 @@ export default async function ReviewLinePage({ params, searchParams }: { params:
       <PageHeader
         title={view.personName}
         subtitle={`${AGE_CLASS_LABEL[line.targetAgeClass]} en ${year} · ${line.accident ? "avec" : "sans"} accident`}
-        back={`/rituel/${year}#ligne-${lineId}`}
+        back={`/bilan/${year}#ligne-${lineId}`}
       />
       {members.length > 1 && (
         <nav aria-label="Personnes du foyer" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0">
           {members.map((m) => (
             <Link
               key={m.id}
-              href={`/rituel/${year}/personne/${m.id}`}
+              href={`/bilan/${year}/personne/${m.id}`}
               aria-current={m.id === lineId ? "page" : undefined}
               className={cn(
                 "flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-medium",

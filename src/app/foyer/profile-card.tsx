@@ -15,7 +15,7 @@ export interface ProfileNeeds {
   doctorName: string | null;
 }
 
-/** Identité (modifiable ici) et besoins (réglés au questionnaire du rituel, en lecture seule). */
+/** Identité (modifiable ici) et besoins (réglés au questionnaire du bilan, en lecture seule). */
 export function ProfileCard({ person, needs, needsHref, year, ageLabel }: { person: PersonDefaults & { id: number }; needs: ProfileNeeds; needsHref: string | null; year: number; ageLabel: string }) {
   const models = needs.allowedModels.length ? needs.allowedModels.map((m) => MODEL_LABEL[m as ModelType]).join(", ") : "tous";
   return (

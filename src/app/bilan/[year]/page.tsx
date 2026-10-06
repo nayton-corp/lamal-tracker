@@ -27,7 +27,7 @@ import { pageScope } from "@/server/auth";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ year: string }> }) {
-  return { title: `Rituel ${(await params).year}` };
+  return { title: `Bilan ${(await params).year}` };
 }
 
 
@@ -50,7 +50,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
   if (!householdRow || persons.length === 0) {
     return (
       <Page>
-        <PageHeader title={`Rituel ${year}`} />
+        <PageHeader title={`Bilan ${year}`} />
         <EmptyState icon={<Users aria-hidden />} title="Rien à analyser pour l'instant" action={<Button asChild><Link href="/bienvenue">Commencer</Link></Button>}>
           Indiquez d&apos;abord qui est assuré et le contrat {year - 1}.
         </EmptyState>
@@ -68,10 +68,10 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
   if (!reviewRow) {
     return (
       <Page>
-        <PageHeader title={`Rituel ${year}`} subtitle="Hausse et meilleure caisse pour l'année suivante." />
+        <PageHeader title={`Bilan ${year}`} subtitle="Hausse et meilleure caisse pour l'année suivante." />
         {published && !windowOpen ? (
           <EmptyState icon={<CalendarClock aria-hidden />} title="Délai passé">
-            Les résiliations pour {year} devaient arriver avant le {formatDateLong(reviewDeadlines(year).receiptDeadline)}. Le prochain rituel s&apos;ouvrira à la publication des primes {year + 1}.
+            Les résiliations pour {year} devaient arriver avant le {formatDateLong(reviewDeadlines(year).receiptDeadline)}. Le prochain bilan s&apos;ouvrira à la publication des primes {year + 1}.
           </EmptyState>
         ) : published && !hasContracts ? (
           <EmptyState icon={<CircleAlert aria-hidden />} title={`Contrat${persons.length > 1 ? "s" : ""} ${year - 1} à indiquer`} action={<Button asChild><Link href="/bienvenue?etape=contrats">Indiquer {persons.length > 1 ? "les contrats" : "mon contrat"}</Link></Button>}>
@@ -108,7 +108,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
   const missingPersons = persons.filter((p) => !view.lines.some((x) => x.person.id === p.id));
   return (
     <Page wide>
-      <PageHeader title={`Rituel ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${householdRow.canton}, région ${householdRow.region}`} />
+      <PageHeader title={`Bilan ${year}`} subtitle={closed ? `Clôturé · contrats ${year} créés.` : `${householdRow.canton}, région ${householdRow.region}`} />
 
       {!closed && <DeadlineLine view={view} />}
       {closed && (
@@ -124,7 +124,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
           <span>
             Préférences : <strong>{STRATEGY_INFO[view.review.strategy].label}</strong>
           </span>
-          <Link className="text-primary underline" href={`/rituel/${year}/preferences`}>Modifier</Link>
+          <Link className="text-primary underline" href={`/bilan/${year}/preferences`}>Modifier</Link>
         </p>
       )}
 
@@ -161,7 +161,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ year: s
 
 /**
  * Actions rares, en bas de page : après la clôture, modifier ses choix (refus de la nouvelle caisse,
- * erreur) ; à tout moment, recommencer le rituel à zéro.
+ * erreur) ; à tout moment, recommencer le bilan à zéro.
  */
 function OtherActions({ year, reviewId, closed, sentCount }: { year: number; reviewId: number; closed: boolean; sentCount: number }) {
   return (
@@ -186,13 +186,13 @@ function OtherActions({ year, reviewId, closed, sentCount }: { year: number; rev
           <ConfirmButton
             variant="ghost"
             block
-            message={`Recommencer le rituel ${year} ?`}
+            message={`Recommencer le bilan ${year} ?`}
             confirmLabel="Recommencer"
             confirmVariant="primary"
             details={
               <div className="space-y-2">
                 <p>
-                  Vos choix et vos courriers {year} seront effacés{closed ? `, ainsi que les contrats ${year} enregistrés` : ""}, et le rituel repartira des nouvelles primes. Vos
+                  Vos choix et vos courriers {year} seront effacés{closed ? `, ainsi que les contrats ${year} enregistrés` : ""}, et le bilan repartira des nouvelles primes. Vos
                   contrats {year - 1} ne changent pas.
                 </p>
                 <p className={sentCount > 0 ? "font-semibold" : undefined}>Les courriers déjà postés ne sont pas annulés.</p>
@@ -225,7 +225,7 @@ function DeadlineLine({ view }: { view: ReviewView }) {
 
 function Steps({ view }: { view: ReviewView }) {
   return (
-    <ol className="grid grid-cols-4 gap-1" aria-label="Étapes du rituel">
+    <ol className="grid grid-cols-4 gap-1" aria-label="Étapes du bilan">
       {view.steps.map((s, i) => (
         <li key={s.key} className="flex flex-col items-center gap-1 text-center">
           <span
@@ -323,7 +323,7 @@ function PersonCard({ pr, year, closed, ready }: { pr: ReviewLineView; year: num
       {!closed && (
         <div className="flex gap-2">
           <Button asChild block variant={decided || !ready ? "secondary" : "primary"}>
-            <Link href={`/rituel/${year}/personne/${pr.line.id}`}>
+            <Link href={`/bilan/${year}/personne/${pr.line.id}`}>
               <Scale aria-hidden className="size-4" /> {decided ? "Revoir" : "Comparer"}
             </Link>
           </Button>

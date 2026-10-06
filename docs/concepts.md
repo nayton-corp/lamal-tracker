@@ -1,7 +1,7 @@
 # Concepts LAMal
 
 Ce document explique l'assurance maladie suisse à un développeur qui n'y connaît rien, puis le
-« rituel » d'automne tel que l'app le modélise. Chaque notion suit le même plan : ce que c'est
+« bilan » d'automne tel que l'app le modélise. Chaque notion suit le même plan : ce que c'est
 dans la vraie vie, puis où elle vit dans le code.
 
 Pour la traduction des mots de l'interface en identifiants de code, voir le
@@ -125,7 +125,7 @@ on calcule `âge = année de couverture − année de naissance`.
 | `YOUNG` | Jeune adulte | 19 à 25 |
 | `ADULT` | Adulte | 26 et plus |
 
-Quand une personne change de classe au 1er janvier, le rituel l'avertit (`ageTransition()`) :
+Quand une personne change de classe au 1er janvier, le bilan l'avertit (`ageTransition()`) :
 un enfant qui passe jeune adulte perd les franchises enfant et doit en choisir une d'adulte.
 
 Distinct de la classe d'âge, `isMinorOn()` dit si la personne est **mineure** à une date (date
@@ -264,7 +264,7 @@ vendredi 21.11.2025.
 L'urgence affichée (`urgency()`) vaut `calm`, `soon` (envoi dans 14 jours au plus), `urgent`
 (date d'envoi conseillée passée) ou `late` (délai de réception passé).
 
-La **fenêtre du rituel** est ouverte quand les primes de l'année cible sont publiées et que le
+La **fenêtre du bilan** est ouverte quand les primes de l'année cible sont publiées et que le
 délai de réception n'est pas passé (`isReviewWindowOpen()`). L'année cible est toujours l'année
 civile suivante (`reviewTargetYear()` dans `src/server/context.ts`).
 
@@ -275,7 +275,7 @@ Code : `reviewDeadlines()`, `urgency()`, `isReviewWindowOpen()` dans `src/domain
 Avant la date d'envoi conseillée, l'app envoie des rappels à J-30, J-14, J-7, J-3 et J-1
 (`REMINDER_OFFSETS`), seulement aux foyers qui ont encore un courrier à poster (ou rien
 préparé). Un dernier rappel part deux jours après la date conseillée s'il reste des courriers.
-Un rituel clôturé (tout est envoyé) ne reçoit plus de rappel. Les rappels sont des
+Un bilan clôturé (tout est envoyé) ne reçoit plus de rappel. Les rappels sont des
 notifications ; J-7, J-1 et le dernier rappel partent aussi par courriel, sans nom de caisse.
 
 Code : `letterReminders()` dans `src/domain/reminders.ts`, `src/application/reminders.ts`.
@@ -335,17 +335,17 @@ Code : `src/domain/ofsp/normalize.ts` (lecture d'une ligne), `src/infrastructure
 (téléchargement, import en flux), `src/infrastructure/reference/`. Le fonctionnement des imports
 automatiques est décrit dans [architecture.md](architecture.md).
 
-## 5. Le rituel d'automne
+## 5. Le bilan d'automne
 
-Le rituel est la revue annuelle d'un foyer : comparer, décider, envoyer les courriers, puis
-enregistrer les contrats de l'année suivante. Il y a un rituel par foyer et par année cible
+Le bilan est la revue annuelle d'un foyer : comparer, décider, envoyer les courriers, puis
+enregistrer les contrats de l'année suivante. Il y a un bilan par foyer et par année cible
 (table `review`), et une **ligne** par personne (table `review_line`).
 
-Le déroulé côté utilisateur est dans le [guide utilisateur](guide-utilisateur.md#le-rituel-dautomne).
+Le déroulé côté utilisateur est dans le [guide utilisateur](guide-utilisateur.md#le-bilan-dautomne).
 
 ### Ouverture
 
-Le rituel s'ouvre seul pendant la fenêtre du rituel, dès que les primes de l'année cible sont
+Le bilan s'ouvre seul pendant la fenêtre du bilan, dès que les primes de l'année cible sont
 importées et qu'au moins une personne a un contrat pour l'année en cours
 (`openReviewIfPossible()`). `openReview()` crée une ligne par personne qui a un contrat et y
 calcule la reconduction. Il est idempotent : les lignes non décidées sont recalculées (par
@@ -353,7 +353,7 @@ exemple après un nouvel import), les lignes décidées ne bougent plus.
 
 Code : `src/application/review/open.ts`.
 
-### Statuts du rituel
+### Statuts du bilan
 
 ```mermaid
 stateDiagram-v2
@@ -370,7 +370,7 @@ Seuls `OPEN` et `CLOSED` sont écrits. `DECIDED` et `LETTERS_SENT` existent enco
 ### Préférences : stratégie et besoins
 
 Avant de comparer, le foyer règle ses **préférences** sur une seule page
-(`/rituel/[year]/preferences`). La première question choisit la stratégie (`review.strategy`),
+(`/bilan/[year]/preferences`). La première question choisit la stratégie (`review.strategy`),
 qui ne fait que pré-remplir les filtres de chaque personne :
 
 | Code | Interface | Filtres proposés |
@@ -415,7 +415,7 @@ Code : `src/application/review/decisions.ts`, `DECISION_LABEL` dans `src/domain/
 
 ### Étapes affichées
 
-La page du rituel montre une frise de quatre étapes, calculée à partir de l'état des lignes :
+La page du bilan montre une frise de quatre étapes, calculée à partir de l'état des lignes :
 
 | Clé | Libellé | Cochée quand |
 |---|---|---|
@@ -427,7 +427,7 @@ La page du rituel montre une frise de quatre étapes, calculée à partir de l'�
 « Hausse » est indépendante. Les suivantes sont **chaînées** : une étape n'est cochée que si
 toutes les précédentes (sauf « Hausse ») le sont.
 
-Quand « Envoi » est cochée, le rituel est terminé (`isRitualComplete()`) : il se clôt seul.
+Quand « Envoi » est cochée, le bilan est terminé (`isRitualComplete()`) : il se clôt seul.
 
 Code : `ritualSteps()` et `isRitualComplete()` dans `src/domain/ritual-steps.ts`.
 
@@ -435,17 +435,17 @@ Code : `ritualSteps()` et `isRitualComplete()` dans `src/domain/ritual-steps.ts`
 
 - **Clôture automatique** (`syncReviewClosure()`) : appelée après chaque action qui change
   l'avancement (dernier choix, courrier ou demande marqué envoyé, envoi annulé, envoi Pingen).
-  Elle clôt le rituel quand il est terminé et le rouvre s'il ne l'est plus. Une lettre refusée
-  par Pingen rouvre aussi son rituel (`reopenReviewOfFailedLetter()`).
+  Elle clôt le bilan quand il est terminé et le rouvre s'il ne l'est plus. Une lettre refusée
+  par Pingen rouvre aussi son bilan (`reopenReviewOfFailedLetter()`).
 - **Clôturer** (`closeReview()`) : exige une décision pour chaque ligne. Crée, pour chaque
   personne, le contrat LAMal de l'année cible à partir du choix figé (`lamal_policy.source` =
-  `REVIEW`), puis passe le rituel en `CLOSED`. Un contrat de l'année cible saisi à la main ou
+  `REVIEW`), puis passe le bilan en `CLOSED`. Un contrat de l'année cible saisi à la main ou
   importé d'un PDF (`MANUAL`) est gardé tel quel.
 - **Rouvrir** (`reopenReview()`, bouton « Modifier mes choix ») : retire les contrats créés par
-  la clôture et repasse en `OPEN`. Les décisions restent. Refusé si le rituel de l'année
+  la clôture et repasse en `OPEN`. Les décisions restent. Refusé si le bilan de l'année
   suivante s'appuie sur ces contrats.
 - **Supprimer** (`deleteReview()`, bouton « Recommencer à zéro ») : rouvre si besoin, puis
-  supprime le rituel, ses lignes, ses lettres et ses demandes d'offre (cascade). On revient à
+  supprime le bilan, ses lignes, ses lettres et ses demandes d'offre (cascade). On revient à
   l'état d'avant.
 
 Code : `src/application/review/close.ts`.

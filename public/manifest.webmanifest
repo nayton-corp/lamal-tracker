@@ -16,7 +16,7 @@
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
   ],
   "shortcuts": [
-    { "name": "Rituel annuel", "url": "/rituel" },
+    { "name": "Bilan annuel", "url": "/bilan" },
     { "name": "Historique", "url": "/historique" }
   ]
 }

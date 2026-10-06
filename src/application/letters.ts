@@ -13,7 +13,7 @@ import { findLetter, ownedLetter, type Scope } from "./scope";
 import { bumpUsage } from "./usage";
 
 /*
- * Lettres (courriers postaux) du rituel adressées à la caisse actuelle : résiliation ou
+ * Lettres (courriers postaux) du bilan adressées à la caisse actuelle : résiliation ou
  * changement de franchise/modèle. Génération, rendu, puis suivi (envoi, n° de suivi, confirmation
  * de la caisse). Une lettre envoyée est figée.
  */

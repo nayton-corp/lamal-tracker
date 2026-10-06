@@ -14,7 +14,7 @@ test("présentation publique et pages légales, accessibles sans compte", async 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("moins chère chaque automne");
   await expect(page.getByRole("navigation", { name: "Navigation principale" })).toHaveCount(0);
   await expect(page.getByText("Aucune commission")).toBeVisible();
-  await expect(page.getByRole("img", { name: /Écran du rituel annuel/ }).first()).toBeVisible();
+  await expect(page.getByRole("img", { name: /Écran du bilan annuel/ }).first()).toBeVisible();
   await expectAccessible(page);
   await page.screenshot({ path: path.join(shots, "v01-presentation.png"), fullPage: true });
 

@@ -149,7 +149,7 @@ export function YearCard({ overview, solo }: { overview: HomeOverview; solo: boo
         </>
       );
       rows = lineRows(view!, true);
-      href = `/rituel/${year}`;
+      href = `/bilan/${year}`;
       cta = "Voir le bilan";
       break;
     }

@@ -16,7 +16,7 @@ chacun avec ses comptes (inscription sur invitation, passkeys, double facteur).
 - **Rappel LCA** : la résiliation ne vise que l'assurance de base, les complémentaires sont
   rappelées sous chaque lettre.
 - **Démarches** : demande d'affiliation, lettre de résiliation PDF signée à l'écran, suivi du
-  recommandé (ou envoi par Pingen), rappels avant l'échéance ; le rituel se termine seul quand
+  recommandé (ou envoi par Pingen), rappels avant l'échéance ; le bilan se termine seul quand
   tout est envoyé.
 - **Historique** pluriannuel des primes payées et des économies.
 - **Import de la police PDF** : personnes, contrats et complémentaires lus sans service externe.

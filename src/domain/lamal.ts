@@ -138,7 +138,7 @@ export function subgroupFor(ageClass: AgeClass, kidSubgroup: string | null | und
   return ageClass === "KID" ? kidSubgroup || DEFAULT_KID_SUBGROUP : defaultSubgroup(ageClass);
 }
 
-/** Première année de primes publiées par l'OFSP que l'app accepte (saisie, import, rituel). */
+/** Première année de primes publiées par l'OFSP que l'app accepte (saisie, import, bilan). */
 export const FIRST_PREMIUM_YEAR = 2010;
 
 /** Années proposées dans les listes : de l'année prochaine à `FIRST_PREMIUM_YEAR`, la plus récente d'abord. */

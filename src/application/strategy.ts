@@ -13,7 +13,7 @@ import { insurerProfiles } from "./insurers";
 import { NotFoundError, UserError } from "./errors";
 
 /*
- * Préférences du rituel : stratégie du foyer et besoins de chaque personne. `lineContext` rassemble ce qu'il faut pour
+ * Préférences du bilan : stratégie du foyer et besoins de chaque personne. `lineContext` rassemble ce qu'il faut pour
  * classer les offres d'une personne ; le comparateur (compare.ts) s'en sert aussi.
  */
 
@@ -39,7 +39,7 @@ export interface LineContext {
 }
 
 /**
- * Contexte de calcul d'une personne du rituel (vérifie que la ligne appartient au foyer).
+ * Contexte de calcul d'une personne du bilan (vérifie que la ligne appartient au foyer).
  * `healthCostsRp` remplace les frais enregistrés, pour une simulation dans le comparateur.
  */
 export function lineContext(db: Db, scope: Scope, lineId: number, healthCostsRp?: number): LineContext {
@@ -112,7 +112,7 @@ export function strategyOverview(db: Db, scope: Scope, reviewId: number): Strate
 
 function openReviewRow(db: Db, scope: Scope, reviewId: number) {
   const reviewRow = ownedReview(db, scope, reviewId);
-  if (reviewRow.status === "CLOSED") throw new UserError("Ce rituel est clôturé.");
+  if (reviewRow.status === "CLOSED") throw new UserError("Ce bilan est clôturé.");
   return reviewRow;
 }
 
@@ -127,7 +127,7 @@ export interface NeedsInput {
 }
 
 /**
- * Enregistre les préférences du rituel : la stratégie du foyer et les besoins de chaque personne
+ * Enregistre les préférences du bilan : la stratégie du foyer et les besoins de chaque personne
  * (pré-remplis par la stratégie, éventuellement affinés). Ouvre ensuite le comparateur.
  */
 export function savePreferences(db: Db, scope: Scope, reviewId: number, strategy: Strategy, needs: NeedsInput[], nowIso: string) {

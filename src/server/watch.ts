@@ -20,7 +20,7 @@ import { latestActiveYear } from "@/infrastructure/db/queries";
 
 /*
  * Planificateur, appelé chaque heure par instrumentation.ts : publications et imports OFSP,
- * référentiels, rappels du rituel, suivi Pingen, comptes inactifs, alertes et ménage.
+ * référentiels, rappels du bilan, suivi Pingen, comptes inactifs, alertes et ménage.
  */
 
 /**
@@ -51,7 +51,7 @@ export async function checkForNewPremiums(force = false): Promise<string> {
       await notify(
         db(),
         { all: true },
-        { title: `Primes ${year} publiées`, body: "Les nouveaux tarifs sont importés : découvrez la hausse pour votre foyer.", url: `/rituel/${year}` },
+        { title: `Primes ${year} publiées`, body: "Les nouveaux tarifs sont importés : découvrez la hausse pour votre foyer.", url: `/bilan/${year}` },
         `primes-${year}-${outcome.datasetId}`,
       );
     }

@@ -96,7 +96,7 @@ export const lcaInput = z.object({
 });
 
 /**
- * Efface un foyer et tout ce qui en dépend (personnes, contrats, rituels, lettres, signatures,
+ * Efface un foyer et tout ce qui en dépend (personnes, contrats, bilans, lettres, signatures,
  * réglages, clé de chiffrement). Les comptes de ses membres restent, sans foyer.
  */
 export function eraseHousehold(db: Db, householdId: number) {
@@ -158,7 +158,7 @@ export function savePerson(db: Db, scope: Scope, input: z.input<typeof personInp
   return db.insert(person).values({ ...data, householdId }).returning().get().id;
 }
 
-/** Supprime une personne ; ses contrats, complémentaires, signature et lignes de rituel partent avec (cascade). */
+/** Supprime une personne ; ses contrats, complémentaires, signature et lignes de bilan partent avec (cascade). */
 export function deletePerson(db: Db, scope: Scope, id: number) {
   ownedPerson(db, scope, id);
   db.delete(person).where(eq(person.id, id)).run();

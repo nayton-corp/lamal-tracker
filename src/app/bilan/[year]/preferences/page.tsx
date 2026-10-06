@@ -13,12 +13,12 @@ import { pageScope } from "@/server/auth";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Préférences" };
 
-/** Préférences du rituel : ce qui compte le plus pour le foyer, puis les besoins de chaque personne. */
+/** Préférences du bilan : ce qui compte le plus pour le foyer, puis les besoins de chaque personne. */
 export default async function PreferencesPage({ params }: { params: Promise<{ year: string }> }) {
   const scope = await pageScope();
   const year = Number((await params).year);
   const reviewRow = getReviewByYear(db(), scope, year);
-  if (!reviewRow || reviewRow.status === "CLOSED") redirect(`/rituel/${year}`);
+  if (!reviewRow || reviewRow.status === "CLOSED") redirect(`/bilan/${year}`);
   const view = getReviewView(db(), scope, reviewRow.id, today());
   const params_ = legalParameters(db(), year);
   const open = view.lines.filter((p) => p.line.decision === "UNDECIDED");
@@ -58,7 +58,7 @@ export default async function PreferencesPage({ params }: { params: Promise<{ ye
 
   return (
     <Page>
-      <PageHeader title="Vos préférences" subtitle="Deux questions, puis l'app vous montre les meilleures offres. Tout reste modifiable." back={`/rituel/${year}`} />
+      <PageHeader title="Vos préférences" subtitle="Deux questions, puis l'app vous montre les meilleures offres. Tout reste modifiable." back={`/bilan/${year}`} />
       <PreferencesForm year={year} reviewId={reviewRow.id} strategy={strategy} choices={choices} persons={persons} />
     </Page>
   );

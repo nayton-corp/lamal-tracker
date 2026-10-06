@@ -49,7 +49,7 @@ export interface YearTotal {
 export interface HistoryStats {
   /** Primes payées sur toutes les années connues (12 × prime facturée). */
   totalPaidRp: number;
-  /** Économies annuelles décidées lors des rituels clôturés (renouvellement − choix). */
+  /** Économies annuelles décidées lors des bilans clôturés (renouvellement − choix). */
   reviewSavings: { year: number; annualRp: number }[];
   /** Hausse annuelle moyenne du foyer et du marché sur la période. */
   avgChangePermille: number | null;

@@ -1,7 +1,7 @@
 import type { Decision } from "./review";
 
 /*
- * Étapes du rituel d'automne, affichées en frise sur la page du rituel :
+ * Étapes du bilan d'automne, affichées en frise sur la page du bilan :
  *
  *   Hausse → Préférences → Choix → Envoi
  *
@@ -25,7 +25,7 @@ export interface RitualStep {
   done: boolean;
 }
 
-/** Ce qu'il faut savoir d'une personne du rituel pour cocher les étapes. */
+/** Ce qu'il faut savoir d'une personne du bilan pour cocher les étapes. */
 export interface RitualLineFacts {
   decision: Decision;
   /** Nouvelle prime de la caisse actuelle connue. */
@@ -75,8 +75,8 @@ export function isStepDone(steps: readonly RitualStep[], key: RitualStepKey): bo
 }
 
 /**
- * Rituel terminé : tout le monde a décidé et chaque courrier nécessaire est envoyé (aucun pour qui
- * garde son contrat). Le rituel se clôt alors tout seul.
+ * Bilan terminé : tout le monde a décidé et chaque courrier nécessaire est envoyé (aucun pour qui
+ * garde son contrat). Le bilan se clôt alors tout seul.
  */
 export function isRitualComplete(steps: readonly RitualStep[]): boolean {
   return isStepDone(steps, "procedures");

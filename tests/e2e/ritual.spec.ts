@@ -21,7 +21,7 @@ async function importFile(page: Page, file: string, year: number) {
   await expect(page.getByText(`Primes ${year} importées`)).toBeVisible({ timeout: 60_000 });
 }
 
-test("rituel annuel complet sur mobile", async ({ page }) => {
+test("bilan annuel complet sur mobile", async ({ page }) => {
   // Premier démarrage : l'app exige le compte administrateur avant tout.
   await page.goto("/");
   await expect(page).toHaveURL(/\/login\/creer/);
@@ -136,9 +136,9 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page.getByText("Sécuriser votre compte")).toHaveCount(0);
   await shot(page, "03a-accueil-carte");
   await expectAccessible(page);
-  // Les démarches n'ont pas de sens avant une décision : retour au rituel.
-  await page.goto("/rituel/2027/lettres");
-  await expect(page).toHaveURL(/\/rituel\/2027$/);
+  // Les démarches n'ont pas de sens avant une décision : retour au bilan.
+  await page.goto("/bilan/2027/lettres");
+  await expect(page).toHaveURL(/\/bilan\/2027$/);
   await shot(page, "03b-accueil-reconduction");
 
   await page.goto("/foyer");
@@ -157,13 +157,13 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await shot(page, "04-personne");
   await expectAccessible(page);
 
-  // Rituel 2027 : reconduction, préférences, comparaison
-  await page.getByRole("link", { name: "Rituel" }).click();
+  // Bilan 2027 : reconduction, préférences, comparaison
+  await page.getByRole("link", { name: "Bilan" }).click();
   await expect(page.getByText(/Pour changer, courrier reçu par la caisse au plus tard le/)).toBeVisible();
   await expect(page.locator("#carte-annee")).toHaveCount(0);
   // Le tarif renommé entre 2026 et 2027 est retrouvé sans rien demander.
   await expect(page.getByText("Produit à préciser")).toHaveCount(0);
-  await shot(page, "05-rituel");
+  await shot(page, "05-bilan");
   await expectAccessible(page);
   await page.getByRole("link", { name: "Régler mes préférences" }).first().click();
   await expect(page.getByRole("heading", { name: "Vos préférences" })).toBeVisible();
@@ -190,8 +190,11 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(page).not.toHaveURL(/all=1/);
   // Les anciennes adresses mènent aux préférences.
   const comparer = page.url();
-  await page.goto("/rituel/2027/strategie");
-  await expect(page).toHaveURL(/\/rituel\/2027\/preferences/);
+  await page.goto("/bilan/2027/strategie");
+  await expect(page).toHaveURL(/\/bilan\/2027\/preferences/);
+  // Les liens d'avant le changement de nom (« rituel ») mènent au bilan.
+  await page.goto("/rituel/2027/preferences");
+  await expect(page).toHaveURL(/\/bilan\/2027\/preferences$/);
   await page.goto(comparer);
 
   // Deux offres côte à côte
@@ -215,13 +218,13 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   if (!(await first.getAttribute("open"))) await first.locator(":scope > summary").click();
   await first.getByRole("button", { name: /^Choisir/ }).click();
   // Dernier choix fait : l'app enchaîne directement sur les démarches (plus d'étape LCA séparée).
-  await expect(page).toHaveURL(/\/rituel\/2027\/lettres/);
-  await page.goto("/rituel/2027");
+  await expect(page).toHaveURL(/\/bilan\/2027\/lettres/);
+  await page.goto("/bilan/2027");
   await expect(page.getByText("Je change de caisse")).toBeVisible();
   await expect(page.getByRole("link", { name: "Envoyer les courriers" })).toBeVisible();
   // L'ancienne adresse de l'étape LCA mène aux démarches.
-  await page.goto("/rituel/2027/lca");
-  await expect(page).toHaveURL(/\/rituel\/2027\/lettres/);
+  await page.goto("/bilan/2027/lca");
+  await expect(page).toHaveURL(/\/bilan\/2027\/lettres/);
 
   // Adresse officielle de l'annuaire OFSP, modifiable au besoin
   await page.goto("/donnees/caisses");
@@ -236,7 +239,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await expect(helsana.getByText("Adresse officielle rétablie.")).toBeVisible();
 
   // Démarches : demande à la nouvelle caisse, résiliation, confirmations
-  await page.goto("/rituel/2027/lettres");
+  await page.goto("/bilan/2027/lettres");
   await expect(page.getByText("Qui change quoi")).toBeVisible();
   // Signature à l'écran, apposée sur les courriers PDF.
   await page.getByRole("button", { name: "Signer à l'écran" }).click();
@@ -283,13 +286,13 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
     await page.goto("/admin");
     await page.getByRole("button", { name: "Autoriser l'envoi Pingen" }).click();
     await expect(page.getByText("Envoi Pingen activé pour ce foyer.")).toBeVisible();
-    await page.goto("/rituel/2027/lettres");
+    await page.goto("/bilan/2027/lettres");
     await page.getByRole("button", { name: "Envoyer en recommandé via Pingen" }).click();
     await expect(page.getByText(/Une signature imprimée n'est pas une signature manuscrite/)).toBeVisible();
     await page.getByRole("button", { name: "Envoyer (test)" }).click();
     await expect(page.getByText(/En préparation chez Pingen/)).toBeVisible();
     await expect(page.getByText(/Confiée à Pingen le/)).toBeVisible();
-    // Tout est parti : le rituel se clôt tout seul…
+    // Tout est parti : le bilan se clôt tout seul…
     await expect(page.getByText("Tout est envoyé", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Actualiser le suivi" }).click();
     await expect(page.getByText("Pingen n'a pas envoyé cette lettre")).toBeVisible();
@@ -306,19 +309,19 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
   await page.getByLabel("N° de suivi").fill("98.00.123456.12345678");
   await page.getByRole("button", { name: "Marquer comme envoyée" }).click();
   await expect(page.getByText("Suivi : 98.00.123456.12345678")).toBeVisible();
-  // Dernier courrier envoyé : le rituel se clôt tout seul, sans étape de confirmations.
+  // Dernier courrier envoyé : le bilan se clôt tout seul, sans étape de confirmations.
   await expect(page.getByText("Tout est envoyé", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Reçue", exact: true })).toHaveCount(0);
   await shot(page, "09-demarches");
 
   // Clôture automatique et historique
-  await page.goto("/rituel/2027");
+  await page.goto("/bilan/2027");
   await expect(page.getByText("Clôturé · contrats 2027 créés.")).toBeVisible();
   await expect(page.getByText("C'est terminé")).toBeVisible();
   await page.getByRole("link", { name: "Historique" }).click();
   await expect(page.getByRole("heading", { name: "Historique" })).toBeVisible();
   await expect(page.getByRole("table")).toContainText("2027");
-  await expect(page.getByText("Économisé grâce aux rituels")).toBeVisible();
+  await expect(page.getByText("Économisé grâce aux bilans")).toBeVisible();
   await expect(page.getByText("Parcours de chaque personne")).toBeVisible();
   await shot(page, "10-historique");
   await expectAccessible(page);
@@ -332,7 +335,7 @@ test("rituel annuel complet sur mobile", async ({ page }) => {
 test.describe("sur ordinateur", () => {
   test.use({ viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
 
-  test("navigation latérale, toutes les pages, et retour en arrière sur un rituel clôturé", async ({ page }) => {
+  test("navigation latérale, toutes les pages, et retour en arrière sur un bilan clôturé", async ({ page }) => {
     const nav = page.getByRole("navigation", { name: "Navigation principale" });
     await login(page);
     await expect(nav.getByRole("link", { name: /Foyer/ })).toBeVisible();
@@ -359,10 +362,10 @@ test.describe("sur ordinateur", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Importer une police" })).toBeVisible();
     await shot(page, "d04b-import-police");
 
-    // Rituel clôturé : on peut le rouvrir…
-    await nav.getByRole("link", { name: /Rituel/ }).click();
+    // Bilan clôturé : on peut le rouvrir…
+    await nav.getByRole("link", { name: /Bilan/ }).click();
     await expect(page.getByText("Clôturé · contrats 2027 créés.")).toBeVisible();
-    await shot(page, "d07-rituel-cloture");
+    await shot(page, "d07-bilan-cloture");
     await page.getByRole("button", { name: "Modifier mes choix" }).click();
     await page.waitForTimeout(300);
     await shot(page, "d08-confirmation");
@@ -372,7 +375,7 @@ test.describe("sur ordinateur", () => {
     await page.getByRole("link", { name: "Revoir" }).click();
     await expect(page.getByText("Sans rien faire en 2027")).toBeVisible();
     await shot(page, "d09-comparateur");
-    await page.goto("/rituel/2027");
+    await page.goto("/bilan/2027");
 
     // … ou recommencer à zéro.
     await page.getByRole("button", { name: "Recommencer à zéro" }).click();
@@ -381,7 +384,7 @@ test.describe("sur ordinateur", () => {
     // Les primes sont publiées : une analyse vierge s'ouvre, sans aucun choix.
     await expect(page.getByRole("link", { name: "Régler mes préférences" }).first()).toBeVisible();
     await expect(page.getByText("Je change de caisse")).toHaveCount(0);
-    await shot(page, "d10-rituel-supprime");
+    await shot(page, "d10-bilan-supprime");
   });
 });
 

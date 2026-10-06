@@ -9,13 +9,13 @@ import { logMailError } from "@/infrastructure/mail/mailer";
 import { householdNotificationKey } from "@/infrastructure/push/push";
 
 /*
- * Rappels du rituel, envoyés par le planificateur (server/watch.ts) : avancement des courriers de
+ * Rappels du bilan, envoyés par le planificateur (server/watch.ts) : avancement des courriers de
  * chaque foyer, puis notifications push et courriels, dédoublonnés dans `notification_log`.
  */
 
 const SIGNATURE = "\n\n— Primes LAMal\nCe message est automatique : n'y répondez pas.";
 
-/** Avancement des courriers d'un foyer pour l'année cible (sans rituel ouvert : rien de préparé). */
+/** Avancement des courriers d'un foyer pour l'année cible (sans bilan ouvert : rien de préparé). */
 export function paperProgress(db: Db, householdId: number, targetYear: number): LetterProgress {
   const persons = db.select({ id: person.id }).from(person).where(eq(person.householdId, householdId)).all().length;
   const r = db.select().from(review).where(and(eq(review.householdId, householdId), eq(review.targetYear, targetYear))).get();

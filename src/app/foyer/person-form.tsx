@@ -21,7 +21,7 @@ const KID_RANK: Record<string, string> = { K1: "Tarif normal", K3: "Rabais 3e en
 
 function isMinorAround(birthDate: string, year: number): boolean {
   try {
-    // Enfant cette année ou l'an prochain : l'échelon enfant compte pour le rituel.
+    // Enfant cette année ou l'an prochain : l'échelon enfant compte pour le bilan.
     return ageClassForYear(birthDate, year) === "KID" || ageClassForYear(birthDate, year + 1) === "KID";
   } catch {
     return false;
@@ -30,7 +30,7 @@ function isMinorAround(birthDate: string, year: number): boolean {
 
 /**
  * Identité d'une personne. Les préférences du comparateur (frais, modèles, médecin) se règlent
- * au questionnaire des besoins du rituel, pas ici. `stay` : rester sur la page après un ajout.
+ * au questionnaire des besoins du bilan, pas ici. `stay` : rester sur la page après un ajout.
  */
 export function PersonForm({ person, year, onDone, stay, next, submitLabel }: {
   person: PersonDefaults | null;

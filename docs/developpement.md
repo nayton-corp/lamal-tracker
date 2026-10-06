@@ -59,7 +59,7 @@ tâches de fond).
 
 | Variable | Effet en local |
 |---|---|
-| `FAKE_TODAY=2026-10-05` | Fige la date du jour (`today()` de `src/server/context.ts`) : pratique pour être en pleine saison du rituel. Les horodatages (`nowIso()`) restent réels. |
+| `FAKE_TODAY=2026-10-05` | Fige la date du jour (`today()` de `src/server/context.ts`) : pratique pour être en pleine saison du bilan. Les horodatages (`nowIso()`) restent réels. |
 | `MAIL_DIR=data/mail` avec `APP_URL=http://localhost:3000` | Chaque courriel est écrit dans un fichier JSON au lieu d'être envoyé : on y lit les liens de confirmation et de réinitialisation. Sans `APP_URL`, aucun courriel n'est produit. |
 | `DISABLE_SCHEDULER=true` | Aucune tâche de fond (import, rappels, Pingen, inactivité). |
 | `OFSP_AUTO_CHECK=false` | Pas de téléchargement OFSP automatique. |
@@ -73,7 +73,7 @@ tâches de fond).
 |---|---|---|
 | `src/domain/**/*.test.ts` | Tests du domaine, à côté du fichier testé (`cost.test.ts`, `renewal.test.ts`…) | Vitest |
 | `tests/unit/*.test.ts` | Tests d'intégration : cas d'usage sur une vraie base SQLite en mémoire (`openDb(":memory:")`), migrations, import, cloisonnement (`isolation.test.ts`) | Vitest |
-| `tests/e2e/*.spec.ts` | Parcours complets dans un navigateur mobile (Pixel 7, `fr-CH`) : rituel, partage du foyer, présentation | Playwright |
+| `tests/e2e/*.spec.ts` | Parcours complets dans un navigateur mobile (Pixel 7, `fr-CH`) : bilan, partage du foyer, présentation | Playwright |
 | `tests/fixtures/` | Générateur de fichiers synthétiques (`generate.ts`, `policy-pdf.ts`), fichiers officiels de référence (`official/`) | |
 | `tests/accounts.ts` | `testAccount()`, `testHousehold()` : un `Scope` prêt à l'emploi pour les tests | |
 
@@ -134,7 +134,7 @@ conteneur Docker par exemple) au lieu du build local.
 ### Langues et noms
 
 - **Identifiants en anglais** (`review`, `household`, `franchiseChf`), **commentaires et
-  interface en français**. Les routes sont en français (`/rituel`, `/foyer`, `/donnees`).
+  interface en français**. Les routes sont en français (`/bilan`, `/foyer`, `/donnees`).
 - **Énumérations** en MAJUSCULES anglaises (`SWITCH`, `ECONOMY`) ; elles sont stockées telles
   quelles en base (voir [modele-de-donnees.md](modele-de-donnees.md#valeurs-enregistrées-à-ne-pas-renommer)).
 - **Unités en suffixe** : `Rp`/`_rp` centimes entiers (type `Rappen`), `Chf`/`_chf` francs
@@ -215,6 +215,6 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm e2e
 |---|---|---|
 | `ci.yml` | Push sur `main`, pull request, manuel | Lint, types, tests, build, e2e ; scan ZAP passif ; `pnpm audit` et TruffleHog ; image construite, scannée par Trivy et lancée en lecture seule ; import du vrai fichier OFSP et des archives |
 | `docker.yml` | CI réussie sur `main`, tag `v*` | Construit et publie l'image `linux/amd64` et `linux/arm64` sur ghcr.io |
-| `ofsp-watch.yml` | Chaque jour en septembre-octobre, chaque lundi sinon | Importe le vrai fichier OFSP (`pnpm cli download`) : un échec prévient avant le rituel |
+| `ofsp-watch.yml` | Chaque jour en septembre-octobre, chaque lundi sinon | Importe le vrai fichier OFSP (`pnpm cli download`) : un échec prévient avant le bilan |
 | `reference-data.yml` | Le 3 de chaque mois | Lance `scripts/build-reference.ts` et propose une pull request si les référentiels ont changé |
 | `postal-regions.yml` | Le 20 septembre | Lance `scripts/build-postal-regions.ts` et propose une pull request si la table a changé |

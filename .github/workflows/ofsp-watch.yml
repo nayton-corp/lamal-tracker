@@ -1,7 +1,7 @@
 name: Surveillance du format OFSP
 
 # Chaque année l'OFSP peut changer colonnes et codes (ce fut le cas pour 2027).
-# Ce contrôle importe le fichier réel : un échec avertit avant le rituel d'automne.
+# Ce contrôle importe le fichier réel : un échec avertit avant le bilan d'automne.
 on:
   schedule:
     - cron: "17 6 * 9,10 *" # tous les jours en septembre-octobre

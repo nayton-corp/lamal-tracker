@@ -1,7 +1,7 @@
 import { addDays, daysBetween, isWeekend, type IsoDate } from "./dates";
 
 /*
- * Échéances du rituel : délai de résiliation (lettre reçue au 30 novembre), date d'envoi
+ * Échéances du bilan : délai de résiliation (lettre reçue au 30 novembre), date d'envoi
  * conseillée, niveau d'urgence et jours de rappel. La date du jour est toujours fournie.
  */
 
@@ -63,8 +63,8 @@ export function dueReminder(today: IsoDate, deadlines: ReviewDeadlines): number 
 }
 
 /**
- * Fenêtre du rituel : les primes de l'année prochaine sont publiées et le délai de résiliation
- * (réception au 30 novembre) n'est pas passé. C'est le moment où l'app met le rituel en avant.
+ * Fenêtre du bilan : les primes de l'année prochaine sont publiées et le délai de résiliation
+ * (réception au 30 novembre) n'est pas passé. C'est le moment où l'app met le bilan en avant.
  */
 export function isReviewWindowOpen(today: IsoDate, targetYear: number, premiumsPublished: boolean): boolean {
   return premiumsPublished && daysBetween(today, reviewDeadlines(targetYear).receiptDeadline) >= 0;

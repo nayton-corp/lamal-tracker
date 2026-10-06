@@ -15,7 +15,7 @@ export default async function NewPersonPage() {
   const solo = getHouseholdMode(db(), scope) === "SOLO";
   return (
     <Page>
-      <PageHeader title={solo ? "Passer en foyer" : "Nouvelle personne"} subtitle={solo ? "Ajoutez une personne : l'app passe en mode foyer, avec un seul rituel pour tous." : undefined} back="/foyer" />
+      <PageHeader title={solo ? "Passer en foyer" : "Nouvelle personne"} subtitle={solo ? "Ajoutez une personne : l'app passe en mode foyer, avec un seul bilan pour tous." : undefined} back="/foyer" />
       <Card>
         <PersonForm person={null} year={currentYear()} />
       </Card>

@@ -103,7 +103,7 @@ function DangerSheet({ label, title, description, children, action }: { label: s
 export function DeleteHousehold({ members }: { members: number }) {
   return (
     <DangerSheet label="Supprimer le foyer" title="Supprimer le foyer ?" description="Tout ce que le foyer a saisi disparaît aussitôt." action={deleteHouseholdAction}>
-      <p>Personnes, contrats, rituels, lettres, signatures et réglages sont effacés, ainsi que la clé qui chiffrait les signatures. Les primes officielles restent.</p>
+      <p>Personnes, contrats, bilans, lettres, signatures et réglages sont effacés, ainsi que la clé qui chiffrait les signatures. Les primes officielles restent.</p>
       {members > 1 && <p>Les {members - 1} autre(s) compte(s) du foyer restent ouverts, mais sans foyer.</p>}
       <p>Votre compte reste ouvert : vous pourrez créer un nouveau foyer.</p>
     </DangerSheet>

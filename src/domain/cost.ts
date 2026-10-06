@@ -2,7 +2,7 @@ import type { Rappen } from "./money";
 
 /*
  * Coût annuel attendu d'une assurance de base : prime, franchise et quote-part, en centimes.
- * Sert au classement des offres, au simulateur de franchise et aux stratégies du rituel.
+ * Sert au classement des offres, au simulateur de franchise et aux stratégies du bilan.
  */
 
 export interface CostInput {

@@ -1,4 +1,4 @@
-/** Tout ce qu'affiche la page du rituel : personnes, meilleure offre, échéances, totaux, étapes. */
+/** Tout ce qu'affiche la page du bilan : personnes, meilleure offre, échéances, totaux, étapes. */
 import { and, asc, eq } from "drizzle-orm";
 import { ageTransition } from "@/domain/age";
 import { costOf, filterOffers, rankOffers, type Offer, type RankedOffer } from "@/domain/comparison";
@@ -91,7 +91,7 @@ function bestOfferFor(
   return ranked[0] ?? null;
 }
 
-/** Vue complète d'un rituel du foyer ; `today` sert aux échéances et à l'urgence affichée. */
+/** Vue complète d'un bilan du foyer ; `today` sert aux échéances et à l'urgence affichée. */
 export function getReviewView(db: Db, scope: Scope, reviewId: number, today: IsoDate): ReviewView {
   const reviewRow = ownedReview(db, scope, reviewId);
   const deadlines = reviewDeadlines(reviewRow.targetYear);
@@ -172,7 +172,7 @@ export function getReviewView(db: Db, scope: Scope, reviewId: number, today: Iso
   };
 }
 
-/** Lignes d'un rituel du foyer, dans l'ordre, avec le prénom de chaque personne (onglets, enchaînement). */
+/** Lignes d'un bilan du foyer, dans l'ordre, avec le prénom de chaque personne (onglets, enchaînement). */
 export function listReviewLineTabs(db: Db, scope: Scope, reviewId: number) {
   ownedReview(db, scope, reviewId);
   return db
@@ -184,7 +184,7 @@ export function listReviewLineTabs(db: Db, scope: Scope, reviewId: number) {
     .all();
 }
 
-/** Une ligne du foyer avec son rituel, son contrat actuel et sa caisse ; null si elle n'est pas au foyer. */
+/** Une ligne du foyer avec son bilan, son contrat actuel et sa caisse ; null si elle n'est pas au foyer. */
 export function lineOverview(db: Db, scope: Scope, lineId: number) {
   const line = findLine(db, scope, lineId);
   if (!line) return null;
